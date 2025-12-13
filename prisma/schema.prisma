@@ -1,0 +1,255 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  USER
+}
+
+enum DealStage {
+  PROSPECT
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum TaskStatus {
+  OPEN
+  DONE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
+
+model Org {
+  id           String         @id @default(uuid())
+  name         String
+  theme        String?        @default("light")
+  notifyEmail  String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  users        User[]
+  contacts     Contact[]
+  companies    Company[]
+  deals        Deal[]
+  tasks        Task[]
+  invoices     Invoice[]
+  expenses     Expense[]
+  positions    Position[]
+  employees    Employee[]
+  galleryItems GalleryItem[]
+  docs         Doc[]
+  notifications Notification[]
+}
+
+model User {
+  id           String   @id @default(uuid())
+  org          Org      @relation(fields: [orgId], references: [id])
+  orgId        String
+  email        String   @unique
+  name         String
+  role         Role
+  passwordHash String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tasks   Task[]
+  deals   Deal[]
+  contacts Contact[]
+  @@index([orgId])
+}
+
+model Contact {
+  id        String   @id @default(uuid())
+  org       Org      @relation(fields: [orgId], references: [id])
+  orgId     String
+  name      String
+  email     String
+  phone     String?
+  notes     String?
+  tags      String?
+  company   Company? @relation(fields: [companyId], references: [id])
+  companyId String?
+  owner     User?    @relation(fields: [ownerId], references: [id])
+  ownerId   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deals Deal[]
+  @@index([orgId])
+}
+
+model Company {
+  id        String    @id @default(uuid())
+  org       Org       @relation(fields: [orgId], references: [id])
+  orgId     String
+  name      String
+  industry  String?
+  size      String?
+  owner     User?     @relation(fields: [ownerId], references: [id])
+  ownerId   String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  contacts Contact[]
+  deals    Deal[]
+  @@index([orgId])
+}
+
+model Deal {
+  id            String     @id @default(uuid())
+  org           Org        @relation(fields: [orgId], references: [id])
+  orgId         String
+  title         String
+  value         Int
+  stage         DealStage  @default(PROSPECT)
+  expectedClose DateTime?
+  company       Company?   @relation(fields: [companyId], references: [id])
+  companyId     String?
+  contact       Contact?   @relation(fields: [contactId], references: [id])
+  contactId     String?
+  owner         User?      @relation(fields: [ownerId], references: [id])
+  ownerId       String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  tasks Task[]
+  @@index([orgId])
+  @@index([stage])
+}
+
+model Task {
+  id          String     @id @default(uuid())
+  org         Org        @relation(fields: [orgId], references: [id])
+  orgId       String
+  title       String
+  dueDate     DateTime?
+  status      TaskStatus @default(OPEN)
+  relatedType String?
+  relatedId   String?
+  owner       User?      @relation(fields: [ownerId], references: [id])
+  ownerId     String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([orgId])
+}
+
+model Invoice {
+  id            String         @id @default(uuid())
+  org           Org            @relation(fields: [orgId], references: [id])
+  orgId         String
+  invoiceNumber String
+  clientName    String
+  amount        Int
+  status        InvoiceStatus  @default(DRAFT)
+  dueDate       DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@unique([orgId, invoiceNumber])
+  @@index([orgId])
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  org         Org      @relation(fields: [orgId], references: [id])
+  orgId       String
+  description String
+  amount      Int
+  category    String
+  date        DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([orgId])
+}
+
+model Position {
+  id        String     @id @default(uuid())
+  org       Org        @relation(fields: [orgId], references: [id])
+  orgId     String
+  title     String
+  department String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  employees Employee[]
+  @@index([orgId])
+}
+
+model Employee {
+  id         String    @id @default(uuid())
+  org        Org       @relation(fields: [orgId], references: [id])
+  orgId      String
+  name       String
+  email      String?
+  phone      String?
+  department String?
+  position   Position? @relation(fields: [positionId], references: [id])
+  positionId String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([orgId])
+}
+
+model GalleryItem {
+  id          String   @id @default(uuid())
+  org         Org      @relation(fields: [orgId], references: [id])
+  orgId       String
+  title       String
+  url         String
+  mediaType   String   // image | video | other
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([orgId])
+}
+
+model Doc {
+  id        String   @id @default(uuid())
+  org       Org      @relation(fields: [orgId], references: [id])
+  orgId     String
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  org       Org              @relation(fields: [orgId], references: [id])
+  orgId     String
+  type      NotificationType @default(INFO)
+  title     String
+  message   String
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([orgId])
+  @@index([read])
+}
