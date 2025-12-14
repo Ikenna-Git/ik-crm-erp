@@ -45,7 +45,7 @@ export default function LoginPage() {
             <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
               I
             </div>
-            <span className="text-2xl font-bold text-primary">Ikenna</span>
+            <span className="text-2xl font-bold text-primary">Civis</span>
           </div>
           <h1 className="text-3xl font-bold text-foreground">Sign in to the premium dashboard</h1>
           <p className="text-muted-foreground">

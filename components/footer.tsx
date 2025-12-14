@@ -10,7 +10,7 @@ export function Footer() {
         <div className="grid md:grid-cols-5 gap-8 mb-12">
           {/* Brand */}
           <div className="md:col-span-1">
-            <h3 className="text-xl font-bold text-primary mb-4">Ikenna</h3>
+            <h3 className="text-xl font-bold text-primary mb-4">Civis</h3>
             <p className="text-sm text-muted-foreground">The complete platform for business management</p>
           </div>
 
@@ -104,7 +104,7 @@ export function Footer() {
         </div>
 
         <div className="border-t border-border pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p className="text-sm text-muted-foreground">© 2025 Ikenna. All rights reserved.</p>
+          <p className="text-sm text-muted-foreground">© 2025 Civis. All rights reserved.</p>
           <div className="flex gap-6">
             <Link href="#" className="text-muted-foreground hover:text-foreground transition">
               <Twitter className="w-5 h-5" />

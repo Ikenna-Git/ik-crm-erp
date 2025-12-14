@@ -4,7 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Updated color palette for Ikenna's modern ERP/CRM brand - teal accents with deep charcoal and clean whites */
+  /* Updated color palette for Civis's modern ERP/CRM brand - teal accents with deep charcoal and clean whites */
   --background: #f8fafc;
   --foreground: #0f172a;
   --card: #ffffff;
@@ -41,7 +41,7 @@
 }
 
 .dark {
-  /* Dark mode colors for Ikenna's ERP/CRM platform */
+  /* Dark mode colors for Civis's ERP/CRM platform */
   --background: #111113;
   --foreground: #e6e6e6;
   --card: #1a1a1d;

@@ -8,7 +8,7 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Ikenna - ERP & CRM Platform",
+  title: "Civis - ERP & CRM Platform",
   description:
     "The complete platform for managing your business - CRM, Accounting, Inventory, Projects, and HR all in one place.",
   generator: "v0.app",

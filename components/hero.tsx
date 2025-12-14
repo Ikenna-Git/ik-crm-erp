@@ -15,7 +15,7 @@ export function Hero() {
           {/* Left Content */}
           <div className="space-y-6 lg:space-y-8">
             <div className="space-y-2">
-              <p className="text-sm font-semibold text-primary uppercase tracking-wide">Welcome to Ikenna</p>
+              <p className="text-sm font-semibold text-primary uppercase tracking-wide">Welcome to Civis</p>
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight">
                 One Platform. All Your Business.
               </h1>

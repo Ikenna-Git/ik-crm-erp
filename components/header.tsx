@@ -15,7 +15,7 @@ export function Header() {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex items-center">
-            <div className="text-2xl font-bold text-primary">Ikenna</div>
+            <div className="text-2xl font-bold text-primary">Civis</div>
             <span className="ml-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">ERP & CRM</span>
           </div>
 

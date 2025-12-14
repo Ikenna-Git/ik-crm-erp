@@ -72,7 +72,7 @@ export default function PricingPage() {
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-sm">I</span>
             </div>
-            <span className="font-bold text-primary">Ikenna</span>
+            <span className="font-bold text-primary">Civis</span>
           </Link>
           <Link href="/">
             <Button variant="outline">Back to Home</Button>
@@ -175,7 +175,7 @@ export default function PricingPage() {
         <div className="bg-primary text-primary-foreground rounded-lg p-12 text-center space-y-4">
           <h2 className="text-3xl font-bold">Ready to get started?</h2>
           <p className="text-lg opacity-90">
-            Join thousands of Nigerian businesses using Ikenna to manage their operations.
+            Join thousands of Nigerian businesses using Civis to manage their operations.
           </p>
           <Button className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
             Start Your Free Trial

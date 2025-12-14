@@ -88,12 +88,12 @@ type Store = {
 const store: Store = {
   org: {
     id: "org-1",
-    name: "Ikenna",
+    name: "Civis",
     theme: "light",
     notifyEmail: "ikchils@gmail.com",
   },
   users: [
-    { id: "u-1", name: "Ikenna Chilokwu", email: "ikchils@gmail.com", role: "super_admin" },
+    { id: "u-1", name: "Civis Chilokwu", email: "ikchils@gmail.com", role: "super_admin" },
     { id: "u-2", name: "Admin User", email: "admin@example.com", role: "admin" },
   ],
   contacts: [

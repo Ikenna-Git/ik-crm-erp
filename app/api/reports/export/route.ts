@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     await transporter.sendMail({
       from: process.env.SMTP_FROM,
       to: email,
-      subject: `Ikenna ${type} report`,
+      subject: `Civis ${type} report`,
       text: "Your requested CSV report is attached.",
       attachments: [{ filename, content: csv, contentType: "text/csv" }],
     })

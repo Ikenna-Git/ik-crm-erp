@@ -8,11 +8,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 const DOCS = [
   {
     id: 1,
-    title: "Getting Started with Ikenna",
+    title: "Getting Started with Civis",
     category: "Basics",
-    content: `Welcome to Ikenna's ERP and CRM platform! This guide will help you get up and running quickly.
+    content: `Welcome to Civis's ERP and CRM platform! This guide will help you get up and running quickly.
 
-Ikenna is a comprehensive business management solution designed to streamline your operations across multiple departments. Whether you're managing customer relationships, accounting, inventory, or projects, Ikenna provides the tools you need.
+Civis is a comprehensive business management solution designed to streamline your operations across multiple departments. Whether you're managing customer relationships, accounting, inventory, or projects, Civis provides the tools you need.
 
 Key Features:
 - Unified dashboard for all business operations
@@ -130,7 +130,7 @@ Reports Available:
     category: "Projects",
     content: `Plan, execute, and track projects efficiently using the Projects module.
 
-Deliver projects on time and within budget using Ikenna's comprehensive project management tools.
+Deliver projects on time and within budget using Civis's comprehensive project management tools.
 
 Project Planning:
 - Define project scope and objectives
@@ -252,9 +252,9 @@ Best Practices:
     id: 8,
     title: "Security & Permissions",
     category: "Security",
-    content: `Protect your data with Ikenna's comprehensive security features.
+    content: `Protect your data with Civis's comprehensive security features.
 
-Security is paramount in Ikenna. We implement industry-leading practices to protect your business data.
+Security is paramount in Civis. We implement industry-leading practices to protect your business data.
 
 Access Control:
 - Role-based permissions
@@ -296,9 +296,9 @@ Compliance:
     id: 9,
     title: "Integration & API",
     category: "Advanced",
-    content: `Extend Ikenna with integrations and API access.
+    content: `Extend Civis with integrations and API access.
 
-Connect Ikenna with your other business tools for seamless data flow.
+Connect Civis with your other business tools for seamless data flow.
 
 Popular Integrations:
 - Email platforms (Gmail, Outlook)
@@ -363,7 +363,7 @@ export default function DocsPage() {
         <BookOpen className="w-8 h-8 text-primary" />
         <div>
           <h1 className="text-3xl font-bold text-foreground">Documentation</h1>
-          <p className="text-muted-foreground">Learn how to use Ikenna's ERP and CRM platform</p>
+          <p className="text-muted-foreground">Learn how to use Civis's ERP and CRM platform</p>
         </div>
       </div>
 

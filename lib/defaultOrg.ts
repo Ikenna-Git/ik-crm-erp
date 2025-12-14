@@ -8,7 +8,7 @@ export async function getDefaultOrg() {
     update: {},
     create: {
       id: DEFAULT_ORG_ID,
-      name: "Ikenna",
+      name: "Civis",
       theme: "light",
       notifyEmail: "ikchils@gmail.com",
     },
