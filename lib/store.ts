@@ -88,7 +88,7 @@ type Store = {
 const store: Store = {
   org: {
     id: "org-1",
-    name: "Ikenna",
+    name: "Civis",
     theme: "light",
     notifyEmail: "ikchils@gmail.com",
   },

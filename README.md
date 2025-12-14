@@ -1,4 +1,4 @@
-# Ikenna CRM & ERP
+# Civis CRM & ERP
 
 Modern Next.js 16 app with CRM, ERP, analytics, and premium dark theme.
 
@@ -25,7 +25,7 @@ SMTP_HOST=
 SMTP_PORT=
 SMTP_USER=
 SMTP_PASS=
-SMTP_FROM="Ikenna Reports <no-reply@yourdomain.com>"
+SMTP_FROM="Civis Reports <no-reply@yourdomain.com>"
 ```
 
 Initialize Prisma and DB:

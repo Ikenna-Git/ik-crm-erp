@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button"
 const demoVideos = [
   {
     id: 1,
-    title: "Getting Started with Ikenna",
-    description: "Learn the basics of navigating the Ikenna ERP & CRM platform in just 5 minutes.",
+    title: "Getting Started with Civis",
+    description: "Learn the basics of navigating the Civis ERP & CRM platform in just 5 minutes.",
     duration: "5:23",
     thumbnail: "/getting-started-dashboard.jpg",
     category: "Fundamentals",
@@ -111,7 +111,7 @@ export default function DemoPage() {
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">Video Demos & Tutorials</h1>
           <p className="text-muted-foreground text-lg">
-            Learn how to use Ikenna's powerful features with our comprehensive video library.
+            Learn how to use Civis' powerful features with our comprehensive video library.
           </p>
         </div>
 

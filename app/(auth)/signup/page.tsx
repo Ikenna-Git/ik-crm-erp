@@ -46,9 +46,9 @@ export default function SignupPage() {
         <div className="max-w-md space-y-4">
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
-              I
+              C
             </div>
-            <span className="text-2xl font-bold text-primary">Ikenna</span>
+            <span className="text-2xl font-bold text-primary">Civis</span>
           </div>
           <h1 className="text-3xl font-bold text-foreground">Create your account</h1>
           <p className="text-muted-foreground">Join the unified CRM/ERP workspace with premium dark mode support.</p>

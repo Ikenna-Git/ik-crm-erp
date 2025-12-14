@@ -27,7 +27,7 @@ const mockImages = [
   {
     id: 2,
     title: "Product Launch",
-    description: "Ikenna ERP Platform Launch Event",
+    description: "Civis ERP Platform Launch Event",
     url: "/product-launch-event.png",
     size: "3.1 MB",
     uploadedDate: "2025-10-28",
@@ -43,7 +43,7 @@ const mockImages = [
   {
     id: 4,
     title: "Dashboard Interface",
-    description: "Ikenna Dashboard UI Preview",
+    description: "Civis Dashboard UI Preview",
     url: "/dashboard-analytics-interface.png",
     size: "2.7 MB",
     uploadedDate: "2025-10-10",
