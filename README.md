@@ -2,6 +2,12 @@
 
 Modern Next.js 16 app with CRM, ERP, analytics, and premium dark theme.
 
+## Overview
+- App Router project with marketing pages, authentication routes, and a multi-section dashboard under `app/(dashboard)`.
+- CRM, accounting, tasks, reports, and settings APIs live under `app/api`, paired with Postgres models managed through Prisma.
+- Shared UI primitives (navigation, cards, tables) live in `components`, while feature-specific widgets reside in `app/features`.
+- Brand and layout experiments are archived under `variants` for reference without impacting the current experience.
+
 ## Tech Stack
 - Next.js 16 (App Router) + React 19
 - TailwindCSS + custom UI components
