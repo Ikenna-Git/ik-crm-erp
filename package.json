@@ -1,7 +1,17 @@
 {
+  "name": "ik-crm-erp",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "prisma:seed": "ts-node --esm prisma/seed.ts"
+  },
   "dependencies": {
     "@prisma/client": "^6.19.0",
     "autoprefixer": "^10.4.22",
+    "bcryptjs": "^3.0.3",
     "next": "^16.1.0-canary.15",
     "next-auth": "^4.24.13",
     "postcss": "^8.5.6",
@@ -12,6 +22,7 @@
     "@types/node": "^25.0.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }
 }
