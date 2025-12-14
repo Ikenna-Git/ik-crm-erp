@@ -1,0 +1,17 @@
+{
+  "dependencies": {
+    "@prisma/client": "^6.19.0",
+    "autoprefixer": "^10.4.22",
+    "next": "^16.1.0-canary.15",
+    "next-auth": "^4.24.13",
+    "postcss": "^8.5.6",
+    "prisma": "^6.19.0",
+    "tailwindcss": "^4.1.17"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^5.9.3"
+  }
+}
