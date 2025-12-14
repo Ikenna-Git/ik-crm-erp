@@ -71,11 +71,19 @@ type ContactsTableProps = {
   contacts?: Contact[]
   onAddContact?: (data: Omit<Contact, "id" | "status" | "revenue" | "lastContact"> & { status: Contact["status"] }) => void
   onDeleteContact?: (id: string) => void
+  onUpdateContact?: (id: string, data: Partial<Contact>) => void
 }
 
-export function ContactsTable({ searchQuery, contacts: providedContacts, onAddContact, onDeleteContact }: ContactsTableProps) {
+export function ContactsTable({
+  searchQuery,
+  contacts: providedContacts,
+  onAddContact,
+  onDeleteContact,
+  onUpdateContact,
+}: ContactsTableProps) {
   const [contacts, setContacts] = useState<Contact[]>(providedContacts || mockContacts)
   const [showModal, setShowModal] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -99,23 +107,35 @@ export function ContactsTable({ searchQuery, contacts: providedContacts, onAddCo
 
   const handleAddContact = (e: React.FormEvent) => {
     e.preventDefault()
-    const payload = { ...formData }
-    if (onAddContact) {
-      onAddContact(payload)
-    } else {
-      const newContact: Contact = {
-        id: Date.now().toString(),
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        company: formData.company,
-        status: formData.status,
-        revenue: 0,
-        lastContact: "Just now",
+    if (editingId) {
+      const payload = { ...formData }
+      if (onUpdateContact) {
+        onUpdateContact(editingId, payload)
+      } else {
+        setContacts((prev) =>
+          prev.map((c) => (c.id === editingId ? { ...c, ...payload, lastContact: c.lastContact || "Updated" } : c)),
+        )
       }
-      setContacts([...contacts, newContact])
+    } else {
+      const payload = { ...formData }
+      if (onAddContact) {
+        onAddContact(payload)
+      } else {
+        const newContact: Contact = {
+          id: Date.now().toString(),
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          company: formData.company,
+          status: formData.status,
+          revenue: 0,
+          lastContact: "Just now",
+        }
+        setContacts([...contacts, newContact])
+      }
     }
     setFormData({ name: "", email: "", phone: "", company: "", status: "lead" })
+    setEditingId(null)
     setShowModal(false)
   }
 
@@ -125,6 +145,18 @@ export function ContactsTable({ searchQuery, contacts: providedContacts, onAddCo
     } else {
       setContacts(contacts.filter((c) => c.id !== id))
     }
+  }
+
+  const handleEdit = (contact: Contact) => {
+    setFormData({
+      name: contact.name,
+      email: contact.email,
+      phone: contact.phone || "",
+      company: contact.company || "",
+      status: contact.status,
+    })
+    setEditingId(contact.id)
+    setShowModal(true)
   }
 
   const downloadContactsCSV = () => {
@@ -196,7 +228,7 @@ export function ContactsTable({ searchQuery, contacts: providedContacts, onAddCo
                     <td className="py-4 px-4">{contact.revenue > 0 ? formatNaira(contact.revenue) : "—"}</td>
                     <td className="py-4 px-4 text-muted-foreground">{contact.lastContact}</td>
                     <td className="py-4 px-4 flex gap-2">
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" onClick={() => handleEdit(contact)}>
                         <Edit className="w-4 h-4" />
                       </Button>
                       <Button
@@ -221,7 +253,7 @@ export function ContactsTable({ searchQuery, contacts: providedContacts, onAddCo
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle>Add New Contact</CardTitle>
+              <CardTitle>{editingId ? "Edit Contact" : "Add New Contact"}</CardTitle>
               <Button variant="ghost" size="sm" onClick={() => setShowModal(false)}>
                 <X className="w-4 h-4" />
               </Button>
@@ -289,7 +321,7 @@ export function ContactsTable({ searchQuery, contacts: providedContacts, onAddCo
                     Cancel
                   </Button>
                   <Button type="submit" className="flex-1">
-                    Add Contact
+                    {editingId ? "Save Contact" : "Add Contact"}
                   </Button>
                 </div>
               </form>

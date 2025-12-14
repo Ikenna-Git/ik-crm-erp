@@ -46,7 +46,7 @@ export default function FeaturesPage() {
       items: [
         "Project boards and dashboards",
         "Kanban task management",
-        ...(flags.raptorMini ? ["Gantt chart timeline views"] : []),
+        "Gantt chart timeline views",
         "Team collaboration tools",
         "Time and budget tracking",
       ],
