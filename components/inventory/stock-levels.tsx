@@ -7,6 +7,7 @@ import { AlertTriangle, MoreHorizontal, Eye, Edit, Trash2, X } from "lucide-reac
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { PaginationControls } from "@/components/shared/pagination-controls"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,60 +26,35 @@ interface StockItem {
   status: "ok" | "low" | "critical"
 }
 
-const mockStockLevels: StockItem[] = [
-  {
-    id: "1",
-    sku: "PROD-001",
-    name: 'Laptop Pro 15"',
-    currentStock: 45,
-    reorderPoint: 10,
-    reorderQuantity: 20,
-    warehouseLocation: "A-12-5",
-    status: "ok",
-  },
-  {
-    id: "2",
-    sku: "PROD-002",
-    name: "Wireless Mouse",
-    currentStock: 8,
-    reorderPoint: 15,
-    reorderQuantity: 50,
-    warehouseLocation: "B-5-2",
-    status: "critical",
-  },
-  {
-    id: "3",
-    sku: "PROD-003",
-    name: "USB-C Cable",
-    currentStock: 120,
-    reorderPoint: 50,
-    reorderQuantity: 200,
-    warehouseLocation: "C-8-1",
-    status: "ok",
-  },
-  {
-    id: "4",
-    sku: "PROD-004",
-    name: 'Monitor 4K 27"',
-    currentStock: 12,
-    reorderPoint: 10,
-    reorderQuantity: 15,
-    warehouseLocation: "A-15-3",
-    status: "low",
-  },
-]
+const stockNames = ['Laptop Pro 15"', "Wireless Mouse", "USB-C Cable", 'Monitor 4K 27"', "Ergo Keyboard", "Desk Lamp"]
+const stockStatuses: StockItem["status"][] = ["ok", "low", "critical"]
+
+const buildMockStock = (count: number): StockItem[] =>
+  Array.from({ length: count }, (_, idx) => ({
+    id: `STK-${(idx + 1).toString().padStart(3, "0")}`,
+    sku: `PROD-${(idx + 1).toString().padStart(4, "0")}`,
+    name: stockNames[idx % stockNames.length],
+    currentStock: 5 + (idx % 20) * 4,
+    reorderPoint: 10 + (idx % 5) * 5,
+    reorderQuantity: 15 + (idx % 6) * 10,
+    warehouseLocation: `A-${(idx % 15) + 1}-${(idx % 6) + 1}`,
+    status: stockStatuses[idx % stockStatuses.length],
+  }))
+
+const mockStockLevels: StockItem[] = buildMockStock(70)
 
 const STORAGE_KEY = "civis_inventory_stock_levels"
 const IMPORT_EVENT = "civis-inventory-import"
 
 const statusConfig = {
-  ok: { badge: "bg-green-100 text-green-800", icon: "✓" },
-  low: { badge: "bg-yellow-100 text-yellow-800", icon: "!" },
-  critical: { badge: "bg-red-100 text-red-800", icon: "!" },
+  ok: { badge: "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-200", icon: "✓" },
+  low: { badge: "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-200", icon: "!" },
+  critical: { badge: "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200", icon: "!" },
 }
 
 export function StockLevels({ searchQuery }: { searchQuery: string }) {
   const [items, setItems] = useState<StockItem[]>(mockStockLevels)
+  const [currentPage, setCurrentPage] = useState(1)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({
@@ -98,7 +74,12 @@ export function StockLevels({ searchQuery }: { searchQuery: string }) {
       if (stored) {
         const parsed = JSON.parse(stored)
         if (Array.isArray(parsed)) {
-          setItems(parsed)
+          const merged = [
+            ...parsed,
+            ...mockStockLevels.filter((seed) => !parsed.some((item: StockItem) => item.id === seed.id)),
+          ]
+          setItems(merged)
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
           return
         }
       }
@@ -134,6 +115,18 @@ export function StockLevels({ searchQuery }: { searchQuery: string }) {
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.sku.toLowerCase().includes(searchQuery.toLowerCase()),
   )
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE))
+  const pagedItems = filteredItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+  }, [currentPage, totalPages])
 
   const stats = {
     ok: filteredItems.filter((i) => i.status === "ok").length,
@@ -236,7 +229,7 @@ export function StockLevels({ searchQuery }: { searchQuery: string }) {
                 </tr>
               </thead>
               <tbody>
-                {filteredItems.map((item) => {
+                {pagedItems.map((item) => {
                   const stockPercentage = (item.currentStock / (item.reorderPoint * 3)) * 100
                   return (
                     <tr key={item.id} className="border-b border-border hover:bg-muted/50 transition">
@@ -293,6 +286,13 @@ export function StockLevels({ searchQuery }: { searchQuery: string }) {
                 })}
               </tbody>
             </table>
+          </div>
+          <div className="pt-4">
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
           </div>
         </CardContent>
       </Card>

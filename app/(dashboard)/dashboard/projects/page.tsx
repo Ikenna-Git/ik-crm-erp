@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Plus, Search, Download } from "lucide-react"
+import { Plus, Download, Sparkles } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import {
   Dialog,
@@ -15,12 +15,13 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ProjectsBoard } from "@/components/projects/projects-board"
+import { ProjectsBoard, type Project, mockProjects } from "@/components/projects/projects-board"
 import { TasksKanban } from "@/components/projects/tasks-kanban"
 import { TimelineView } from "@/components/projects/timeline-view"
 
 export default function ProjectsPage() {
-  const [searchQuery, setSearchQuery] = useState("")
+  const searchQuery = ""
+  const [projects, setProjects] = useState<Project[]>(mockProjects)
   const [openProjectDialog, setOpenProjectDialog] = useState(false)
   const [projectForm, setProjectForm] = useState({
     name: "",
@@ -31,10 +32,32 @@ export default function ProjectsPage() {
 
   const handleAddProject = () => {
     if (projectForm.name && projectForm.client) {
-      console.log("Adding project:", projectForm)
+      const today = new Date().toISOString().slice(0, 10)
+      const payload: Omit<Project, "id"> = {
+        name: projectForm.name,
+        description: `Client: ${projectForm.client}`,
+        client: projectForm.client,
+        status: projectForm.status as Project["status"],
+        priority: "medium",
+        progress: 0,
+        team: 0,
+        budget: Number.parseFloat(projectForm.budget || "0"),
+        spent: 0,
+        startDate: today,
+        endDate: today,
+      }
+      setProjects((prev) => [{ id: Date.now().toString(), ...payload }, ...prev])
       setProjectForm({ name: "", client: "", budget: "", status: "planning" })
       setOpenProjectDialog(false)
     }
+  }
+
+  const handleUpdateProject = (id: string, data: Omit<Project, "id">) => {
+    setProjects((prev) => prev.map((project) => (project.id === id ? { id, ...data } : project)))
+  }
+
+  const handleDeleteProject = (id: string) => {
+    setProjects((prev) => prev.filter((project) => project.id !== id))
   }
 
   const handleExportReport = () => {
@@ -126,15 +149,28 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Search projects, tasks..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
+      {/* Project Pulse */}
+      <div className="rounded-xl border border-border bg-card/70 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <p className="font-semibold">Project Pulse</p>
+            <p className="text-sm text-muted-foreground">Keep milestones on track with live project health.</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
+            Total: {projects.length}
+          </span>
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
+            In progress: {projects.filter((project) => project.status === "in-progress").length}
+          </span>
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
+            Completed: {projects.filter((project) => project.status === "completed").length}
+          </span>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -147,7 +183,13 @@ export default function ProjectsPage() {
 
         {/* Projects Tab */}
         <TabsContent value="board" className="space-y-4">
-          <ProjectsBoard searchQuery={searchQuery} />
+          <ProjectsBoard
+            searchQuery={searchQuery}
+            projects={projects}
+            onAddProject={(data) => setProjects((prev) => [{ id: Date.now().toString(), ...data }, ...prev])}
+            onUpdateProject={handleUpdateProject}
+            onDeleteProject={handleDeleteProject}
+          />
         </TabsContent>
 
         {/* Tasks Tab */}

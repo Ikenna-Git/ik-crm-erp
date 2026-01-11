@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Plus, Search } from "lucide-react"
+import { Plus, Sparkles } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import {
   Dialog,
@@ -15,12 +15,14 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { EmployeesTable } from "@/components/hr/employees-table"
-import { PayrollTable } from "@/components/hr/payroll-table"
+import { EmployeesTable, type Employee, mockEmployees } from "@/components/hr/employees-table"
+import { PayrollTable, type PayrollRecord, mockPayroll } from "@/components/hr/payroll-table"
 import { AttendanceTracker } from "@/components/hr/attendance-tracker"
 
 export default function HRPage() {
-  const [searchQuery, setSearchQuery] = useState("")
+  const searchQuery = ""
+  const [employees, setEmployees] = useState<Employee[]>(mockEmployees)
+  const [payroll, setPayroll] = useState<PayrollRecord[]>(mockPayroll)
   const [openEmployeeDialog, setOpenEmployeeDialog] = useState(false)
   const [employeeForm, setEmployeeForm] = useState({
     name: "",
@@ -40,18 +42,59 @@ export default function HRPage() {
 
   const handleAddEmployee = () => {
     if (employeeForm.name && employeeForm.department) {
-      console.log("Adding employee:", employeeForm)
+      const payload: Omit<Employee, "id"> = {
+        name: employeeForm.name,
+        email: employeeForm.email || "user@example.com",
+        phone: employeeForm.phone || "",
+        department: employeeForm.department,
+        position: employeeForm.position || "Staff",
+        startDate: new Date().toISOString().slice(0, 10),
+        status: "active",
+        salary: 0,
+      }
+      setEmployees((prev) => [{ id: Date.now().toString(), ...payload }, ...prev])
       setEmployeeForm({ name: "", department: "", position: "", email: "", phone: "" })
       setOpenEmployeeDialog(false)
     }
   }
 
+  const handleUpdateEmployee = (id: string, data: Omit<Employee, "id">) => {
+    setEmployees((prev) => prev.map((emp) => (emp.id === id ? { id, ...data } : emp)))
+  }
+
+  const handleDeleteEmployee = (id: string) => {
+    setEmployees((prev) => prev.filter((emp) => emp.id !== id))
+  }
+
+  const addPayrollRecord = (record: Omit<PayrollRecord, "id">) => {
+    setPayroll((prev) => [{ id: Date.now().toString(), ...record }, ...prev])
+  }
+
   const handleAddPayroll = () => {
     if (payrollForm.employeeName && payrollForm.baseSalary) {
-      console.log("Adding payroll:", payrollForm)
+      const baseSalary = Number.parseFloat(payrollForm.baseSalary)
+      const bonus = Number.parseFloat(payrollForm.bonus) || 0
+      const deductions = Number.parseFloat(payrollForm.deductions) || 0
+      addPayrollRecord({
+        employee: payrollForm.employeeName,
+        period: new Date().toLocaleString("en-US", { month: "long", year: "numeric" }),
+        baseSalary,
+        bonus,
+        deductions,
+        netPay: baseSalary + bonus - deductions,
+        status: "pending",
+      })
       setPayrollForm({ employeeName: "", baseSalary: "", bonus: "", deductions: "" })
       setOpenPayrollDialog(false)
     }
+  }
+
+  const handleUpdatePayroll = (id: string, data: Omit<PayrollRecord, "id">) => {
+    setPayroll((prev) => prev.map((record) => (record.id === id ? { id, ...data } : record)))
+  }
+
+  const handleDeletePayroll = (id: string) => {
+    setPayroll((prev) => prev.filter((record) => record.id !== id))
   }
 
   return (
@@ -199,15 +242,28 @@ export default function HRPage() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Search employees..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
+      {/* People Pulse */}
+      <div className="rounded-xl border border-border bg-card/70 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <p className="font-semibold">People Pulse</p>
+            <p className="text-sm text-muted-foreground">Track headcount, payroll, and attendance.</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
+            Employees: {employees.length}
+          </span>
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
+            Payroll records: {payroll.length}
+          </span>
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
+            Active: {employees.filter((emp) => emp.status === "active").length}
+          </span>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -220,12 +276,24 @@ export default function HRPage() {
 
         {/* Employees Tab */}
         <TabsContent value="employees" className="space-y-4">
-          <EmployeesTable searchQuery={searchQuery} />
+          <EmployeesTable
+            searchQuery={searchQuery}
+            employees={employees}
+            onAddEmployee={(data) => setEmployees((prev) => [{ id: Date.now().toString(), ...data }, ...prev])}
+            onUpdateEmployee={handleUpdateEmployee}
+            onDeleteEmployee={handleDeleteEmployee}
+          />
         </TabsContent>
 
         {/* Payroll Tab */}
         <TabsContent value="payroll" className="space-y-4">
-          <PayrollTable searchQuery={searchQuery} />
+          <PayrollTable
+            searchQuery={searchQuery}
+            payroll={payroll}
+            onAddPayroll={addPayrollRecord}
+            onUpdatePayroll={handleUpdatePayroll}
+            onDeletePayroll={handleDeletePayroll}
+          />
         </TabsContent>
 
         {/* Attendance Tab */}

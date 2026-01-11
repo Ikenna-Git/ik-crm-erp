@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Plus, Search, Download } from "lucide-react"
+import { Plus, Download, Sparkles } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -20,20 +20,40 @@ import { InvoicesTable, type Invoice } from "@/components/accounting/invoices-ta
 import { ExpensesTable, type Expense } from "@/components/accounting/expenses-table"
 import { FinancialReports } from "@/components/accounting/financial-reports"
 
-const fallbackInvoices: Invoice[] = [
-  { id: "INV-001", number: "INV-001", client: "Acme Corp", amount: 450000, status: "sent", dueDate: "2025-02-15" },
-  { id: "INV-002", number: "INV-002", client: "Northwind", amount: 320000, status: "draft", dueDate: "2025-03-01" },
-  { id: "INV-003", number: "INV-003", client: "Globex", amount: 825000, status: "paid", dueDate: "2025-01-20" },
-]
+const invoiceClients = ["Acme Corp", "Northwind", "Globex", "Venture Labs", "Nimbus", "Zenith"]
+const expenseCategories = ["utilities", "travel", "equipment", "software", "office", "meals"]
+const expenseOwners = ["Finance Bot", "HR", "IT", "Ops", "Sales", "Admin"]
 
-const fallbackExpenses: Expense[] = [
-  { id: "EXP-001", description: "Cloud infrastructure", category: "utilities", amount: 185000, date: "2025-01-05", status: "pending", submittedBy: "Finance Bot" },
-  { id: "EXP-002", description: "Team offsite travel", category: "travel", amount: 250000, date: "2025-01-10", status: "pending", submittedBy: "HR" },
-  { id: "EXP-003", description: "Laptop procurement", category: "equipment", amount: 520000, date: "2025-01-12", status: "pending", submittedBy: "IT" },
-]
+const buildFallbackInvoices = (count: number): Invoice[] =>
+  Array.from({ length: count }, (_, idx) => {
+    const statusOptions: Invoice["status"][] = ["draft", "sent", "paid", "overdue"]
+    return {
+      id: `INV-${(idx + 1).toString().padStart(3, "0")}`,
+      number: `INV-2025-${(idx + 1).toString().padStart(3, "0")}`,
+      client: invoiceClients[idx % invoiceClients.length],
+      amount: 120000 + (idx % 8) * 65000,
+      status: statusOptions[idx % statusOptions.length],
+      dueDate: new Date(2025, (idx % 12), (idx % 27) + 1).toISOString().slice(0, 10),
+      date: new Date(2025, (idx % 12), (idx % 27) + 1).toISOString().slice(0, 10),
+    }
+  })
+
+const buildFallbackExpenses = (count: number): Expense[] =>
+  Array.from({ length: count }, (_, idx) => ({
+    id: `EXP-${(idx + 1).toString().padStart(3, "0")}`,
+    description: `Expense ${idx + 1} - ${expenseCategories[idx % expenseCategories.length]}`,
+    category: expenseCategories[idx % expenseCategories.length],
+    amount: 45000 + (idx % 10) * 25000,
+    date: new Date(2025, (idx % 12), (idx % 27) + 1).toISOString().slice(0, 10),
+    status: "pending",
+    submittedBy: expenseOwners[idx % expenseOwners.length],
+  }))
+
+const fallbackInvoices = buildFallbackInvoices(70)
+const fallbackExpenses = buildFallbackExpenses(70)
 
 export default function AccountingPage() {
-  const [searchQuery, setSearchQuery] = useState("")
+  const searchQuery = ""
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(false)
@@ -521,15 +541,28 @@ export default function AccountingPage() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Search invoices, expenses..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
+      {/* Finance Pulse */}
+      <div className="rounded-xl border border-border bg-card/70 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <p className="font-semibold">Finance Pulse</p>
+            <p className="text-sm text-muted-foreground">Monitor invoices, expenses, and cash flow.</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
+            Invoices: {invoices.length}
+          </span>
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
+            Expenses: {expenses.length}
+          </span>
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
+            Overdue: {invoices.filter((inv) => inv.status === "overdue").length}
+          </span>
+        </div>
       </div>
 
       {/* Tabs */}

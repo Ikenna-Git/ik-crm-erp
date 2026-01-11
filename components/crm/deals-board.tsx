@@ -1,8 +1,10 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DollarSign, Calendar } from "lucide-react"
 import { formatNaira } from "@/lib/currency"
+import { PaginationControls } from "@/components/shared/pagination-controls"
 
 interface Deal {
   id: string
@@ -15,12 +17,12 @@ interface Deal {
 }
 
 const stages = [
-  { id: "prospect", title: "Prospect", color: "bg-blue-50" },
-  { id: "qualified", title: "Qualified", color: "bg-sky-50" },
-  { id: "proposal", title: "Proposal", color: "bg-yellow-50" },
-  { id: "negotiation", title: "Negotiation", color: "bg-purple-50" },
-  { id: "won", title: "Won", color: "bg-green-50" },
-  { id: "lost", title: "Lost", color: "bg-red-50" },
+  { id: "prospect", title: "Prospect", color: "bg-blue-50 dark:bg-blue-950/30" },
+  { id: "qualified", title: "Qualified", color: "bg-sky-50 dark:bg-sky-950/30" },
+  { id: "proposal", title: "Proposal", color: "bg-yellow-50 dark:bg-yellow-950/30" },
+  { id: "negotiation", title: "Negotiation", color: "bg-purple-50 dark:bg-purple-950/30" },
+  { id: "won", title: "Won", color: "bg-green-50 dark:bg-green-950/30" },
+  { id: "lost", title: "Lost", color: "bg-red-50 dark:bg-red-950/30" },
 ]
 
 const mockDeals: Deal[] = [
@@ -64,11 +66,25 @@ const mockDeals: Deal[] = [
 
 export function DealsBoard({ deals }: { deals?: Deal[] }) {
   const data = deals && deals.length ? deals : mockDeals
+  const [currentPage, setCurrentPage] = useState(1)
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(data.length / PAGE_SIZE))
+  const pagedDeals = data.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [data.length])
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+  }, [currentPage, totalPages])
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {stages.map((stage) => {
-          const stageDeals = data.filter((d) => d.stage === stage.id)
+          const stageDeals = pagedDeals.filter((d) => d.stage === stage.id)
           const stageTotal = stageDeals.reduce((sum, d) => sum + d.value, 0)
 
           return (
@@ -81,7 +97,7 @@ export function DealsBoard({ deals }: { deals?: Deal[] }) {
                 {stageDeals.map((deal) => (
                   <div
                     key={deal.id}
-                    className="bg-white rounded-lg p-3 border border-border hover:shadow-md transition-shadow cursor-pointer"
+                    className="bg-card rounded-lg p-3 border border-border hover:shadow-md transition-shadow cursor-pointer"
                   >
                     <p className="font-medium text-sm line-clamp-2">{deal.title}</p>
                     <p className="text-xs text-muted-foreground mt-1">{deal.company || "—"}</p>
@@ -125,6 +141,8 @@ export function DealsBoard({ deals }: { deals?: Deal[] }) {
           </div>
         </CardContent>
       </Card>
+
+      <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
     </div>
   )
 }

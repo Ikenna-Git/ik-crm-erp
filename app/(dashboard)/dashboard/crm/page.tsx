@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Search } from "lucide-react"
+import { Plus, Sparkles } from "lucide-react"
 import { ContactsTable } from "@/components/crm/contacts-table"
 import { DealsBoard } from "@/components/crm/deals-board"
 import { ActivitiesTimeline } from "@/components/crm/activities-timeline"
@@ -19,21 +19,50 @@ import {
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-const fallbackContacts = [
-  { id: "C-001", name: "Adaeze Okafor", email: "adaeze@civis.io", phone: "+234 801 000 1234", company: "Northwind", status: "prospect", revenue: 0, lastContact: "3d ago" },
-  { id: "C-002", name: "Emeka Umeh", email: "emeka@acmecorp.com", phone: "+234 802 321 4567", company: "Acme Corp", status: "customer", revenue: 120000, lastContact: "1d ago" },
-  { id: "C-003", name: "Sarah Johnson", email: "sarah@venturelabs.com", phone: "+1 555 222 9898", company: "Venture Labs", status: "lead", revenue: 0, lastContact: "5h ago" },
-]
+const crmNames = ["Adaeze Okafor", "Emeka Umeh", "Sarah Johnson", "David Chen", "Ibrahim Musa", "Lena Martins", "Grace Williams", "Noah Brown"]
+const crmCompanies = ["Northwind", "Acme Corp", "Venture Labs", "Globex", "NovaWorks", "Blue Ridge", "Nimbus", "Zenith"]
+const crmStages = ["prospect", "qualified", "proposal", "negotiation", "won", "lost"] as const
 
-const fallbackDeals = [
-  { id: "D-001", title: "Annual License - Civis Core", company: "Acme Corp", value: 250000, stage: "proposal", owner: "Adaeze Okafor", expectedClose: "2025-02-15" },
-  { id: "D-002", title: "Implementation + Training", company: "Northwind", value: 175000, stage: "negotiation", owner: "Emeka Umeh", expectedClose: "2025-01-30" },
-  { id: "D-003", title: "Pilot - 50 seats", company: "Venture Labs", value: 95000, stage: "qualified", owner: "Sarah Johnson", expectedClose: "2025-03-05" },
-  { id: "D-004", title: "Renewal Q2", company: "Globex", value: 140000, stage: "won", owner: "Adaeze Okafor", expectedClose: "2025-04-01" },
-]
+const buildFallbackContacts = (count: number) =>
+  Array.from({ length: count }, (_, idx) => {
+    const name = crmNames[idx % crmNames.length]
+    const company = crmCompanies[idx % crmCompanies.length]
+    const statusOptions = ["lead", "prospect", "customer"] as const
+    return {
+      id: `C-${(idx + 1).toString().padStart(3, "0")}`,
+      name,
+      email: `${name.split(" ")[0].toLowerCase()}@${company.toLowerCase().replace(/\s+/g, "")}.com`,
+      phone: `+234 80${(10 + idx).toString().padStart(2, "0")} ${(100 + idx).toString().padStart(3, "0")} ${(4000 + idx).toString().padStart(4, "0")}`,
+      company,
+      status: statusOptions[idx % statusOptions.length],
+      revenue: idx % 3 === 0 ? 90000 + (idx % 6) * 15000 : 0,
+      lastContact: `${(idx % 7) + 1}d ago`,
+    }
+  })
+
+const buildFallbackDeals = (count: number) =>
+  Array.from({ length: count }, (_, idx) => {
+    const company = crmCompanies[idx % crmCompanies.length]
+    const owner = crmNames[idx % crmNames.length]
+    const stage = crmStages[idx % crmStages.length]
+    const value = 75000 + (idx % 8) * 25000
+    const expectedClose = new Date(2025, (idx % 6) + 1, (idx % 27) + 1).toISOString().slice(0, 10)
+    return {
+      id: `D-${(idx + 1).toString().padStart(3, "0")}`,
+      title: `Civis Suite ${idx % 2 === 0 ? "Implementation" : "License"} - ${company}`,
+      company,
+      value,
+      stage,
+      owner,
+      expectedClose,
+    }
+  })
+
+const fallbackContacts = buildFallbackContacts(70)
+const fallbackDeals = buildFallbackDeals(70)
 
 export default function CRMPage() {
-  const [searchQuery, setSearchQuery] = useState("")
+  const searchQuery = ""
   const [loading, setLoading] = useState(false)
   const [contacts, setContacts] = useState<any[]>([])
   const [deals, setDeals] = useState<any[]>([])
@@ -216,15 +245,28 @@ export default function CRMPage() {
         </Dialog>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Search contacts, deals..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
+      {/* CRM Pulse */}
+      <div className="rounded-xl border border-border bg-card/70 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <p className="font-semibold">CRM Focus</p>
+            <p className="text-sm text-muted-foreground">Track pipeline momentum and follow-ups.</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
+            Contacts: {contacts.length}
+          </span>
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
+            Deals: {deals.length}
+          </span>
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
+            Active follow-ups: {deals.filter((deal) => ["proposal", "negotiation"].includes(deal.stage)).length}
+          </span>
+        </div>
       </div>
 
       {/* Tabs */}

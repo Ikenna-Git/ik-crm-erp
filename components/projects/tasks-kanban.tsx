@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Calendar, User, MoreHorizontal, Eye, Edit, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { PaginationControls } from "@/components/shared/pagination-controls"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,68 +26,50 @@ interface Task {
 }
 
 const taskStages = [
-  { id: "todo", title: "To Do", color: "bg-slate-50" },
-  { id: "in-progress", title: "In Progress", color: "bg-blue-50" },
-  { id: "review", title: "Review", color: "bg-yellow-50" },
-  { id: "done", title: "Done", color: "bg-green-50" },
+  { id: "todo", title: "To Do", color: "bg-slate-50 dark:bg-slate-900/40" },
+  { id: "in-progress", title: "In Progress", color: "bg-blue-50 dark:bg-blue-950/30" },
+  { id: "review", title: "Review", color: "bg-yellow-50 dark:bg-yellow-950/30" },
+  { id: "done", title: "Done", color: "bg-green-50 dark:bg-green-950/30" },
 ]
 
-const mockTasks: Task[] = [
-  {
-    id: "1",
-    title: "Design homepage mockup",
-    project: "Website Redesign",
-    assignee: "Sarah Chen",
-    dueDate: "2025-02-10",
-    priority: "high",
-    stage: "in-progress",
-  },
-  {
-    id: "2",
-    title: "Setup development environment",
-    project: "Mobile App Development",
-    assignee: "John Smith",
-    dueDate: "2025-02-15",
-    priority: "high",
-    stage: "in-progress",
-  },
-  {
-    id: "3",
-    title: "Write API documentation",
-    project: "Mobile App Development",
-    assignee: "Jane Doe",
-    dueDate: "2025-02-20",
-    priority: "medium",
-    stage: "todo",
-  },
-  {
-    id: "4",
-    title: "Code review - Auth module",
-    project: "Website Redesign",
-    assignee: "Mike Johnson",
-    dueDate: "2025-02-08",
-    priority: "high",
-    stage: "review",
-  },
-  {
-    id: "5",
-    title: "Deploy to staging",
-    project: "Website Redesign",
-    assignee: "Sarah Chen",
-    dueDate: "2025-02-25",
-    priority: "medium",
-    stage: "done",
-  },
+const taskTitles = [
+  "Design homepage mockup",
+  "Setup development environment",
+  "Write API documentation",
+  "Code review - Auth module",
+  "Deploy to staging",
+  "Refine onboarding flow",
+  "Sync data model",
+  "QA regression suite",
 ]
+
+const taskProjects = ["Website Redesign", "Mobile App Development", "Data Migration", "Customer Portal"]
+const taskAssignees = ["Sarah Chen", "John Smith", "Jane Doe", "Mike Johnson", "Grace Martins", "Noah Brown"]
+const taskStagesValues: Task["stage"][] = ["todo", "in-progress", "review", "done"]
+const priorityValues: Task["priority"][] = ["low", "medium", "high"]
+
+const buildMockTasks = (count: number): Task[] =>
+  Array.from({ length: count }, (_, idx) => ({
+    id: `TSK-${(idx + 1).toString().padStart(3, "0")}`,
+    title: taskTitles[idx % taskTitles.length],
+    project: taskProjects[idx % taskProjects.length],
+    assignee: taskAssignees[idx % taskAssignees.length],
+    dueDate: new Date(2025, (idx % 6) + 1, (idx % 27) + 1).toISOString().slice(0, 10),
+    priority: priorityValues[idx % priorityValues.length],
+    stage: taskStagesValues[idx % taskStagesValues.length],
+  }))
+
+const mockTasks: Task[] = buildMockTasks(70)
 
 const priorityColors = {
-  low: "bg-blue-100 text-blue-800",
-  medium: "bg-yellow-100 text-yellow-800",
-  high: "bg-red-100 text-red-800",
+  low: "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200",
+  medium: "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-200",
+  high: "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200",
 }
 
 export function TasksKanban({ searchQuery }: { searchQuery: string }) {
   const [tasks, setTasks] = useState<Task[]>(mockTasks)
+  const [currentPage, setCurrentPage] = useState(1)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({
@@ -97,6 +80,22 @@ export function TasksKanban({ searchQuery }: { searchQuery: string }) {
     priority: "medium" as Task["priority"],
     stage: "todo" as Task["stage"],
   })
+
+  const filteredTasks = tasks.filter((task) =>
+    task.title.toLowerCase().includes(searchQuery.toLowerCase()),
+  )
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(filteredTasks.length / PAGE_SIZE))
+  const pagedTasks = filteredTasks.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+  }, [currentPage, totalPages])
 
   const openEditor = (task?: Task) => {
     if (task) {
@@ -157,9 +156,7 @@ export function TasksKanban({ searchQuery }: { searchQuery: string }) {
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {taskStages.map((stage) => {
-          const stageTasks = tasks.filter(
-            (t) => t.stage === stage.id && t.title.toLowerCase().includes(searchQuery.toLowerCase()),
-          )
+          const stageTasks = pagedTasks.filter((t) => t.stage === stage.id)
           return (
             <div key={stage.id} className={`${stage.color} rounded-lg p-4 min-h-96`}>
               <div className="mb-4">
@@ -168,7 +165,7 @@ export function TasksKanban({ searchQuery }: { searchQuery: string }) {
               </div>
               <div className="space-y-3">
                 {stageTasks.map((task) => (
-                  <Card key={task.id} className="bg-white hover:shadow-md transition-shadow cursor-pointer">
+                  <Card key={task.id} className="bg-card hover:shadow-md transition-shadow cursor-pointer">
                     <CardContent className="p-3">
                       <div className="flex items-start justify-between gap-2">
                         <p className="font-medium text-sm line-clamp-2">{task.title}</p>
@@ -221,6 +218,8 @@ export function TasksKanban({ searchQuery }: { searchQuery: string }) {
           )
         })}
       </div>
+
+      <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

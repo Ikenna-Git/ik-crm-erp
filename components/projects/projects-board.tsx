@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Users, Calendar, Flag, Eye, Trash2, MoreHorizontal, Edit, X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { PaginationControls } from "@/components/shared/pagination-controls"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,10 +15,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-interface Project {
+export interface Project {
   id: string
   name: string
   description: string
+  client?: string
   status: "planning" | "in-progress" | "on-hold" | "completed"
   progress: number
   team: number
@@ -29,72 +31,58 @@ interface Project {
 }
 
 const statusColors = {
-  planning: "bg-blue-100 text-blue-800",
-  "in-progress": "bg-yellow-100 text-yellow-800",
-  "on-hold": "bg-orange-100 text-orange-800",
-  completed: "bg-green-100 text-green-800",
+  planning: "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200",
+  "in-progress": "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-200",
+  "on-hold": "bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-200",
+  completed: "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-200",
 }
 
 const priorityColors = {
-  low: "text-blue-600",
-  medium: "text-yellow-600",
-  high: "text-red-600",
+  low: "text-blue-600 dark:text-blue-300",
+  medium: "text-yellow-600 dark:text-yellow-300",
+  high: "text-red-600 dark:text-red-300",
 }
 
-const mockProjects: Project[] = [
-  {
-    id: "1",
-    name: "Website Redesign",
-    description: "Complete overhaul of company website",
-    status: "in-progress",
-    progress: 65,
-    team: 5,
-    budget: 25000,
-    spent: 16250,
-    startDate: "2025-01-15",
-    endDate: "2025-03-31",
-    priority: "high",
-  },
-  {
-    id: "2",
-    name: "Mobile App Development",
-    description: "New iOS and Android application",
-    status: "in-progress",
-    progress: 45,
-    team: 8,
-    budget: 75000,
-    spent: 33750,
-    startDate: "2024-12-01",
-    endDate: "2025-06-30",
-    priority: "high",
-  },
-  {
-    id: "3",
-    name: "Data Migration",
-    description: "Migrate legacy systems to cloud",
-    status: "planning",
-    progress: 10,
-    team: 3,
-    budget: 15000,
-    spent: 1500,
-    startDate: "2025-02-01",
-    endDate: "2025-04-30",
-    priority: "medium",
-  },
-  {
-    id: "4",
-    name: "Marketing Campaign",
-    description: "Q1 product launch campaign",
-    status: "completed",
-    progress: 100,
-    team: 4,
-    budget: 8000,
-    spent: 7850,
-    startDate: "2024-12-15",
-    endDate: "2025-01-31",
-    priority: "medium",
-  },
+const projectNames = [
+  "Website Redesign",
+  "Mobile App Development",
+  "Data Migration",
+  "Marketing Campaign",
+  "Customer Portal",
+  "ERP Upgrade",
+  "Support Revamp",
+  "Analytics Refresh",
 ]
+
+const projectClients = ["Acme Corp", "Product Team", "IT Operations", "Marketing", "Northwind", "Globex", "Nimbus"]
+const projectStatuses: Project["status"][] = ["planning", "in-progress", "on-hold", "completed"]
+const projectPriorities: Project["priority"][] = ["low", "medium", "high"]
+
+const buildMockProjects = (count: number): Project[] =>
+  Array.from({ length: count }, (_, idx) => {
+    const status = projectStatuses[idx % projectStatuses.length]
+    const progress = status === "completed" ? 100 : 15 + (idx % 6) * 12
+    const budget = 15000 + (idx % 10) * 5000
+    const spent = Math.round(budget * (progress / 120))
+    const startDate = new Date(2025, (idx % 6), (idx % 27) + 1).toISOString().slice(0, 10)
+    const endDate = new Date(2025, (idx % 6) + 1, (idx % 27) + 10).toISOString().slice(0, 10)
+    return {
+      id: `PRJ-${(idx + 1).toString().padStart(3, "0")}`,
+      name: projectNames[idx % projectNames.length],
+      description: "Project initiative to improve core workflows and delivery.",
+      client: projectClients[idx % projectClients.length],
+      status,
+      progress,
+      team: 3 + (idx % 6),
+      budget,
+      spent,
+      startDate,
+      endDate,
+      priority: projectPriorities[idx % projectPriorities.length],
+    }
+  })
+
+export const mockProjects: Project[] = buildMockProjects(70)
 
 const formatNaira = (amount: number) => {
   return new Intl.NumberFormat("en-NG", {
@@ -104,13 +92,29 @@ const formatNaira = (amount: number) => {
   }).format(amount * 805)
 }
 
-export function ProjectsBoard({ searchQuery }: { searchQuery: string }) {
-  const [projects, setProjects] = useState<Project[]>(mockProjects)
+type ProjectsBoardProps = {
+  searchQuery: string
+  projects?: Project[]
+  onAddProject?: (data: Omit<Project, "id">) => void
+  onUpdateProject?: (id: string, data: Omit<Project, "id">) => void
+  onDeleteProject?: (id: string) => void
+}
+
+export function ProjectsBoard({
+  searchQuery,
+  projects: providedProjects,
+  onAddProject,
+  onUpdateProject,
+  onDeleteProject,
+}: ProjectsBoardProps) {
+  const [projects, setProjects] = useState<Project[]>(providedProjects || mockProjects)
+  const [currentPage, setCurrentPage] = useState(1)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({
     name: "",
     description: "",
+    client: "",
     status: "planning" as Project["status"],
     priority: "medium" as Project["priority"],
     progress: "",
@@ -121,7 +125,26 @@ export function ProjectsBoard({ searchQuery }: { searchQuery: string }) {
     endDate: "",
   })
 
-  const filteredProjects = projects.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+  useEffect(() => {
+    if (providedProjects) setProjects(providedProjects)
+  }, [providedProjects])
+
+  const filteredProjects = projects.filter((p) => {
+    const query = searchQuery.toLowerCase()
+    return p.name.toLowerCase().includes(query) || (p.client || "").toLowerCase().includes(query)
+  })
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE))
+  const pagedProjects = filteredProjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+  }, [currentPage, totalPages])
 
   const openEditor = (project?: Project) => {
     if (project) {
@@ -129,6 +152,7 @@ export function ProjectsBoard({ searchQuery }: { searchQuery: string }) {
       setForm({
         name: project.name,
         description: project.description,
+        client: project.client || "",
         status: project.status,
         priority: project.priority,
         progress: String(project.progress),
@@ -143,6 +167,7 @@ export function ProjectsBoard({ searchQuery }: { searchQuery: string }) {
       setForm({
         name: "",
         description: "",
+        client: "",
         status: "planning",
         priority: "medium",
         progress: "",
@@ -157,10 +182,10 @@ export function ProjectsBoard({ searchQuery }: { searchQuery: string }) {
   }
 
   const saveProject = () => {
-    const payload: Project = {
-      id: editingId || Date.now().toString(),
+    const payload: Omit<Project, "id"> = {
       name: form.name || "New Project",
       description: form.description || "Project description",
+      client: form.client || "",
       status: form.status,
       priority: form.priority,
       progress: Number(form.progress || 0),
@@ -171,16 +196,28 @@ export function ProjectsBoard({ searchQuery }: { searchQuery: string }) {
       endDate: form.endDate || new Date().toISOString().slice(0, 10),
     }
     if (editingId) {
-      setProjects((prev) => prev.map((p) => (p.id === editingId ? payload : p)))
+      if (onUpdateProject) {
+        onUpdateProject(editingId, payload)
+      } else {
+        setProjects((prev) => prev.map((p) => (p.id === editingId ? { id: editingId, ...payload } : p)))
+      }
     } else {
-      setProjects((prev) => [payload, ...prev])
+      if (onAddProject) {
+        onAddProject(payload)
+      } else {
+        setProjects((prev) => [{ id: Date.now().toString(), ...payload }, ...prev])
+      }
     }
     setShowModal(false)
     setEditingId(null)
   }
 
   const deleteProject = (id: string) => {
-    setProjects((prev) => prev.filter((p) => p.id !== id))
+    if (onDeleteProject) {
+      onDeleteProject(id)
+    } else {
+      setProjects((prev) => prev.filter((p) => p.id !== id))
+    }
   }
 
   return (
@@ -219,7 +256,7 @@ export function ProjectsBoard({ searchQuery }: { searchQuery: string }) {
 
       {/* Projects List */}
       <div className="space-y-4">
-        {filteredProjects.map((project) => {
+        {pagedProjects.map((project) => {
           const budgetUtilization = ((project.spent / project.budget) * 100).toFixed(0)
           return (
             <Card key={project.id} className="hover:shadow-md transition-shadow">
@@ -228,6 +265,9 @@ export function ProjectsBoard({ searchQuery }: { searchQuery: string }) {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <h3 className="text-lg font-semibold">{project.name}</h3>
+                      {project.client ? (
+                        <p className="text-xs text-muted-foreground">Client: {project.client}</p>
+                      ) : null}
                       <p className="text-sm text-muted-foreground mt-1">{project.description}</p>
                     </div>
                     <div className="flex gap-2">
@@ -314,6 +354,8 @@ export function ProjectsBoard({ searchQuery }: { searchQuery: string }) {
         })}
       </div>
 
+      <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-4xl mx-4">
@@ -338,6 +380,10 @@ export function ProjectsBoard({ searchQuery }: { searchQuery: string }) {
                     value={form.description}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
                   />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Client</Label>
+                  <Input value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} />
                 </div>
                 <div>
                   <Label className="text-sm font-medium">Status</Label>

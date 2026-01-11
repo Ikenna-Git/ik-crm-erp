@@ -1,8 +1,10 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Phone, Mail, Calendar, Users } from "lucide-react"
+import { PaginationControls } from "@/components/shared/pagination-controls"
 
 interface Activity {
   id: string
@@ -22,52 +24,39 @@ const activityIcons = {
 }
 
 const activityColors = {
-  call: "bg-blue-50 text-blue-700 border-blue-200",
-  email: "bg-purple-50 text-purple-700 border-purple-200",
-  meeting: "bg-green-50 text-green-700 border-green-200",
-  note: "bg-yellow-50 text-yellow-700 border-yellow-200",
+  call: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-200 dark:border-blue-500/40",
+  email: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/30 dark:text-purple-200 dark:border-purple-500/40",
+  meeting: "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-200 dark:border-green-500/40",
+  note: "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-200 dark:border-yellow-500/40",
 }
 
-const mockActivities: Activity[] = [
-  {
-    id: "1",
-    type: "call",
-    title: "Product Demo Call",
-    contact: "Sarah Johnson",
-    date: "Today",
-    time: "2:00 PM",
-    description: "Discussed enterprise features and pricing",
-  },
-  {
-    id: "2",
-    type: "email",
-    title: "Follow-up Email",
-    contact: "Michael Chen",
-    date: "Yesterday",
-    time: "10:30 AM",
-    description: "Sent proposal document and contract",
-  },
-  {
-    id: "3",
-    type: "meeting",
-    title: "Board Meeting",
-    contact: "Emma Davis",
-    date: "2 days ago",
-    time: "3:00 PM",
-    description: "Quarterly business review and planning",
-  },
-  {
-    id: "4",
-    type: "note",
-    title: "Implementation Notes",
-    contact: "Global Industries",
-    date: "3 days ago",
-    time: "1:15 PM",
-    description: "Documented customer requirements and timeline",
-  },
-]
+const activityTitles = ["Product Demo Call", "Follow-up Email", "Board Meeting", "Implementation Notes", "Kickoff Call"]
+const activityContacts = ["Sarah Johnson", "Michael Chen", "Emma Davis", "Global Industries", "Acme Corp", "Northwind"]
+const activityTypes: Activity["type"][] = ["call", "email", "meeting", "note"]
+
+const buildMockActivities = (count: number): Activity[] =>
+  Array.from({ length: count }, (_, idx) => ({
+    id: `ACT-${(idx + 1).toString().padStart(3, "0")}`,
+    type: activityTypes[idx % activityTypes.length],
+    title: activityTitles[idx % activityTitles.length],
+    contact: activityContacts[idx % activityContacts.length],
+    date: `${(idx % 7) + 1} days ago`,
+    time: `${(idx % 12) + 1}:00 PM`,
+    description: "Captured notes and next steps for the account.",
+  }))
+
+const mockActivities: Activity[] = buildMockActivities(70)
 
 export function ActivitiesTimeline() {
+  const [currentPage, setCurrentPage] = useState(1)
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(mockActivities.length / PAGE_SIZE))
+  const pagedActivities = mockActivities.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+  }, [currentPage, totalPages])
+
   return (
     <Card>
       <CardHeader>
@@ -76,7 +65,7 @@ export function ActivitiesTimeline() {
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          {mockActivities.map((activity, idx) => {
+          {pagedActivities.map((activity, idx) => {
             const Icon = activityIcons[activity.type]
             return (
               <div key={activity.id} className="flex gap-4">
@@ -106,6 +95,9 @@ export function ActivitiesTimeline() {
               </div>
             )
           })}
+        </div>
+        <div className="pt-6">
+          <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
         </div>
       </CardContent>
     </Card>

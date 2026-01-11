@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { PaginationControls } from "@/components/shared/pagination-controls"
 import { Badge } from "@/components/ui/badge"
 import { Edit, Trash2, MoreHorizontal, Eye, X, Lock } from "lucide-react"
 import {
@@ -14,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
-interface Employee {
+export interface Employee {
   id: string
   name: string
   email: string
@@ -27,77 +28,57 @@ interface Employee {
 }
 
 const departmentColors = {
-  Engineering: "bg-blue-100 text-blue-800",
-  Sales: "bg-green-100 text-green-800",
-  Marketing: "bg-purple-100 text-purple-800",
-  HR: "bg-pink-100 text-pink-800",
-  Finance: "bg-yellow-100 text-yellow-800",
-  Operations: "bg-orange-100 text-orange-800",
+  Engineering: "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200",
+  Sales: "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-200",
+  Marketing: "bg-purple-100 text-purple-800 dark:bg-purple-500/20 dark:text-purple-200",
+  HR: "bg-pink-100 text-pink-800 dark:bg-pink-500/20 dark:text-pink-200",
+  Finance: "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-200",
+  Operations: "bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-200",
 }
 
 const statusColors = {
-  active: "bg-green-100 text-green-800",
-  leave: "bg-yellow-100 text-yellow-800",
-  inactive: "bg-gray-100 text-gray-800",
+  active: "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-200",
+  leave: "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-200",
+  inactive: "bg-gray-100 text-gray-800 dark:bg-slate-700/40 dark:text-slate-200",
 }
 
-const mockEmployees: Employee[] = [
-  {
-    id: "1",
-    name: "Sarah Johnson",
-    email: "sarah.johnson@company.com",
-    phone: "+1 (555) 123-4567",
-    department: "Engineering",
-    position: "Senior Developer",
-    startDate: "2022-03-15",
-    status: "active",
-    salary: 125000,
-  },
-  {
-    id: "2",
-    name: "Michael Chen",
-    email: "michael.chen@company.com",
-    phone: "+1 (555) 234-5678",
-    department: "Sales",
-    position: "Sales Manager",
-    startDate: "2020-07-01",
-    status: "active",
-    salary: 95000,
-  },
-  {
-    id: "3",
-    name: "Emma Davis",
-    email: "emma.davis@company.com",
-    phone: "+1 (555) 345-6789",
-    department: "Marketing",
-    position: "Marketing Lead",
-    startDate: "2021-11-10",
-    status: "active",
-    salary: 85000,
-  },
-  {
-    id: "4",
-    name: "John Smith",
-    email: "john.smith@company.com",
-    phone: "+1 (555) 456-7890",
-    department: "Engineering",
-    position: "DevOps Engineer",
-    startDate: "2023-01-20",
-    status: "leave",
-    salary: 110000,
-  },
-  {
-    id: "5",
-    name: "Lisa Anderson",
-    email: "lisa.anderson@company.com",
-    phone: "+1 (555) 567-8901",
-    department: "HR",
-    position: "HR Manager",
-    startDate: "2021-06-15",
-    status: "active",
-    salary: 80000,
-  },
-]
+const firstNames = ["Sarah", "Michael", "Emma", "John", "Lisa", "David", "Ava", "Noah", "Grace", "Daniel"]
+const lastNames = ["Johnson", "Chen", "Davis", "Smith", "Anderson", "Okafor", "Umeh", "Martins", "Williams", "Brown"]
+const departments = ["Engineering", "Sales", "Marketing", "HR", "Finance", "Operations"] as const
+const positionsByDepartment: Record<(typeof departments)[number], string[]> = {
+  Engineering: ["Senior Developer", "DevOps Engineer", "QA Engineer", "Frontend Engineer"],
+  Sales: ["Sales Manager", "Account Executive", "Sales Lead", "BDR"],
+  Marketing: ["Marketing Lead", "Content Strategist", "Growth Manager", "Brand Designer"],
+  HR: ["HR Manager", "People Ops", "Recruiter", "HR Analyst"],
+  Finance: ["Financial Analyst", "Accountant", "Payroll Specialist", "Finance Manager"],
+  Operations: ["Ops Lead", "Support Manager", "Facilities Lead", "Program Coordinator"],
+}
+
+const buildMockEmployees = (count: number) =>
+  Array.from({ length: count }, (_, idx) => {
+    const first = firstNames[idx % firstNames.length]
+    const last = lastNames[(idx * 3) % lastNames.length]
+    const department = departments[idx % departments.length]
+    const positions = positionsByDepartment[department]
+    const position = positions[idx % positions.length]
+    const statusOptions: Employee["status"][] = ["active", "leave", "inactive"]
+    const status = statusOptions[idx % statusOptions.length]
+    const startDate = new Date(2020, idx % 12, (idx % 28) + 1).toISOString().slice(0, 10)
+
+    return {
+      id: `EMP-${(idx + 1).toString().padStart(3, "0")}`,
+      name: `${first} ${last}`,
+      email: `${first.toLowerCase()}.${last.toLowerCase()}@civis.io`,
+      phone: `+1 (555) ${(200 + idx).toString().padStart(3, "0")}-${(3000 + idx).toString().padStart(4, "0")}`,
+      department,
+      position,
+      startDate,
+      status,
+      salary: 65000 + (idx % 10) * 8500,
+    }
+  })
+
+export const mockEmployees: Employee[] = buildMockEmployees(70)
 
 const formatNaira = (amount: number) => {
   return new Intl.NumberFormat("en-NG", {
@@ -107,8 +88,23 @@ const formatNaira = (amount: number) => {
   }).format(amount * 805)
 }
 
-export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
-  const [employees, setEmployees] = useState<Employee[]>(mockEmployees)
+type EmployeesTableProps = {
+  searchQuery: string
+  employees?: Employee[]
+  onAddEmployee?: (data: Omit<Employee, "id">) => void
+  onUpdateEmployee?: (id: string, data: Omit<Employee, "id">) => void
+  onDeleteEmployee?: (id: string) => void
+}
+
+export function EmployeesTable({
+  searchQuery,
+  employees: providedEmployees,
+  onAddEmployee,
+  onUpdateEmployee,
+  onDeleteEmployee,
+}: EmployeesTableProps) {
+  const [employees, setEmployees] = useState<Employee[]>(providedEmployees || mockEmployees)
+  const [currentPage, setCurrentPage] = useState(1)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isUnlocked, setIsUnlocked] = useState(false)
@@ -116,6 +112,9 @@ export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
   const [accessCode, setAccessCode] = useState("1234")
   const [accessInput, setAccessInput] = useState("")
   const [accessError, setAccessError] = useState("")
+  const [accessNotice, setAccessNotice] = useState("")
+  const [newAccessCode, setNewAccessCode] = useState("")
+  const [confirmAccessCode, setConfirmAccessCode] = useState("")
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -128,8 +127,12 @@ export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
   })
 
   useEffect(() => {
-    setEmployees(mockEmployees)
-  }, [])
+    if (providedEmployees) setEmployees(providedEmployees)
+  }, [providedEmployees])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -154,15 +157,25 @@ export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
 
   const displaySalary = isUnlocked && showSalaries
 
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / PAGE_SIZE))
+  const pagedEmployees = filteredEmployees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+  }, [currentPage, totalPages])
+
   const unlockAccess = () => {
     if (accessInput.trim() !== accessCode) {
       setAccessError("Invalid access code.")
+      setAccessNotice("")
       return
     }
     setIsUnlocked(true)
     setShowSalaries(true)
     setAccessInput("")
     setAccessError("")
+    setAccessNotice("")
   }
 
   const lockAccess = () => {
@@ -170,6 +183,25 @@ export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
     setShowSalaries(false)
     setAccessInput("")
     setAccessError("")
+    setAccessNotice("")
+  }
+
+  const updateAccessCode = () => {
+    const next = newAccessCode.trim()
+    const confirm = confirmAccessCode.trim()
+    if (!next || next !== confirm) {
+      setAccessError("Access codes do not match.")
+      setAccessNotice("")
+      return
+    }
+    setAccessCode(next)
+    if (typeof window !== "undefined") {
+      localStorage.setItem("civis_hr_access_code", next)
+    }
+    setNewAccessCode("")
+    setConfirmAccessCode("")
+    setAccessError("")
+    setAccessNotice("Access code updated.")
   }
 
   const openEditor = (employee?: Employee) => {
@@ -203,8 +235,7 @@ export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
   }
 
   const saveEmployee = () => {
-    const payload: Employee = {
-      id: editingId || Date.now().toString(),
+    const payload: Omit<Employee, "id"> = {
       name: form.name || "Unnamed",
       email: form.email || "user@example.com",
       phone: form.phone || "",
@@ -215,9 +246,17 @@ export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
       salary: Number(form.salary || 0),
     }
     if (editingId) {
-      setEmployees((prev) => prev.map((e) => (e.id === editingId ? payload : e)))
+      if (onUpdateEmployee) {
+        onUpdateEmployee(editingId, payload)
+      } else {
+        setEmployees((prev) => prev.map((e) => (e.id === editingId ? { id: editingId, ...payload } : e)))
+      }
     } else {
-      setEmployees((prev) => [payload, ...prev])
+      if (onAddEmployee) {
+        onAddEmployee(payload)
+      } else {
+        setEmployees((prev) => [{ id: Date.now().toString(), ...payload }, ...prev])
+      }
     }
     setShowModal(false)
     setEditingId(null)
@@ -225,7 +264,11 @@ export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
 
   const deleteEmployee = (id: string) => {
     if (!isUnlocked) return
-    setEmployees((prev) => prev.filter((e) => e.id !== id))
+    if (onDeleteEmployee) {
+      onDeleteEmployee(id)
+    } else {
+      setEmployees((prev) => prev.filter((e) => e.id !== id))
+    }
   }
 
   return (
@@ -255,9 +298,30 @@ export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <p className="text-sm text-muted-foreground">HR data unlocked for this session.</p>
-              <div className="flex items-center gap-2">
+            <div className="grid md:grid-cols-3 gap-4">
+              <div className="md:col-span-2 space-y-2">
+                <p className="text-sm text-muted-foreground">HR data unlocked for this session.</p>
+                <div className="grid md:grid-cols-2 gap-2">
+                  <Input
+                    type="password"
+                    placeholder="New access code"
+                    value={newAccessCode}
+                    onChange={(e) => setNewAccessCode(e.target.value)}
+                  />
+                  <Input
+                    type="password"
+                    placeholder="Confirm new code"
+                    value={confirmAccessCode}
+                    onChange={(e) => setConfirmAccessCode(e.target.value)}
+                  />
+                </div>
+                {accessError ? <p className="text-xs text-destructive">{accessError}</p> : null}
+                {accessNotice ? <p className="text-xs text-green-600 dark:text-green-400">{accessNotice}</p> : null}
+              </div>
+              <div className="flex flex-col gap-2 justify-end">
+                <Button variant="outline" className="bg-transparent" onClick={updateAccessCode}>
+                  Update Access Code
+                </Button>
                 <Button variant="outline" className="bg-transparent" onClick={() => setShowSalaries(!showSalaries)}>
                   {showSalaries ? "Hide salaries" : "Show salaries"}
                 </Button>
@@ -274,7 +338,7 @@ export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Total Employees</p>
-            <p className="text-2xl font-bold">{mockEmployees.length}</p>
+            <p className="text-2xl font-bold">{employees.length}</p>
           </CardContent>
         </Card>
         <Card>
@@ -312,7 +376,7 @@ export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
                 </tr>
               </thead>
               <tbody>
-                {filteredEmployees.map((employee) => (
+                {pagedEmployees.map((employee) => (
                   <tr key={employee.id} className="border-b border-border hover:bg-muted/50 transition">
                     <td className="py-4 px-4">
                       <div>
@@ -324,7 +388,8 @@ export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
                       <Badge
                         variant="outline"
                         className={
-                          departmentColors[employee.department as keyof typeof departmentColors] || "bg-gray-100"
+                          departmentColors[employee.department as keyof typeof departmentColors] ||
+                          "bg-gray-100 text-gray-800 dark:bg-slate-700/40 dark:text-slate-200"
                         }
                       >
                         {employee.department}
@@ -371,6 +436,13 @@ export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="pt-4">
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
           </div>
         </CardContent>
       </Card>

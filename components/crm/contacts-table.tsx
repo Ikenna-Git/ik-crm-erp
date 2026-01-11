@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Edit, Trash2, Plus, X, Download, MoreHorizontal, Eye } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { PaginationControls } from "@/components/shared/pagination-controls"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,43 +26,42 @@ interface Contact {
   lastContact?: string
 }
 
-const mockContacts: Contact[] = [
-  {
-    id: "1",
-    name: "Sarah Johnson",
-    email: "sarah@company.com",
-    phone: "+1 (555) 123-4567",
-    company: "Tech Solutions Inc",
-    status: "customer",
-    revenue: 45000,
-    lastContact: "2 days ago",
-  },
-  {
-    id: "2",
-    name: "Michael Chen",
-    email: "michael@startup.io",
-    phone: "+1 (555) 234-5678",
-    company: "StartUp Labs",
-    status: "prospect",
-    revenue: 0,
-    lastContact: "1 week ago",
-  },
-  {
-    id: "3",
-    name: "Emma Davis",
-    email: "emma@enterprise.com",
-    phone: "+1 (555) 345-6789",
-    company: "Enterprise Corp",
-    status: "lead",
-    revenue: 0,
-    lastContact: "3 days ago",
-  },
+const contactFirstNames = ["Sarah", "Michael", "Emma", "John", "Lisa", "Ava", "Noah", "Grace", "Daniel", "Olivia"]
+const contactLastNames = ["Johnson", "Chen", "Davis", "Smith", "Anderson", "Okafor", "Umeh", "Martins", "Williams", "Brown"]
+const contactCompanies = [
+  "Tech Solutions Inc",
+  "StartUp Labs",
+  "Enterprise Corp",
+  "Northwind",
+  "Acme Corp",
+  "Globex",
+  "Blue Ridge",
+  "NovaWorks",
 ]
+
+const buildMockContacts = (count: number) =>
+  Array.from({ length: count }, (_, idx) => {
+    const first = contactFirstNames[idx % contactFirstNames.length]
+    const last = contactLastNames[(idx * 2) % contactLastNames.length]
+    const statusOptions: Contact["status"][] = ["lead", "prospect", "customer"]
+    return {
+      id: `CON-${(idx + 1).toString().padStart(3, "0")}`,
+      name: `${first} ${last}`,
+      email: `${first.toLowerCase()}.${last.toLowerCase()}@example.com`,
+      phone: `+1 (555) ${(410 + idx).toString().padStart(3, "0")}-${(7000 + idx).toString().padStart(4, "0")}`,
+      company: contactCompanies[idx % contactCompanies.length],
+      status: statusOptions[idx % statusOptions.length],
+      revenue: idx % 3 === 0 ? 25000 + (idx % 10) * 5000 : 0,
+      lastContact: `${(idx % 7) + 1} days ago`,
+    }
+  })
+
+const mockContacts: Contact[] = buildMockContacts(70)
 
 const statusColors = {
   customer: "bg-primary/10 text-primary",
   prospect: "bg-accent/10 text-accent",
-  lead: "bg-secondary/10 text-secondary",
+  lead: "bg-muted text-muted-foreground dark:bg-slate-700/40 dark:text-slate-200",
 }
 
 const formatNaira = (amount: number = 0) => {
@@ -88,6 +88,7 @@ export function ContactsTable({
   onUpdateContact,
 }: ContactsTableProps) {
   const [contacts, setContacts] = useState<Contact[]>(providedContacts || mockContacts)
+  const [currentPage, setCurrentPage] = useState(1)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
@@ -104,12 +105,24 @@ export function ContactsTable({
     }
   }, [providedContacts])
 
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
+
   const filteredContacts = contacts.filter(
     (contact) =>
       contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       contact.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contact.company.toLowerCase().includes(searchQuery.toLowerCase()),
+      (contact.company || "").toLowerCase().includes(searchQuery.toLowerCase()),
   )
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(filteredContacts.length / PAGE_SIZE))
+  const pagedContacts = filteredContacts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+  }, [currentPage, totalPages])
 
   const handleAddContact = (e: React.FormEvent) => {
     e.preventDefault()
@@ -215,7 +228,7 @@ export function ContactsTable({
                 </tr>
               </thead>
               <tbody>
-                {filteredContacts.map((contact) => (
+                {pagedContacts.map((contact) => (
                   <tr key={contact.id} className="border-b border-border hover:bg-muted/50 transition">
                     <td className="py-4 px-4">
                       <div>
@@ -263,6 +276,13 @@ export function ContactsTable({
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="pt-4">
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
           </div>
         </CardContent>
       </Card>

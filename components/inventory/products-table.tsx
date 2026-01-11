@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Edit, Trash2, Plus, X, Download, MoreHorizontal, Eye } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { PaginationControls } from "@/components/shared/pagination-controls"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,53 +28,38 @@ interface Product {
 }
 
 const statusColors = {
-  active: "bg-green-100 text-green-800",
-  inactive: "bg-yellow-100 text-yellow-800",
-  discontinued: "bg-red-100 text-red-800",
+  active: "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-200",
+  inactive: "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-200",
+  discontinued: "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200",
 }
 
-const mockProducts: Product[] = [
-  {
-    id: "1",
-    sku: "PROD-001",
-    name: 'Laptop Pro 15"',
-    category: "Electronics",
-    price: 1299,
-    cost: 800,
-    supplier: "TechGear Inc",
-    status: "active",
-  },
-  {
-    id: "2",
-    sku: "PROD-002",
-    name: "Wireless Mouse",
-    category: "Accessories",
-    price: 29,
-    cost: 12,
-    supplier: "PeripheralCo",
-    status: "active",
-  },
-  {
-    id: "3",
-    sku: "PROD-003",
-    name: "USB-C Cable",
-    category: "Cables",
-    price: 15,
-    cost: 5,
-    supplier: "CableMaster",
-    status: "active",
-  },
-  {
-    id: "4",
-    sku: "PROD-004",
-    name: 'Monitor 4K 27"',
-    category: "Electronics",
-    price: 449,
-    cost: 250,
-    supplier: "DisplayTech",
-    status: "inactive",
-  },
+const productNames = [
+  'Laptop Pro 15"',
+  "Wireless Mouse",
+  "USB-C Cable",
+  'Monitor 4K 27"',
+  "Ergo Keyboard",
+  "Desk Lamp",
+  "Noise Canceling Headset",
+  "Docking Station",
 ]
+
+const productCategories = ["Electronics", "Accessories", "Cables", "Office", "Peripherals"]
+const productSuppliers = ["TechGear Inc", "PeripheralCo", "CableMaster", "DisplayTech", "OfficeWorks"]
+
+const buildMockProducts = (count: number): Product[] =>
+  Array.from({ length: count }, (_, idx) => ({
+    id: `PROD-${(idx + 1).toString().padStart(3, "0")}`,
+    sku: `PROD-${(idx + 1).toString().padStart(4, "0")}`,
+    name: productNames[idx % productNames.length],
+    category: productCategories[idx % productCategories.length],
+    price: 25 + (idx % 10) * 75,
+    cost: 10 + (idx % 8) * 45,
+    supplier: productSuppliers[idx % productSuppliers.length],
+    status: idx % 7 === 0 ? "inactive" : idx % 9 === 0 ? "discontinued" : "active",
+  }))
+
+const mockProducts: Product[] = buildMockProducts(70)
 
 const STORAGE_KEY = "civis_inventory_products"
 const IMPORT_EVENT = "civis-inventory-import"
@@ -88,6 +74,7 @@ const formatNaira = (amount: number) => {
 
 export function ProductsTable({ searchQuery }: { searchQuery: string }) {
   const [products, setProducts] = useState<Product[]>(mockProducts)
+  const [currentPage, setCurrentPage] = useState(1)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
@@ -107,7 +94,12 @@ export function ProductsTable({ searchQuery }: { searchQuery: string }) {
       if (stored) {
         const parsed = JSON.parse(stored)
         if (Array.isArray(parsed)) {
-          setProducts(parsed)
+          const merged = [
+            ...parsed,
+            ...mockProducts.filter((seed) => !parsed.some((item: Product) => item.id === seed.id)),
+          ]
+          setProducts(merged)
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
           return
         }
       }
@@ -144,6 +136,18 @@ export function ProductsTable({ searchQuery }: { searchQuery: string }) {
       product.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
       product.category.toLowerCase().includes(searchQuery.toLowerCase()),
   )
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE))
+  const pagedProducts = filteredProducts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+  }, [currentPage, totalPages])
 
   const avgMargin = (
     products.reduce((sum, p) => sum + ((p.price - p.cost) / p.price) * 100, 0) / products.length
@@ -264,7 +268,7 @@ export function ProductsTable({ searchQuery }: { searchQuery: string }) {
                 </tr>
               </thead>
               <tbody>
-                {filteredProducts.map((product) => {
+                {pagedProducts.map((product) => {
                   const margin = (((product.price - product.cost) / product.price) * 100).toFixed(0)
                   return (
                     <tr key={product.id} className="border-b border-border hover:bg-muted/50 transition">
@@ -310,6 +314,13 @@ export function ProductsTable({ searchQuery }: { searchQuery: string }) {
                 })}
               </tbody>
             </table>
+          </div>
+          <div className="pt-4">
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
           </div>
         </CardContent>
       </Card>

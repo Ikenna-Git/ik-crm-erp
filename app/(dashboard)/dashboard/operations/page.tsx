@@ -33,9 +33,13 @@ const integrationsSeed = [
   { id: "i1", name: "Paystack", category: "Payments", connected: false },
   { id: "i2", name: "Flutterwave", category: "Payments", connected: false },
   { id: "i3", name: "WhatsApp", category: "Messaging", connected: false },
-  { id: "i4", name: "Email (SMTP)", category: "Email", connected: true },
-  { id: "i5", name: "Google Calendar", category: "Calendar", connected: false },
-  { id: "i6", name: "SAP / Oracle / Sage", category: "ERP", connected: false },
+  { id: "i4", name: "Slack", category: "Messaging", connected: false },
+  { id: "i5", name: "Email (SMTP)", category: "Email", connected: true },
+  { id: "i6", name: "Google Calendar", category: "Calendar", connected: false },
+  { id: "i7", name: "SAP / Oracle / Sage", category: "ERP", connected: false },
+  { id: "i8", name: "ChatGPT (OpenAI)", category: "AI", connected: false },
+  { id: "i9", name: "Google Gemini", category: "AI", connected: false },
+  { id: "i10", name: "Anthropic Claude", category: "AI", connected: false },
 ]
 
 const insightsSeed = [
@@ -58,14 +62,40 @@ const complianceSeed = [
 ]
 
 const reportsSeed = [
-  { id: "r1", name: "Monthly payroll summary", schedule: "Monthly", owner: "HR" },
-  { id: "r2", name: "Sales pipeline conversion", schedule: "Weekly", owner: "CRM" },
+  {
+    id: "r1",
+    name: "Monthly payroll summary",
+    dataset: "HR",
+    metrics: "Payroll costs",
+    groupBy: "Month",
+    schedule: "Monthly",
+    notes: "Send to CFO and HR lead",
+    owner: "HR",
+    lastRun: "Not run yet",
+  },
+  {
+    id: "r2",
+    name: "Sales pipeline conversion",
+    dataset: "CRM",
+    metrics: "Win rate",
+    groupBy: "Stage",
+    schedule: "Weekly",
+    notes: "",
+    owner: "CRM",
+    lastRun: "Not run yet",
+  },
 ]
 
 const STORAGE = {
   workflows: "civis_ops_workflows",
   integrations: "civis_ops_integrations",
   reports: "civis_ops_reports",
+}
+
+const approvalStatusStyles: Record<string, string> = {
+  pending: "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-500/20 dark:text-yellow-200 dark:border-yellow-500/40",
+  approved: "bg-green-100 text-green-800 border-green-200 dark:bg-green-500/20 dark:text-green-200 dark:border-green-500/40",
+  rejected: "bg-red-100 text-red-800 border-red-200 dark:bg-red-500/20 dark:text-red-200 dark:border-red-500/40",
 }
 
 export default function OperationsPage() {
@@ -108,8 +138,26 @@ export default function OperationsPage() {
       }
     }
     load(STORAGE.workflows, workflowSeed, setWorkflows)
-    load(STORAGE.integrations, integrationsSeed, setIntegrations)
     load(STORAGE.reports, reportsSeed, setReports)
+
+    try {
+      const stored = localStorage.getItem(STORAGE.integrations)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed)) {
+          const merged = [
+            ...parsed,
+            ...integrationsSeed.filter((seed) => !parsed.some((item: { id: string }) => item.id === seed.id)),
+          ]
+          setIntegrations(merged)
+          localStorage.setItem(STORAGE.integrations, JSON.stringify(merged))
+          return
+        }
+      }
+      localStorage.setItem(STORAGE.integrations, JSON.stringify(integrationsSeed))
+    } catch {
+      setIntegrations(integrationsSeed)
+    }
   }, [])
 
   useEffect(() => {
@@ -128,9 +176,12 @@ export default function OperationsPage() {
   }, [reports])
 
   const addWorkflow = () => {
-    if (!workflowForm.name || !workflowForm.trigger || !workflowForm.action) return
+    const name = workflowForm.name.trim()
+    const trigger = workflowForm.trigger.trim()
+    const action = workflowForm.action.trim()
+    if (!name || !trigger || !action) return
     setWorkflows((prev) => [
-      { id: `w-${Date.now()}`, name: workflowForm.name, trigger: workflowForm.trigger, action: workflowForm.action, active: true },
+      { id: `w-${Date.now()}`, name, trigger, action, active: true },
       ...prev,
     ])
     setWorkflowForm({ name: "", trigger: "", action: "" })
@@ -155,10 +206,25 @@ export default function OperationsPage() {
   const saveReport = () => {
     if (!reportForm.name) return
     setReports((prev) => [
-      { id: `r-${Date.now()}`, name: reportForm.name, schedule: reportForm.schedule, owner: reportForm.dataset },
+      {
+        id: `r-${Date.now()}`,
+        name: reportForm.name,
+        dataset: reportForm.dataset,
+        metrics: reportForm.metrics,
+        groupBy: reportForm.groupBy,
+        schedule: reportForm.schedule,
+        notes: reportForm.notes,
+        owner: reportForm.dataset,
+        lastRun: "Not run yet",
+      },
       ...prev,
     ])
     setReportForm({ name: "", dataset: "CRM", metrics: "Revenue", groupBy: "Month", schedule: "Monthly", notes: "" })
+  }
+
+  const runReport = (id: string) => {
+    const timestamp = new Date().toLocaleString()
+    setReports((prev) => prev.map((report) => (report.id === id ? { ...report, lastRun: timestamp } : report)))
   }
 
   return (
@@ -224,7 +290,11 @@ export default function OperationsPage() {
                 value={workflowForm.action}
                 onChange={(e) => setWorkflowForm({ ...workflowForm, action: e.target.value })}
               />
-              <Button className="md:col-span-3 w-fit" onClick={addWorkflow}>
+              <Button
+                className="md:col-span-3 w-fit"
+                onClick={addWorkflow}
+                disabled={!workflowForm.name.trim() || !workflowForm.trigger.trim() || !workflowForm.action.trim()}
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Workflow
               </Button>
@@ -265,11 +335,18 @@ export default function OperationsPage() {
                     <p className="text-sm text-muted-foreground">{ap.owner} • {ap.amount}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline">{ap.status}</Badge>
-                    <Button size="sm" variant="outline" className="bg-transparent" onClick={() => updateApproval(ap.id, "approved")}>
+                    <Badge variant="outline" className={approvalStatusStyles[ap.status]}>
+                      {ap.status}
+                    </Badge>
+                    <Button size="sm" className="bg-green-600 text-white hover:bg-green-700" onClick={() => updateApproval(ap.id, "approved")}>
                       Approve
                     </Button>
-                    <Button size="sm" variant="outline" className="bg-transparent" onClick={() => updateApproval(ap.id, "rejected")}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-red-500 text-red-600 hover:bg-red-50 dark:border-red-500/70 dark:text-red-300 dark:hover:bg-red-950/30"
+                      onClick={() => updateApproval(ap.id, "rejected")}
+                    >
                       Reject
                     </Button>
                   </div>
@@ -381,9 +458,12 @@ export default function OperationsPage() {
                 <div key={report.id} className="flex items-center justify-between border-b border-border pb-3 last:border-0">
                   <div>
                     <p className="font-medium">{report.name}</p>
-                    <p className="text-sm text-muted-foreground">{report.owner} • {report.schedule}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {report.dataset || report.owner} • {report.metrics || "Metrics"} • {report.groupBy || "Group"} • {report.schedule}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">Last run: {report.lastRun || "Not run yet"}</p>
                   </div>
-                  <Button size="sm" variant="outline" className="bg-transparent">
+                  <Button size="sm" variant="outline" className="bg-transparent" onClick={() => runReport(report.id)}>
                     Run
                   </Button>
                 </div>

@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Plus, Search, Upload } from "lucide-react"
+import { Plus, Upload, Sparkles } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import {
   Dialog,
@@ -20,7 +20,7 @@ import { StockLevels } from "@/components/inventory/stock-levels"
 import { OrdersTable } from "@/components/inventory/orders-table"
 
 export default function InventoryPage() {
-  const [searchQuery, setSearchQuery] = useState("")
+  const searchQuery = ""
   const [openProductDialog, setOpenProductDialog] = useState(false)
   const [importNotice, setImportNotice] = useState("")
   const [productForm, setProductForm] = useState({
@@ -259,15 +259,22 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Search products, SKU, orders..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
+      {/* Inventory Pulse */}
+      <div className="rounded-xl border border-border bg-card/70 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <p className="font-semibold">Inventory Pulse</p>
+            <p className="text-sm text-muted-foreground">Imports ready. Track products, stock, and orders.</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">Templates: 3</span>
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">Auto reorder: Enabled</span>
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">Sync: Local</span>
+        </div>
       </div>
 
       {/* Tabs */}

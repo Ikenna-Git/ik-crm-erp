@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Edit, Trash2, Plus, X, Download, MoreHorizontal, Eye } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { PaginationControls } from "@/components/shared/pagination-controls"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,30 +27,36 @@ export interface Expense {
 }
 
 const categoryColors: Record<string, string> = {
-  travel: "bg-blue-100 text-blue-800",
-  office: "bg-purple-100 text-purple-800",
-  meals: "bg-orange-100 text-orange-800",
-  software: "bg-green-100 text-green-800",
-  other: "bg-gray-100 text-gray-800",
+  travel: "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200",
+  office: "bg-purple-100 text-purple-800 dark:bg-purple-500/20 dark:text-purple-200",
+  meals: "bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-200",
+  software: "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-200",
+  utilities: "bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-200",
+  equipment: "bg-indigo-100 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-200",
+  other: "bg-gray-100 text-gray-800 dark:bg-slate-700/40 dark:text-slate-200",
 }
 
 const statusColors = {
-  approved: "bg-green-100 text-green-800",
-  pending: "bg-yellow-100 text-yellow-800",
-  rejected: "bg-red-100 text-red-800",
+  approved: "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-200",
+  pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-200",
+  rejected: "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200",
 }
 
-const mockExpenses: Expense[] = [
-  {
-    id: "1",
-    description: "Flight to Lagos",
-    category: "travel",
-    amount: 450000,
-    date: "2025-01-20",
-    status: "approved",
-    submittedBy: "John Smith",
-  },
-]
+const expenseCategories = ["travel", "office", "meals", "software", "other"]
+const expenseOwners = ["John Smith", "Adaeze Okafor", "Finance Ops", "HR Team", "Civis Bot"]
+
+const buildMockExpenses = (count: number): Expense[] =>
+  Array.from({ length: count }, (_, idx) => ({
+    id: `EXP-${(idx + 1).toString().padStart(3, "0")}`,
+    description: `Expense ${idx + 1} - ${expenseCategories[idx % expenseCategories.length]}`,
+    category: expenseCategories[idx % expenseCategories.length],
+    amount: 45000 + (idx % 10) * 25000,
+    date: new Date(2025, (idx % 12), (idx % 27) + 1).toISOString().slice(0, 10),
+    status: idx % 3 === 0 ? "approved" : "pending",
+    submittedBy: expenseOwners[idx % expenseOwners.length],
+  }))
+
+const mockExpenses: Expense[] = buildMockExpenses(70)
 
 type Props = {
   searchQuery: string
@@ -63,6 +70,7 @@ const formatNaira = (amount: number) =>
 
 export function ExpensesTable({ searchQuery, expenses: providedExpenses, onAddExpense, onDeleteExpense }: Props) {
   const [expenses, setExpenses] = useState<Expense[]>(providedExpenses || mockExpenses)
+  const [currentPage, setCurrentPage] = useState(1)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
@@ -77,11 +85,23 @@ export function ExpensesTable({ searchQuery, expenses: providedExpenses, onAddEx
     if (providedExpenses) setExpenses(providedExpenses)
   }, [providedExpenses])
 
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
+
   const filteredExpenses = expenses.filter(
     (expense) =>
       expense.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (expense.category || "").toLowerCase().includes(searchQuery.toLowerCase()),
   )
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(filteredExpenses.length / PAGE_SIZE))
+  const pagedExpenses = filteredExpenses.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+  }, [currentPage, totalPages])
 
   const stats = {
     approved: expenses.filter((e) => e.status === "approved").reduce((sum, e) => sum + e.amount, 0),
@@ -90,12 +110,13 @@ export function ExpensesTable({ searchQuery, expenses: providedExpenses, onAddEx
 
   const handleAddExpense = (e: React.FormEvent) => {
     e.preventDefault()
+    const existing = editingId ? expenses.find((exp) => exp.id === editingId) : undefined
     const payload: Omit<Expense, "id"> = {
       description: formData.description,
       category: formData.category,
       amount: Number.parseFloat(formData.amount),
       date: formData.date,
-      status: "pending",
+      status: existing?.status || "pending",
       submittedBy: formData.submittedBy,
     }
     if (editingId) {
@@ -203,7 +224,7 @@ export function ExpensesTable({ searchQuery, expenses: providedExpenses, onAddEx
                 </tr>
               </thead>
               <tbody>
-                {filteredExpenses.map((expense) => (
+                {pagedExpenses.map((expense) => (
                   <tr key={expense.id} className="border-b border-border hover:bg-muted/50 transition">
                     <td className="py-4 px-4">
                       <div>
@@ -213,7 +234,7 @@ export function ExpensesTable({ searchQuery, expenses: providedExpenses, onAddEx
                     </td>
                     <td className="py-4 px-4">
                       <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${categoryColors[expense.category] || "bg-gray-100 text-gray-800"}`}
+                        className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${categoryColors[expense.category] || "bg-gray-100 text-gray-800 dark:bg-slate-700/40 dark:text-slate-200"}`}
                       >
                         {expense.category}
                       </span>
@@ -255,6 +276,13 @@ export function ExpensesTable({ searchQuery, expenses: providedExpenses, onAddEx
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="pt-4">
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
           </div>
         </CardContent>
       </Card>

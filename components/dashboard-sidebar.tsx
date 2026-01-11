@@ -10,6 +10,7 @@ import {
   Users,
   TrendingUp,
   Settings,
+  Workflow,
   LogOut,
   ImageIcon,
   BookOpen,
@@ -28,7 +29,7 @@ const navigation = [
   { name: "Docs", href: "/dashboard/docs", icon: BookOpen },
   { name: "Demo", href: "/dashboard/demo", icon: Play },
   { name: "Analytics", href: "/dashboard/analytics", icon: TrendingUp },
-  { name: "Operations", href: "/dashboard/operations", icon: Settings },
+  { name: "Operations", href: "/dashboard/operations", icon: Workflow },
 ]
 
 export function DashboardSidebar() {
@@ -55,7 +56,10 @@ export function DashboardSidebar() {
       <nav className="flex-1 p-4 space-y-2 overflow-auto">
         {navigation.map((item) => {
           const Icon = item.icon
-          const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+          const isOverview = item.href === "/dashboard"
+          const isActive = isOverview
+            ? pathname === "/dashboard"
+            : pathname === item.href || pathname.startsWith(item.href + "/")
 
           return (
             <Link

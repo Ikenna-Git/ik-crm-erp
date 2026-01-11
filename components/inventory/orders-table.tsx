@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Eye, Trash2, Truck, MoreHorizontal, Edit, X } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { PaginationControls } from "@/components/shared/pagination-controls"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,55 +27,33 @@ interface PurchaseOrder {
 }
 
 const statusColors = {
-  draft: "bg-slate-100 text-slate-800",
-  ordered: "bg-blue-100 text-blue-800",
-  "in-transit": "bg-yellow-100 text-yellow-800",
-  delivered: "bg-green-100 text-green-800",
-  cancelled: "bg-red-100 text-red-800",
+  draft: "bg-slate-100 text-slate-800 dark:bg-slate-700/40 dark:text-slate-200",
+  ordered: "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200",
+  "in-transit": "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-200",
+  delivered: "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-200",
+  cancelled: "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200",
 }
 
-const mockOrders: PurchaseOrder[] = [
-  {
-    id: "1",
-    orderNo: "PO-2025-001",
-    supplier: "TechGear Inc",
-    items: 50,
-    totalValue: 32500,
-    orderDate: "2025-01-10",
-    expectedDelivery: "2025-02-05",
-    status: "delivered",
-  },
-  {
-    id: "2",
-    orderNo: "PO-2025-002",
-    supplier: "PeripheralCo",
-    items: 200,
-    totalValue: 4800,
-    orderDate: "2025-01-18",
-    expectedDelivery: "2025-02-08",
-    status: "in-transit",
-  },
-  {
-    id: "3",
-    orderNo: "PO-2025-003",
-    supplier: "CableMaster",
-    items: 500,
-    totalValue: 2500,
-    orderDate: "2025-01-22",
-    expectedDelivery: "2025-02-15",
-    status: "ordered",
-  },
-  {
-    id: "4",
-    orderNo: "PO-2025-004",
-    supplier: "DisplayTech",
-    items: 15,
-    totalValue: 3750,
-    orderDate: "2025-01-25",
-    expectedDelivery: "2025-02-20",
-    status: "draft",
-  },
-]
+const orderSuppliers = ["TechGear Inc", "PeripheralCo", "CableMaster", "DisplayTech", "OfficeWorks", "Nimbus Supply"]
+const orderStatuses: PurchaseOrder["status"][] = ["draft", "ordered", "in-transit", "delivered", "cancelled"]
+
+const buildMockOrders = (count: number): PurchaseOrder[] =>
+  Array.from({ length: count }, (_, idx) => {
+    const orderDate = new Date(2025, (idx % 12), (idx % 27) + 1).toISOString().slice(0, 10)
+    const expectedDelivery = new Date(2025, (idx % 12), (idx % 27) + 6).toISOString().slice(0, 10)
+    return {
+      id: `PO-${(idx + 1).toString().padStart(3, "0")}`,
+      orderNo: `PO-2025-${(idx + 1).toString().padStart(3, "0")}`,
+      supplier: orderSuppliers[idx % orderSuppliers.length],
+      items: 10 + (idx % 12) * 5,
+      totalValue: 2500 + (idx % 10) * 1800,
+      orderDate,
+      expectedDelivery,
+      status: orderStatuses[idx % orderStatuses.length],
+    }
+  })
+
+const mockOrders: PurchaseOrder[] = buildMockOrders(70)
 
 const STORAGE_KEY = "civis_inventory_orders"
 const IMPORT_EVENT = "civis-inventory-import"
@@ -89,6 +68,7 @@ const formatNaira = (amount: number) => {
 
 export function OrdersTable({ searchQuery }: { searchQuery: string }) {
   const [orders, setOrders] = useState<PurchaseOrder[]>(mockOrders)
+  const [currentPage, setCurrentPage] = useState(1)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({
@@ -107,7 +87,12 @@ export function OrdersTable({ searchQuery }: { searchQuery: string }) {
       if (stored) {
         const parsed = JSON.parse(stored)
         if (Array.isArray(parsed)) {
-          setOrders(parsed)
+          const merged = [
+            ...parsed,
+            ...mockOrders.filter((seed) => !parsed.some((item: PurchaseOrder) => item.id === seed.id)),
+          ]
+          setOrders(merged)
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
           return
         }
       }
@@ -143,6 +128,18 @@ export function OrdersTable({ searchQuery }: { searchQuery: string }) {
       order.orderNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.supplier.toLowerCase().includes(searchQuery.toLowerCase()),
   )
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE))
+  const pagedOrders = filteredOrders.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+  }, [currentPage, totalPages])
 
   const stats = {
     pending: filteredOrders.filter((o) => o.status === "ordered" || o.status === "draft").length,
@@ -244,7 +241,7 @@ export function OrdersTable({ searchQuery }: { searchQuery: string }) {
                 </tr>
               </thead>
               <tbody>
-                {filteredOrders.map((order) => (
+                {pagedOrders.map((order) => (
                   <tr key={order.id} className="border-b border-border hover:bg-muted/50 transition">
                     <td className="py-4 px-4 font-medium">{order.orderNo}</td>
                     <td className="py-4 px-4">{order.supplier}</td>
@@ -284,6 +281,13 @@ export function OrdersTable({ searchQuery }: { searchQuery: string }) {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="pt-4">
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
           </div>
         </CardContent>
       </Card>
