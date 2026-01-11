@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Edit, Trash2, MoreHorizontal, Eye, X } from "lucide-react"
+import { Edit, Trash2, MoreHorizontal, Eye, X, Lock } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -111,6 +111,11 @@ export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
   const [employees, setEmployees] = useState<Employee[]>(mockEmployees)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [isUnlocked, setIsUnlocked] = useState(false)
+  const [showSalaries, setShowSalaries] = useState(false)
+  const [accessCode, setAccessCode] = useState("1234")
+  const [accessInput, setAccessInput] = useState("")
+  const [accessError, setAccessError] = useState("")
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -126,6 +131,17 @@ export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
     setEmployees(mockEmployees)
   }, [])
 
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const stored = localStorage.getItem("civis_hr_access_code")
+    if (stored) {
+      setAccessCode(stored)
+    } else {
+      localStorage.setItem("civis_hr_access_code", "1234")
+    }
+    setShowSalaries(false)
+  }, [])
+
   const filteredEmployees = employees.filter(
     (emp) =>
       emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -136,7 +152,28 @@ export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
   const activeEmployees = employees.filter((e) => e.status === "active").length
   const totalSalary = employees.reduce((sum, e) => sum + e.salary, 0)
 
+  const displaySalary = isUnlocked && showSalaries
+
+  const unlockAccess = () => {
+    if (accessInput.trim() !== accessCode) {
+      setAccessError("Invalid access code.")
+      return
+    }
+    setIsUnlocked(true)
+    setShowSalaries(true)
+    setAccessInput("")
+    setAccessError("")
+  }
+
+  const lockAccess = () => {
+    setIsUnlocked(false)
+    setShowSalaries(false)
+    setAccessInput("")
+    setAccessError("")
+  }
+
   const openEditor = (employee?: Employee) => {
+    if (!isUnlocked) return
     if (employee) {
       setEditingId(employee.id)
       setForm({
@@ -187,11 +224,51 @@ export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
   }
 
   const deleteEmployee = (id: string) => {
+    if (!isUnlocked) return
     setEmployees((prev) => prev.filter((e) => e.id !== id))
   }
 
   return (
     <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>HR Access</CardTitle>
+          <CardDescription>Protect employee salary data with an access code.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!isUnlocked ? (
+            <div className="grid md:grid-cols-3 gap-4">
+              <div className="md:col-span-2">
+                <Label className="text-sm font-medium">Access code</Label>
+                <Input
+                  type="password"
+                  value={accessInput}
+                  onChange={(e) => setAccessInput(e.target.value)}
+                  placeholder="Enter HR access code"
+                />
+                {accessError ? <p className="text-xs text-destructive mt-2">{accessError}</p> : null}
+              </div>
+              <div className="flex items-end">
+                <Button className="w-full" onClick={unlockAccess}>
+                  Unlock HR Data
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <p className="text-sm text-muted-foreground">HR data unlocked for this session.</p>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" className="bg-transparent" onClick={() => setShowSalaries(!showSalaries)}>
+                  {showSalaries ? "Hide salaries" : "Show salaries"}
+                </Button>
+                <Button variant="secondary" onClick={lockAccess}>
+                  Lock HR Data
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
       {/* Stats */}
       <div className="grid md:grid-cols-3 gap-4">
         <Card>
@@ -209,7 +286,7 @@ export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Total Salary Cost</p>
-            <p className="text-2xl font-bold text-primary">{formatNaira(totalSalary)}</p>
+            <p className="text-2xl font-bold text-primary">{displaySalary ? formatNaira(totalSalary) : "****"}</p>
           </CardContent>
         </Card>
       </div>
@@ -260,29 +337,35 @@ export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
                       </Badge>
                     </td>
                     <td className="py-4 px-4 text-muted-foreground">{employee.startDate}</td>
-                    <td className="py-4 px-4 font-semibold">{formatNaira(employee.salary)}</td>
+                    <td className="py-4 px-4 font-semibold">{displaySalary ? formatNaira(employee.salary) : "****"}</td>
                     <td className="py-4 px-4">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="p-2">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => alert(JSON.stringify(employee, null, 2))}>
-                            <Eye className="w-4 h-4 mr-2" />
-                            View details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openEditor(employee)}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive" onClick={() => deleteEmployee(employee.id)}>
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      {isUnlocked ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="p-2">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => alert(JSON.stringify(employee, null, 2))}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              View details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openEditor(employee)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive" onClick={() => deleteEmployee(employee.id)}>
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : (
+                        <Button variant="ghost" size="sm" className="p-2" disabled>
+                          <Lock className="w-4 h-4" />
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}

@@ -28,6 +28,7 @@ const navigation = [
   { name: "Docs", href: "/dashboard/docs", icon: BookOpen },
   { name: "Demo", href: "/dashboard/demo", icon: Play },
   { name: "Analytics", href: "/dashboard/analytics", icon: TrendingUp },
+  { name: "Operations", href: "/dashboard/operations", icon: Settings },
 ]
 
 export function DashboardSidebar() {
