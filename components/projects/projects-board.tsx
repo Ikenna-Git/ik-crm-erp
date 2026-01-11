@@ -94,6 +94,7 @@ const formatNaira = (amount: number) => {
 
 type ProjectsBoardProps = {
   searchQuery: string
+  statusFilter?: "all" | Project["status"]
   projects?: Project[]
   onAddProject?: (data: Omit<Project, "id">) => void
   onUpdateProject?: (id: string, data: Omit<Project, "id">) => void
@@ -102,6 +103,7 @@ type ProjectsBoardProps = {
 
 export function ProjectsBoard({
   searchQuery,
+  statusFilter = "all",
   projects: providedProjects,
   onAddProject,
   onUpdateProject,
@@ -131,7 +133,9 @@ export function ProjectsBoard({
 
   const filteredProjects = projects.filter((p) => {
     const query = searchQuery.toLowerCase()
-    return p.name.toLowerCase().includes(query) || (p.client || "").toLowerCase().includes(query)
+    const matchesQuery = p.name.toLowerCase().includes(query) || (p.client || "").toLowerCase().includes(query)
+    const matchesStatus = statusFilter === "all" ? true : p.status === statusFilter
+    return matchesQuery && matchesStatus
   })
 
   const PAGE_SIZE = 10
@@ -140,7 +144,7 @@ export function ProjectsBoard({
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery])
+  }, [searchQuery, statusFilter])
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages)

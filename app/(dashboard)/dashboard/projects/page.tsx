@@ -23,6 +23,7 @@ export default function ProjectsPage() {
   const searchQuery = ""
   const [projects, setProjects] = useState<Project[]>(mockProjects)
   const [openProjectDialog, setOpenProjectDialog] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<"all" | Project["status"]>("all")
   const [projectForm, setProjectForm] = useState({
     name: "",
     client: "",
@@ -160,7 +161,7 @@ export default function ProjectsPage() {
             <p className="text-sm text-muted-foreground">Keep milestones on track with live project health.</p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
             Total: {projects.length}
           </span>
@@ -170,6 +171,20 @@ export default function ProjectsPage() {
           <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
             Completed: {projects.filter((project) => project.status === "completed").length}
           </span>
+          <div className="min-w-[160px]">
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}>
+              <SelectTrigger className="h-8 text-xs bg-background">
+                <SelectValue placeholder="Filter status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="planning">Planning</SelectItem>
+                <SelectItem value="in-progress">In Progress</SelectItem>
+                <SelectItem value="on-hold">On Hold</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
@@ -185,6 +200,7 @@ export default function ProjectsPage() {
         <TabsContent value="board" className="space-y-4">
           <ProjectsBoard
             searchQuery={searchQuery}
+            statusFilter={statusFilter}
             projects={projects}
             onAddProject={(data) => setProjects((prev) => [{ id: Date.now().toString(), ...data }, ...prev])}
             onUpdateProject={handleUpdateProject}
