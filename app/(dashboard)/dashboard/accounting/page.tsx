@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Plus, Search, Download } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,7 @@ export default function AccountingPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(false)
+  const [importNotice, setImportNotice] = useState("")
   const [openInvoiceDialog, setOpenInvoiceDialog] = useState(false)
   const [invoiceForm, setInvoiceForm] = useState({
     invoiceNumber: "",
@@ -60,6 +62,102 @@ export default function AccountingPage() {
     } catch {
       throw new Error(`Invalid JSON response: ${text.slice(0, 120)}`)
     }
+  }
+
+  const splitCsvLine = (line: string) => {
+    const result: string[] = []
+    let current = ""
+    let inQuotes = false
+    for (let i = 0; i < line.length; i += 1) {
+      const char = line[i]
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"'
+          i += 1
+        } else {
+          inQuotes = !inQuotes
+        }
+      } else if (char === "," && !inQuotes) {
+        result.push(current)
+        current = ""
+      } else {
+        current += char
+      }
+    }
+    result.push(current)
+    return result.map((value) => value.trim())
+  }
+
+  const parseCsv = (text: string) => {
+    const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0)
+    if (!lines.length) return []
+    const headers = splitCsvLine(lines[0]).map((h) => h.toLowerCase())
+    return lines.slice(1).map((line) => {
+      const values = splitCsvLine(line)
+      const record: Record<string, string> = {}
+      headers.forEach((header, idx) => {
+        record[header] = values[idx] ?? ""
+      })
+      return record
+    })
+  }
+
+  const parseNumber = (value: string) => {
+    const cleaned = String(value || "").replace(/[^0-9.-]/g, "")
+    return Number.parseFloat(cleaned || "0")
+  }
+
+  const downloadTemplate = (type: "invoices" | "expenses") => {
+    const headers =
+      type === "invoices"
+        ? ["invoiceNumber", "clientName", "amount", "status", "dueDate"]
+        : ["description", "amount", "category", "date"]
+    const sample =
+      type === "invoices"
+        ? ["INV-2025-001", "Acme Corp", "120000", "sent", "2025-02-15"]
+        : ["Cloud hosting", "85000", "utilities", "2025-01-10"]
+    const csv = [headers.join(","), sample.join(",")].join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = type === "invoices" ? "accounting-invoices-template.csv" : "accounting-expenses-template.csv"
+    a.click()
+    window.URL.revokeObjectURL(url)
+  }
+
+  const handleImportInvoices = async (file: File) => {
+    const text = await file.text()
+    const rows = parseCsv(text)
+    if (!rows.length) return setImportNotice("No invoices found in file.")
+    const mapped: Invoice[] = rows.map((row, idx) => ({
+      id: `IMP-INV-${Date.now()}-${idx}`,
+      number: row.invoicenumber || row.number || row.invoice || `INV-IMPORT-${idx + 1}`,
+      client: row.clientname || row.client || "Imported Client",
+      amount: parseNumber(row.amount),
+      status: (row.status as Invoice["status"]) || "draft",
+      dueDate: row.duedate || row.due || undefined,
+      date: row.date || undefined,
+    }))
+    setInvoices((prev) => [...mapped, ...prev])
+    setImportNotice(`Imported ${mapped.length} invoices.`)
+  }
+
+  const handleImportExpenses = async (file: File) => {
+    const text = await file.text()
+    const rows = parseCsv(text)
+    if (!rows.length) return setImportNotice("No expenses found in file.")
+    const mapped: Expense[] = rows.map((row, idx) => ({
+      id: `IMP-EXP-${Date.now()}-${idx}`,
+      description: row.description || "Imported expense",
+      amount: parseNumber(row.amount),
+      category: row.category || "general",
+      date: row.date || undefined,
+      status: "pending",
+      submittedBy: "Import",
+    }))
+    setExpenses((prev) => [...mapped, ...prev])
+    setImportNotice(`Imported ${mapped.length} expenses.`)
   }
 
   const loadData = async () => {
@@ -436,10 +534,11 @@ export default function AccountingPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="invoices" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="invoices">Invoices</TabsTrigger>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
+          <TabsTrigger value="import">Import</TabsTrigger>
         </TabsList>
 
         {/* Invoices Tab */}
@@ -455,6 +554,54 @@ export default function AccountingPage() {
         {/* Reports Tab */}
         <TabsContent value="reports" className="space-y-4">
           <FinancialReports />
+        </TabsContent>
+
+        <TabsContent value="import" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Import Data</CardTitle>
+              <CardDescription>Upload CSV files using the templates below.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {importNotice ? <div className="text-sm text-primary">{importNotice}</div> : null}
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-3 border border-border rounded-lg p-4">
+                  <div>
+                    <p className="font-medium">Invoices CSV</p>
+                    <p className="text-sm text-muted-foreground">Use the template to match required columns.</p>
+                  </div>
+                  <Button variant="outline" className="bg-transparent w-full" onClick={() => downloadTemplate("invoices")}>
+                    Download invoice template
+                  </Button>
+                  <Input
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) handleImportInvoices(file)
+                    }}
+                  />
+                </div>
+                <div className="space-y-3 border border-border rounded-lg p-4">
+                  <div>
+                    <p className="font-medium">Expenses CSV</p>
+                    <p className="text-sm text-muted-foreground">Use the template to match required columns.</p>
+                  </div>
+                  <Button variant="outline" className="bg-transparent w-full" onClick={() => downloadTemplate("expenses")}>
+                    Download expenses template
+                  </Button>
+                  <Input
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) handleImportExpenses(file)
+                    }}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

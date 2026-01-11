@@ -39,6 +39,50 @@ const statsCards = [
   { icon: TrendingUp, label: "Growth Rate", value: "23%", change: "+3%" },
 ]
 
+const recentActivity = [
+  {
+    id: "act-1",
+    title: "Invoice INV-2025-014 marked as paid",
+    detail: "Acme Corp • ₦1,250,000",
+    time: "2 hours ago",
+    status: "success",
+  },
+  {
+    id: "act-2",
+    title: "New lead added to CRM",
+    detail: "Northwind Trading • Adaeze Okafor",
+    time: "5 hours ago",
+    status: "info",
+  },
+  {
+    id: "act-3",
+    title: "Payroll batch processed",
+    detail: "January payroll • 18 employees",
+    time: "Yesterday",
+    status: "success",
+  },
+  {
+    id: "act-4",
+    title: "Stock alert: Low inventory",
+    detail: "Wireless Mouse • Reorder 50 units",
+    time: "Yesterday",
+    status: "warning",
+  },
+  {
+    id: "act-5",
+    title: "Project milestone completed",
+    detail: "Website Redesign • Phase 2",
+    time: "2 days ago",
+    status: "info",
+  },
+]
+
+const activityStatusStyles = {
+  success: "bg-green-100 text-green-800",
+  warning: "bg-yellow-100 text-yellow-800",
+  info: "bg-blue-100 text-blue-800",
+}
+
 export default function DashboardPage() {
   return (
     <div className="p-6 space-y-6">
@@ -129,13 +173,21 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex items-center justify-between pb-4 border-b border-border last:border-0">
+            {recentActivity.map((activity) => (
+              <div
+                key={activity.id}
+                className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 pb-4 border-b border-border last:border-0"
+              >
                 <div>
-                  <p className="font-medium">Activity item {i + 1}</p>
-                  <p className="text-sm text-muted-foreground">2 hours ago</p>
+                  <p className="font-medium">{activity.title}</p>
+                  <p className="text-sm text-muted-foreground">{activity.detail}</p>
                 </div>
-                <span className="text-sm text-primary">New</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">{activity.time}</span>
+                  <span className={`text-xs px-2 py-1 rounded-full ${activityStatusStyles[activity.status]}`}>
+                    {activity.status}
+                  </span>
+                </div>
               </div>
             ))}
           </div>

@@ -73,9 +73,11 @@ export function DashboardSidebar() {
 
       {/* Footer */}
       <div className="p-4 border-t border-border space-y-2">
-        <Button variant="outline" className="w-full justify-start gap-2 bg-transparent">
-          <Settings className="w-4 h-4" />
-          Settings
+        <Button variant="outline" className="w-full justify-start gap-2 bg-transparent" asChild>
+          <Link href="/dashboard/settings">
+            <Settings className="w-4 h-4" />
+            Settings
+          </Link>
         </Button>
         <Button
           variant="outline"

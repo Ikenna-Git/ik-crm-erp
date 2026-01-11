@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { Bell, Search, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -32,9 +33,11 @@ export function DashboardHeader() {
         <Button variant="ghost" size="sm">
           <Bell className="w-5 h-5" />
         </Button>
-        <Button variant="ghost" size="sm" className="flex items-center gap-2">
-          <User className="w-5 h-5" />
-          <span className="text-sm">{userName}</span>
+        <Button variant="ghost" size="sm" className="flex items-center gap-2" asChild>
+          <Link href="/dashboard/profile">
+            <User className="w-5 h-5" />
+            <span className="text-sm">{userName}</span>
+          </Link>
         </Button>
       </div>
     </header>

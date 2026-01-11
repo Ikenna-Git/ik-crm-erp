@@ -6,8 +6,14 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Edit, Trash2, Plus, X, Download } from "lucide-react"
+import { Edit, Trash2, Plus, X, Download, MoreHorizontal, Eye } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 export interface Expense {
   id: string
@@ -58,6 +64,7 @@ const formatNaira = (amount: number) =>
 export function ExpensesTable({ searchQuery, expenses: providedExpenses, onAddExpense, onDeleteExpense }: Props) {
   const [expenses, setExpenses] = useState<Expense[]>(providedExpenses || mockExpenses)
   const [showModal, setShowModal] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     description: "",
     category: "travel",
@@ -91,7 +98,10 @@ export function ExpensesTable({ searchQuery, expenses: providedExpenses, onAddEx
       status: "pending",
       submittedBy: formData.submittedBy,
     }
-    if (onAddExpense) {
+    if (editingId) {
+      setExpenses((prev) => prev.map((exp) => (exp.id === editingId ? { ...exp, ...payload } : exp)))
+      setEditingId(null)
+    } else if (onAddExpense) {
       onAddExpense(payload)
     } else {
       setExpenses((prev) => [...prev, { id: Date.now().toString(), ...payload }])
@@ -112,6 +122,18 @@ export function ExpensesTable({ searchQuery, expenses: providedExpenses, onAddEx
     } else {
       setExpenses(expenses.filter((exp) => exp.id !== id))
     }
+  }
+
+  const handleEditExpense = (expense: Expense) => {
+    setEditingId(expense.id)
+    setFormData({
+      description: expense.description,
+      category: expense.category,
+      amount: String(expense.amount),
+      date: expense.date || "",
+      submittedBy: expense.submittedBy || "",
+    })
+    setShowModal(true)
   }
 
   const downloadExpensesCSV = () => {
@@ -203,18 +225,31 @@ export function ExpensesTable({ searchQuery, expenses: providedExpenses, onAddEx
                       </Badge>
                     </td>
                     <td className="py-4 px-4 text-muted-foreground">{expense.date || "—"}</td>
-                    <td className="py-4 px-4 flex gap-2">
-                      <Button variant="ghost" size="sm">
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive"
-                        onClick={() => handleDeleteExpense(expense.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                    <td className="py-4 px-4">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="p-2">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => alert(JSON.stringify(expense, null, 2))}>
+                            <Eye className="w-4 h-4 mr-2" />
+                            View details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditExpense(expense)}>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => handleDeleteExpense(expense.id)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </td>
                   </tr>
                 ))}
@@ -229,7 +264,7 @@ export function ExpensesTable({ searchQuery, expenses: providedExpenses, onAddEx
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle>Add New Expense</CardTitle>
+              <CardTitle>{editingId ? "Edit Expense" : "Add New Expense"}</CardTitle>
               <Button variant="ghost" size="sm" onClick={() => setShowModal(false)}>
                 <X className="w-4 h-4" />
               </Button>

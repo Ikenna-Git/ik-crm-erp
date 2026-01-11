@@ -1,9 +1,18 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Edit, Trash2 } from "lucide-react"
+import { Edit, Trash2, MoreHorizontal, Eye, X } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 interface Employee {
   id: string
@@ -99,15 +108,87 @@ const formatNaira = (amount: number) => {
 }
 
 export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
-  const filteredEmployees = mockEmployees.filter(
+  const [employees, setEmployees] = useState<Employee[]>(mockEmployees)
+  const [showModal, setShowModal] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    department: "",
+    position: "",
+    startDate: "",
+    status: "active" as Employee["status"],
+    salary: "",
+  })
+
+  useEffect(() => {
+    setEmployees(mockEmployees)
+  }, [])
+
+  const filteredEmployees = employees.filter(
     (emp) =>
       emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       emp.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       emp.department.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
-  const activeEmployees = mockEmployees.filter((e) => e.status === "active").length
-  const totalSalary = mockEmployees.reduce((sum, e) => sum + e.salary, 0)
+  const activeEmployees = employees.filter((e) => e.status === "active").length
+  const totalSalary = employees.reduce((sum, e) => sum + e.salary, 0)
+
+  const openEditor = (employee?: Employee) => {
+    if (employee) {
+      setEditingId(employee.id)
+      setForm({
+        name: employee.name,
+        email: employee.email,
+        phone: employee.phone,
+        department: employee.department,
+        position: employee.position,
+        startDate: employee.startDate,
+        status: employee.status,
+        salary: String(employee.salary),
+      })
+    } else {
+      setEditingId(null)
+      setForm({
+        name: "",
+        email: "",
+        phone: "",
+        department: "",
+        position: "",
+        startDate: "",
+        status: "active",
+        salary: "",
+      })
+    }
+    setShowModal(true)
+  }
+
+  const saveEmployee = () => {
+    const payload: Employee = {
+      id: editingId || Date.now().toString(),
+      name: form.name || "Unnamed",
+      email: form.email || "user@example.com",
+      phone: form.phone || "",
+      department: form.department || "Operations",
+      position: form.position || "Staff",
+      startDate: form.startDate || new Date().toISOString().slice(0, 10),
+      status: form.status,
+      salary: Number(form.salary || 0),
+    }
+    if (editingId) {
+      setEmployees((prev) => prev.map((e) => (e.id === editingId ? payload : e)))
+    } else {
+      setEmployees((prev) => [payload, ...prev])
+    }
+    setShowModal(false)
+    setEditingId(null)
+  }
+
+  const deleteEmployee = (id: string) => {
+    setEmployees((prev) => prev.filter((e) => e.id !== id))
+  }
 
   return (
     <div className="space-y-4">
@@ -180,13 +261,28 @@ export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
                     </td>
                     <td className="py-4 px-4 text-muted-foreground">{employee.startDate}</td>
                     <td className="py-4 px-4 font-semibold">{formatNaira(employee.salary)}</td>
-                    <td className="py-4 px-4 flex gap-2">
-                      <Button variant="ghost" size="sm">
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="text-destructive">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                    <td className="py-4 px-4">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="p-2">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => alert(JSON.stringify(employee, null, 2))}>
+                            <Eye className="w-4 h-4 mr-2" />
+                            View details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openEditor(employee)}>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive" onClick={() => deleteEmployee(employee.id)}>
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </td>
                   </tr>
                 ))}
@@ -195,6 +291,75 @@ export function EmployeesTable({ searchQuery }: { searchQuery: string }) {
           </div>
         </CardContent>
       </Card>
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-3xl mx-4">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <div>
+                <CardTitle>{editingId ? "Edit Employee" : "Add Employee"}</CardTitle>
+                <CardDescription>Update details and roles.</CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setShowModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label className="text-sm font-medium">Full name</Label>
+                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Email</Label>
+                  <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Phone</Label>
+                  <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Department</Label>
+                  <Input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Position</Label>
+                  <Input value={form.position} onChange={(e) => setForm({ ...form, position: e.target.value })} />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Start date</Label>
+                  <Input
+                    type="date"
+                    value={form.startDate}
+                    onChange={(e) => setForm({ ...form, startDate: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Status</Label>
+                  <Input
+                    value={form.status}
+                    onChange={(e) => setForm({ ...form, status: e.target.value as Employee["status"] })}
+                  />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Salary</Label>
+                  <Input
+                    type="number"
+                    value={form.salary}
+                    onChange={(e) => setForm({ ...form, salary: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 justify-end">
+                <Button variant="outline" className="bg-transparent" onClick={() => setShowModal(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={saveEmployee}>{editingId ? "Save changes" : "Add employee"}</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

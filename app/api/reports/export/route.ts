@@ -12,6 +12,12 @@ type ExportBody = {
 }
 
 export async function POST(request: Request) {
+  if (!process.env.DATABASE_URL) {
+    return NextResponse.json(
+      { error: "Database not configured. Set DATABASE_URL to enable report exports." },
+      { status: 503 },
+    )
+  }
   const body = (await request.json()) as ExportBody
   const { type, target, email } = body
 

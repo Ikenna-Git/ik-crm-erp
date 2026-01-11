@@ -6,8 +6,14 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Edit, Trash2, Plus, X, Download, Eye } from "lucide-react"
+import { Edit, Trash2, Plus, X, Download, Eye, MoreHorizontal } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 export interface Invoice {
   id: string
@@ -51,6 +57,7 @@ const formatNaira = (amount: number) =>
 export function InvoicesTable({ searchQuery, invoices: providedInvoices, onAddInvoice, onDeleteInvoice }: Props) {
   const [invoices, setInvoices] = useState<Invoice[]>(providedInvoices || mockInvoices)
   const [showModal, setShowModal] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     number: "",
     client: "",
@@ -85,7 +92,12 @@ export function InvoicesTable({ searchQuery, invoices: providedInvoices, onAddIn
       date: formData.date,
       dueDate: formData.dueDate,
     }
-    if (onAddInvoice) {
+    if (editingId) {
+      setInvoices((prev) =>
+        prev.map((inv) => (inv.id === editingId ? { ...inv, ...payload } : inv)),
+      )
+      setEditingId(null)
+    } else if (onAddInvoice) {
       onAddInvoice(payload)
     } else {
       setInvoices((prev) => [...prev, { id: Date.now().toString(), ...payload }])
@@ -100,6 +112,18 @@ export function InvoicesTable({ searchQuery, invoices: providedInvoices, onAddIn
     } else {
       setInvoices(invoices.filter((inv) => inv.id !== id))
     }
+  }
+
+  const handleEditInvoice = (invoice: Invoice) => {
+    setEditingId(invoice.id)
+    setFormData({
+      number: invoice.number,
+      client: invoice.client,
+      amount: String(invoice.amount),
+      date: invoice.date || "",
+      dueDate: invoice.dueDate || "",
+    })
+    setShowModal(true)
   }
 
   const downloadInvoicesCSV = () => {
@@ -181,21 +205,35 @@ export function InvoicesTable({ searchQuery, invoices: providedInvoices, onAddIn
                       </Badge>
                     </td>
                     <td className="py-4 px-4 text-muted-foreground">{invoice.dueDate || "—"}</td>
-                    <td className="py-4 px-4 flex gap-2">
-                      <Button variant="ghost" size="sm">
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <Download className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive"
-                        onClick={() => handleDeleteInvoice(invoice.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                    <td className="py-4 px-4">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="p-2">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => alert(JSON.stringify(invoice, null, 2))}>
+                            <Eye className="w-4 h-4 mr-2" />
+                            View details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditInvoice(invoice)}>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => downloadInvoicesCSV()}>
+                            <Download className="w-4 h-4 mr-2" />
+                            Download PDF
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => handleDeleteInvoice(invoice.id)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </td>
                   </tr>
                 ))}
@@ -210,7 +248,7 @@ export function InvoicesTable({ searchQuery, invoices: providedInvoices, onAddIn
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle>Add New Invoice</CardTitle>
+              <CardTitle>{editingId ? "Edit Invoice" : "Add New Invoice"}</CardTitle>
               <Button variant="ghost" size="sm" onClick={() => setShowModal(false)}>
                 <X className="w-4 h-4" />
               </Button>
@@ -267,7 +305,7 @@ export function InvoicesTable({ searchQuery, invoices: providedInvoices, onAddIn
                     Cancel
                   </Button>
                   <Button type="submit" className="flex-1">
-                    Add Invoice
+                    {editingId ? "Save Changes" : "Add Invoice"}
                   </Button>
                 </div>
               </form>

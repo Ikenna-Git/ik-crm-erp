@@ -2,13 +2,19 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Download, Eye, EyeOff, Plus, X } from "lucide-react"
+import { Download, Eye, EyeOff, Plus, X, MoreHorizontal, Edit, Trash2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { formatNaira } from "@/lib/currency"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface PayrollRecord {
   id: string
@@ -74,6 +80,13 @@ export function PayrollTable({ searchQuery }: { searchQuery: string }) {
   const [payroll, setPayroll] = useState<PayrollRecord[]>(mockPayroll)
   const [showAmounts, setShowAmounts] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [isUnlocked, setIsUnlocked] = useState(false)
+  const [accessCode, setAccessCode] = useState("1234")
+  const [accessInput, setAccessInput] = useState("")
+  const [accessError, setAccessError] = useState("")
+  const [newAccessCode, setNewAccessCode] = useState("")
+  const [confirmAccessCode, setConfirmAccessCode] = useState("")
   const [formData, setFormData] = useState({
     employee: "",
     period: "",
@@ -94,6 +107,19 @@ export function PayrollTable({ searchQuery }: { searchQuery: string }) {
     total: filteredPayroll.reduce((sum, p) => sum + p.netPay, 0),
   }
 
+  const displayAmounts = isUnlocked && showAmounts
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const stored = localStorage.getItem("civis_payroll_access_code")
+    if (stored) {
+      setAccessCode(stored)
+    } else {
+      localStorage.setItem("civis_payroll_access_code", "1234")
+    }
+    setShowAmounts(false)
+  }, [])
+
   const handleAddPayroll = (e: React.FormEvent) => {
     e.preventDefault()
     const baseSalary = Number.parseFloat(formData.baseSalary)
@@ -102,7 +128,7 @@ export function PayrollTable({ searchQuery }: { searchQuery: string }) {
     const netPay = baseSalary + bonus - deductions
 
     const newRecord: PayrollRecord = {
-      id: Date.now().toString(),
+      id: editingId || Date.now().toString(),
       employee: formData.employee,
       period: formData.period,
       baseSalary,
@@ -111,9 +137,31 @@ export function PayrollTable({ searchQuery }: { searchQuery: string }) {
       netPay,
       status: "pending",
     }
-    setPayroll([...payroll, newRecord])
+    if (editingId) {
+      setPayroll((prev) => prev.map((p) => (p.id === editingId ? newRecord : p)))
+      setEditingId(null)
+    } else {
+      setPayroll([...payroll, newRecord])
+    }
     setFormData({ employee: "", period: "", baseSalary: "", bonus: "", deductions: "" })
     setShowModal(false)
+  }
+
+  const handleEditPayroll = (record: PayrollRecord) => {
+    if (!isUnlocked) return
+    setEditingId(record.id)
+    setFormData({
+      employee: record.employee,
+      period: record.period,
+      baseSalary: String(record.baseSalary),
+      bonus: String(record.bonus),
+      deductions: String(record.deductions),
+    })
+    setShowModal(true)
+  }
+
+  const handleDeletePayroll = (id: string) => {
+    setPayroll((prev) => prev.filter((p) => p.id !== id))
   }
 
   const downloadPayrollCSV = () => {
@@ -128,28 +176,120 @@ export function PayrollTable({ searchQuery }: { searchQuery: string }) {
     a.click()
   }
 
+  const unlockPayroll = () => {
+    if (accessInput.trim() !== accessCode) {
+      setAccessError("Invalid access code.")
+      return
+    }
+    setIsUnlocked(true)
+    setShowAmounts(true)
+    setAccessInput("")
+    setAccessError("")
+  }
+
+  const lockPayroll = () => {
+    setIsUnlocked(false)
+    setShowAmounts(false)
+    setAccessInput("")
+    setAccessError("")
+  }
+
+  const updateAccessCode = () => {
+    if (!newAccessCode || newAccessCode !== confirmAccessCode) {
+      setAccessError("Access codes do not match.")
+      return
+    }
+    setAccessCode(newAccessCode)
+    if (typeof window !== "undefined") {
+      localStorage.setItem("civis_payroll_access_code", newAccessCode)
+    }
+    setNewAccessCode("")
+    setConfirmAccessCode("")
+    setAccessError("")
+  }
+
   return (
     <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Payroll Access</CardTitle>
+          <CardDescription>Protect salary data with an access code.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!isUnlocked ? (
+            <div className="grid md:grid-cols-3 gap-4">
+              <div className="md:col-span-2">
+                <label className="text-sm font-medium">Access code</label>
+                <Input
+                  type="password"
+                  value={accessInput}
+                  onChange={(e) => setAccessInput(e.target.value)}
+                  placeholder="Enter payroll access code"
+                />
+                {accessError ? <p className="text-xs text-destructive mt-2">{accessError}</p> : null}
+                <p className="text-xs text-muted-foreground mt-2">
+                  Access is required to view, edit, or export payroll details.
+                </p>
+              </div>
+              <div className="flex items-end">
+                <Button className="w-full" onClick={unlockPayroll}>
+                  Unlock Payroll
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-3 gap-4">
+              <div className="md:col-span-2 space-y-2">
+                <p className="text-sm text-muted-foreground">Payroll is unlocked for this session.</p>
+                <div className="grid md:grid-cols-2 gap-2">
+                  <Input
+                    type="password"
+                    placeholder="New access code"
+                    value={newAccessCode}
+                    onChange={(e) => setNewAccessCode(e.target.value)}
+                  />
+                  <Input
+                    type="password"
+                    placeholder="Confirm new code"
+                    value={confirmAccessCode}
+                    onChange={(e) => setConfirmAccessCode(e.target.value)}
+                  />
+                </div>
+                {accessError ? <p className="text-xs text-destructive">{accessError}</p> : null}
+              </div>
+              <div className="flex flex-col gap-2 justify-end">
+                <Button variant="outline" className="bg-transparent" onClick={updateAccessCode}>
+                  Update Access Code
+                </Button>
+                <Button variant="secondary" onClick={lockPayroll}>
+                  Lock Payroll
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Stats */}
       <div className="grid md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Total Payroll</p>
-            <p className="text-2xl font-bold">{showAmounts ? formatNaira(stats.total, true) : "****"}</p>
+            <p className="text-2xl font-bold">{displayAmounts ? formatNaira(stats.total, true) : "****"}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Pending</p>
             <p className="text-2xl font-bold text-yellow-600">
-              {showAmounts ? formatNaira(stats.pending, true) : "****"}
+              {displayAmounts ? formatNaira(stats.pending, true) : "****"}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Paid</p>
-            <p className="text-2xl font-bold text-green-600">{showAmounts ? formatNaira(stats.paid, true) : "****"}</p>
+            <p className="text-2xl font-bold text-green-600">{displayAmounts ? formatNaira(stats.paid, true) : "****"}</p>
           </CardContent>
         </Card>
       </div>
@@ -166,6 +306,7 @@ export function PayrollTable({ searchQuery }: { searchQuery: string }) {
               size="sm"
               variant="outline"
               onClick={() => setShowAmounts(!showAmounts)}
+              disabled={!isUnlocked}
               className="flex items-center gap-2"
             >
               {showAmounts ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -175,12 +316,13 @@ export function PayrollTable({ searchQuery }: { searchQuery: string }) {
               size="sm"
               variant="outline"
               onClick={downloadPayrollCSV}
+              disabled={!isUnlocked}
               className="flex items-center gap-2 bg-transparent"
             >
               <Download className="w-4 h-4" />
               Export CSV
             </Button>
-            <Button size="sm" onClick={() => setShowModal(true)} className="flex items-center gap-2">
+            <Button size="sm" onClick={() => setShowModal(true)} className="flex items-center gap-2" disabled={!isUnlocked}>
               <Plus className="w-4 h-4" />
               Add Payroll
             </Button>
@@ -206,21 +348,49 @@ export function PayrollTable({ searchQuery }: { searchQuery: string }) {
                   <tr key={record.id} className="border-b border-border hover:bg-muted/50 transition">
                     <td className="py-4 px-4 font-medium">{record.employee}</td>
                     <td className="py-4 px-4">{record.period}</td>
-                    <td className="py-4 px-4">{showAmounts ? formatNaira(record.baseSalary, true) : "****"}</td>
-                    <td className="py-4 px-4">{showAmounts ? formatNaira(record.bonus, true) : "****"}</td>
-                    <td className="py-4 px-4">{showAmounts ? formatNaira(record.deductions, true) : "****"}</td>
+                    <td className="py-4 px-4">{displayAmounts ? formatNaira(record.baseSalary, true) : "****"}</td>
+                    <td className="py-4 px-4">{displayAmounts ? formatNaira(record.bonus, true) : "****"}</td>
+                    <td className="py-4 px-4">{displayAmounts ? formatNaira(record.deductions, true) : "****"}</td>
                     <td className="py-4 px-4 font-semibold text-primary">
-                      {showAmounts ? formatNaira(record.netPay, true) : "****"}
+                      {displayAmounts ? formatNaira(record.netPay, true) : "****"}
                     </td>
                     <td className="py-4 px-4">
                       <Badge variant="outline" className={statusColors[record.status]}>
                         {record.status}
                       </Badge>
                     </td>
-                    <td className="py-4 px-4 flex gap-2">
-                      <Button variant="ghost" size="sm">
-                        <Download className="w-4 h-4" />
-                      </Button>
+                    <td className="py-4 px-4">
+                      {isUnlocked ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="p-2">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => alert(JSON.stringify(record, null, 2))}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              View details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditPayroll(record)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => downloadPayrollCSV()}>
+                              <Download className="w-4 h-4 mr-2" />
+                              Download payslip
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive" onClick={() => handleDeletePayroll(record.id)}>
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : (
+                        <Button variant="ghost" size="sm" className="p-2" disabled>
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -235,7 +405,7 @@ export function PayrollTable({ searchQuery }: { searchQuery: string }) {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle>Add New Payroll</CardTitle>
+              <CardTitle>{editingId ? "Edit Payroll" : "Add New Payroll"}</CardTitle>
               <Button variant="ghost" size="sm" onClick={() => setShowModal(false)}>
                 <X className="w-4 h-4" />
               </Button>
@@ -299,7 +469,7 @@ export function PayrollTable({ searchQuery }: { searchQuery: string }) {
                     Cancel
                   </Button>
                   <Button type="submit" className="flex-1">
-                    Add Payroll
+                    {editingId ? "Save Changes" : "Add Payroll"}
                   </Button>
                 </div>
               </form>
