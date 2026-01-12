@@ -15,6 +15,7 @@ import {
   ImageIcon,
   BookOpen,
   Play,
+  ClipboardList,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -28,6 +29,7 @@ const navigation = [
   { name: "Gallery", href: "/dashboard/gallery", icon: ImageIcon },
   { name: "Docs", href: "/dashboard/docs", icon: BookOpen },
   { name: "Demo", href: "/dashboard/demo", icon: Play },
+  { name: "Playbooks", href: "/dashboard/playbooks", icon: ClipboardList },
   { name: "Analytics", href: "/dashboard/analytics", icon: TrendingUp },
   { name: "Operations", href: "/dashboard/operations", icon: Workflow },
 ]

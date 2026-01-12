@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Download, Eye, EyeOff, Plus, X, MoreHorizontal, Edit, Trash2 } from "lucide-react"
+import { Download, Eye, EyeOff, Plus, X, MoreHorizontal, Edit, Trash2, CheckSquare } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { formatNaira } from "@/lib/currency"
 import { PaginationControls } from "@/components/shared/pagination-controls"
@@ -16,6 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { addApprovalRequest } from "@/lib/approvals"
 
 export interface PayrollRecord {
   id: string
@@ -119,6 +120,13 @@ export function PayrollTable({
       record.period.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
+  const parsePeriod = (period: string) => {
+    const parsed = Date.parse(`${period} 01`)
+    return Number.isNaN(parsed) ? 0 : parsed
+  }
+
+  const sortedPayroll = [...filteredPayroll].sort((a, b) => parsePeriod(b.period) - parsePeriod(a.period))
+
   const stats = {
     pending: filteredPayroll.filter((p) => p.status === "pending").reduce((sum, p) => sum + p.netPay, 0),
     paid: filteredPayroll.filter((p) => p.status === "paid").reduce((sum, p) => sum + p.netPay, 0),
@@ -128,8 +136,8 @@ export function PayrollTable({
   const displayAmounts = isUnlocked && showAmounts
 
   const PAGE_SIZE = 10
-  const totalPages = Math.max(1, Math.ceil(filteredPayroll.length / PAGE_SIZE))
-  const pagedPayroll = filteredPayroll.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const totalPages = Math.max(1, Math.ceil(sortedPayroll.length / PAGE_SIZE))
+  const pagedPayroll = sortedPayroll.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -201,6 +209,16 @@ export function PayrollTable({
       deductions: String(record.deductions),
     })
     setShowModal(true)
+  }
+
+  const requestApproval = (record: PayrollRecord) => {
+    addApprovalRequest({
+      request: `Payroll ${record.period}`,
+      owner: "HR",
+      amount: formatNaira(record.netPay),
+      module: "HR",
+    })
+    alert("Approval requested. Review it in Operations → Approvals.")
   }
 
   const handleDeletePayroll = (id: string) => {
@@ -434,6 +452,10 @@ export function PayrollTable({
                             <DropdownMenuItem onClick={() => downloadPayrollCSV()}>
                               <Download className="w-4 h-4 mr-2" />
                               Download payslip
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => requestApproval(record)}>
+                              <CheckSquare className="w-4 h-4 mr-2" />
+                              Request approval
                             </DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive" onClick={() => handleDeletePayroll(record.id)}>
                               <Trash2 className="w-4 h-4 mr-2" />

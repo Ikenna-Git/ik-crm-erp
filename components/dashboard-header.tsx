@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Bell, User, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { UnifiedSearch } from "@/components/unified-search"
 
 export function DashboardHeader() {
   const [userName, setUserName] = useState("")
@@ -49,6 +50,7 @@ export function DashboardHeader() {
       </div>
 
       <div className="flex items-center gap-4">
+        <UnifiedSearch />
         <ThemeToggle />
         <Button variant="ghost" size="sm">
           <Bell className="w-5 h-5" />

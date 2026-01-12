@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Edit, Trash2, Plus, X, Download, Eye, MoreHorizontal } from "lucide-react"
+import { Edit, Trash2, Plus, X, Download, Eye, MoreHorizontal, CheckSquare } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { PaginationControls } from "@/components/shared/pagination-controls"
 import {
@@ -15,6 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { addApprovalRequest } from "@/lib/approvals"
 
 export interface Invoice {
   id: string
@@ -54,12 +55,19 @@ type Props = {
   invoices?: Invoice[]
   onAddInvoice?: (data: Omit<Invoice, "id">) => void
   onDeleteInvoice?: (id: string) => void
+  showAmounts?: boolean
 }
 
 const formatNaira = (amount: number) =>
   new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", minimumFractionDigits: 0 }).format(amount * 805)
 
-export function InvoicesTable({ searchQuery, invoices: providedInvoices, onAddInvoice, onDeleteInvoice }: Props) {
+export function InvoicesTable({
+  searchQuery,
+  invoices: providedInvoices,
+  onAddInvoice,
+  onDeleteInvoice,
+  showAmounts = true,
+}: Props) {
   const [invoices, setInvoices] = useState<Invoice[]>(providedInvoices || mockInvoices)
   const [currentPage, setCurrentPage] = useState(1)
   const [showModal, setShowModal] = useState(false)
@@ -86,9 +94,13 @@ export function InvoicesTable({ searchQuery, invoices: providedInvoices, onAddIn
       invoice.client.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
+  const sortedInvoices = [...filteredInvoices].sort((a, b) =>
+    (b.date || b.dueDate || "").localeCompare(a.date || a.dueDate || ""),
+  )
+
   const PAGE_SIZE = 10
-  const totalPages = Math.max(1, Math.ceil(filteredInvoices.length / PAGE_SIZE))
-  const pagedInvoices = filteredInvoices.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const totalPages = Math.max(1, Math.ceil(sortedInvoices.length / PAGE_SIZE))
+  const pagedInvoices = sortedInvoices.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages)
@@ -157,6 +169,16 @@ export function InvoicesTable({ searchQuery, invoices: providedInvoices, onAddIn
     a.click()
   }
 
+  const requestApproval = (invoice: Invoice) => {
+    addApprovalRequest({
+      request: `Invoice ${invoice.number}`,
+      owner: "Accounting",
+      amount: formatNaira(invoice.amount),
+      module: "Accounting",
+    })
+    alert("Approval requested. Review it in Operations → Approvals.")
+  }
+
   return (
     <div className="space-y-4">
       {/* Stats Cards */}
@@ -164,19 +186,19 @@ export function InvoicesTable({ searchQuery, invoices: providedInvoices, onAddIn
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Paid</p>
-            <p className="text-2xl font-bold text-primary">{formatNaira(stats.paid)}</p>
+            <p className="text-2xl font-bold text-primary">{showAmounts ? formatNaira(stats.paid) : "••••"}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Pending</p>
-            <p className="text-2xl font-bold text-accent">{formatNaira(stats.pending)}</p>
+            <p className="text-2xl font-bold text-accent">{showAmounts ? formatNaira(stats.pending) : "••••"}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Overdue</p>
-            <p className="text-2xl font-bold text-destructive">{formatNaira(stats.overdue)}</p>
+            <p className="text-2xl font-bold text-destructive">{showAmounts ? formatNaira(stats.overdue) : "••••"}</p>
           </CardContent>
         </Card>
       </div>
@@ -217,7 +239,7 @@ export function InvoicesTable({ searchQuery, invoices: providedInvoices, onAddIn
                   <tr key={invoice.id} className="border-b border-border hover:bg-muted/50 transition">
                     <td className="py-4 px-4 font-medium">{invoice.number}</td>
                     <td className="py-4 px-4">{invoice.client}</td>
-                    <td className="py-4 px-4 font-semibold">{formatNaira(invoice.amount)}</td>
+                    <td className="py-4 px-4 font-semibold">{showAmounts ? formatNaira(invoice.amount) : "••••"}</td>
                     <td className="py-4 px-4">
                       <Badge variant="outline" className={statusColors[invoice.status]}>
                         {invoice.status}
@@ -243,6 +265,10 @@ export function InvoicesTable({ searchQuery, invoices: providedInvoices, onAddIn
                           <DropdownMenuItem onClick={() => downloadInvoicesCSV()}>
                             <Download className="w-4 h-4 mr-2" />
                             Download PDF
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => requestApproval(invoice)}>
+                            <CheckSquare className="w-4 h-4 mr-2" />
+                            Request approval
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive"

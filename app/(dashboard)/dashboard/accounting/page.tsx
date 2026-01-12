@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Plus, Download, Sparkles } from "lucide-react"
+import { Plus, Download, Sparkles, Lock, Unlock } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -66,6 +66,12 @@ export default function AccountingPage() {
     dueDate: "",
     status: "draft",
   })
+
+  const [financeUnlocked, setFinanceUnlocked] = useState(false)
+  const [financeCode, setFinanceCode] = useState("2468")
+  const [financeInput, setFinanceInput] = useState("")
+  const [financeNotice, setFinanceNotice] = useState("")
+  const [financeError, setFinanceError] = useState("")
 
   const [openExpenseDialog, setOpenExpenseDialog] = useState(false)
   const [expenseForm, setExpenseForm] = useState({
@@ -226,6 +232,34 @@ export default function AccountingPage() {
   useEffect(() => {
     loadData()
   }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const stored = localStorage.getItem("civis_finance_access_code")
+    if (stored) {
+      setFinanceCode(stored)
+    } else {
+      localStorage.setItem("civis_finance_access_code", "2468")
+    }
+  }, [])
+
+  const unlockFinance = () => {
+    if (financeInput.trim() !== financeCode) {
+      setFinanceError("Invalid access code.")
+      setFinanceNotice("")
+      return
+    }
+    setFinanceUnlocked(true)
+    setFinanceInput("")
+    setFinanceError("")
+    setFinanceNotice("Finance view unlocked.")
+  }
+
+  const lockFinance = () => {
+    setFinanceUnlocked(false)
+    setFinanceError("")
+    setFinanceNotice("Finance view locked.")
+  }
 
   const handleAddInvoice = async () => {
     if (!invoiceForm.invoiceNumber || !invoiceForm.amount) return
@@ -565,6 +599,41 @@ export default function AccountingPage() {
         </div>
       </div>
 
+      {/* Finance Privacy */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Lock className="w-5 h-5 text-primary" />
+            Finance Privacy Lock
+          </CardTitle>
+          <CardDescription>Protect financial amounts from casual viewing.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="finance-code">Access code</Label>
+            <Input
+              id="finance-code"
+              type="password"
+              placeholder="Enter access code"
+              value={financeInput}
+              onChange={(e) => setFinanceInput(e.target.value)}
+              className="max-w-xs"
+            />
+            {financeError ? <p className="text-xs text-destructive">{financeError}</p> : null}
+            {financeNotice ? <p className="text-xs text-primary">{financeNotice}</p> : null}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={unlockFinance} className="flex items-center gap-2">
+              <Unlock className="w-4 h-4" />
+              Unlock amounts
+            </Button>
+            <Button variant="outline" className="bg-transparent" onClick={lockFinance}>
+              Lock view
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Tabs */}
       <Tabs defaultValue="invoices" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
@@ -576,12 +645,12 @@ export default function AccountingPage() {
 
         {/* Invoices Tab */}
         <TabsContent value="invoices" className="space-y-4">
-          <InvoicesTable searchQuery={searchQuery} invoices={invoices} />
+          <InvoicesTable searchQuery={searchQuery} invoices={invoices} showAmounts={financeUnlocked} />
         </TabsContent>
 
         {/* Expenses Tab */}
         <TabsContent value="expenses" className="space-y-4">
-          <ExpensesTable searchQuery={searchQuery} expenses={expenses} />
+          <ExpensesTable searchQuery={searchQuery} expenses={expenses} showAmounts={financeUnlocked} />
         </TabsContent>
 
         {/* Reports Tab */}

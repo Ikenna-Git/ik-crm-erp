@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
-import { Plus, CheckSquare, Lock } from "lucide-react"
+import { Plus, CheckSquare, Lock, Globe, FileText, DownloadCloud } from "lucide-react"
+import { ApprovalRequest, approvalsStorageKey, getApprovals } from "@/lib/approvals"
 
 const timelineSeed = [
   { id: "t1", title: "Invoice INV-2025-014 paid", detail: "Acme Corp • ₦1,250,000", time: "2 hours ago", type: "finance" },
@@ -23,10 +24,34 @@ const workflowSeed = [
   { id: "w3", name: "New hire onboarding", trigger: "Employee created", action: "Assign onboarding tasks", active: false },
 ]
 
-const approvalsSeed = [
-  { id: "a1", request: "Payroll January", owner: "HR", amount: "₦3,500,000", status: "pending" },
-  { id: "a2", request: "Purchase order PO-2025-011", owner: "Procurement", amount: "₦850,000", status: "pending" },
-  { id: "a3", request: "Expense reimbursement", owner: "Finance", amount: "₦120,000", status: "approved" },
+const approvalsSeed: ApprovalRequest[] = [
+  {
+    id: "a1",
+    request: "Payroll January",
+    owner: "HR",
+    amount: "₦3,500,000",
+    status: "pending",
+    module: "HR",
+    createdAt: "2025-01-10T09:00:00Z",
+  },
+  {
+    id: "a2",
+    request: "Purchase order PO-2025-011",
+    owner: "Procurement",
+    amount: "₦850,000",
+    status: "pending",
+    module: "Inventory",
+    createdAt: "2025-01-11T11:30:00Z",
+  },
+  {
+    id: "a3",
+    request: "Expense reimbursement",
+    owner: "Finance",
+    amount: "₦120,000",
+    status: "approved",
+    module: "Accounting",
+    createdAt: "2025-01-09T16:45:00Z",
+  },
 ]
 
 const integrationsSeed = [
@@ -61,6 +86,33 @@ const complianceSeed = [
   { id: "c4", title: "Backup verification", status: "pending" },
 ]
 
+const compliancePack = [
+  {
+    id: "cp1",
+    title: "VAT Returns Pack",
+    detail: "Monthly VAT summary + sales ledger export",
+    region: "Nigeria",
+  },
+  {
+    id: "cp2",
+    title: "PAYE Payroll Schedule",
+    detail: "Employee PAYE deductions + remittance sheet",
+    region: "Nigeria",
+  },
+  {
+    id: "cp3",
+    title: "Pension + NHF Remittance",
+    detail: "Pension contributions + NHF summary",
+    region: "Nigeria",
+  },
+  {
+    id: "cp4",
+    title: "Company Tax Checklist",
+    detail: "Quarterly compliance checklist + deadlines",
+    region: "Nigeria",
+  },
+]
+
 const reportsSeed = [
   {
     id: "r1",
@@ -90,6 +142,7 @@ const STORAGE = {
   workflows: "civis_ops_workflows",
   integrations: "civis_ops_integrations",
   reports: "civis_ops_reports",
+  approvals: approvalsStorageKey,
 }
 
 const approvalStatusStyles: Record<string, string> = {
@@ -101,7 +154,7 @@ const approvalStatusStyles: Record<string, string> = {
 export default function OperationsPage() {
   const [timeline] = useState(timelineSeed)
   const [workflows, setWorkflows] = useState(workflowSeed)
-  const [approvals, setApprovals] = useState(approvalsSeed)
+  const [approvals, setApprovals] = useState<ApprovalRequest[]>(approvalsSeed)
   const [integrations, setIntegrations] = useState(integrationsSeed)
   const [insights, setInsights] = useState(insightsSeed)
   const [auditLogs] = useState(auditSeed)
@@ -139,6 +192,7 @@ export default function OperationsPage() {
     }
     load(STORAGE.workflows, workflowSeed, setWorkflows)
     load(STORAGE.reports, reportsSeed, setReports)
+    setApprovals(getApprovals(approvalsSeed))
 
     try {
       const stored = localStorage.getItem(STORAGE.integrations)
@@ -174,6 +228,11 @@ export default function OperationsPage() {
     if (typeof window === "undefined") return
     localStorage.setItem(STORAGE.reports, JSON.stringify(reports))
   }, [reports])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    localStorage.setItem(STORAGE.approvals, JSON.stringify(approvals))
+  }, [approvals])
 
   const addWorkflow = () => {
     const name = workflowForm.name.trim()
@@ -225,6 +284,23 @@ export default function OperationsPage() {
   const runReport = (id: string) => {
     const timestamp = new Date().toLocaleString()
     setReports((prev) => prev.map((report) => (report.id === id ? { ...report, lastRun: timestamp } : report)))
+  }
+
+  const downloadCompliancePack = (title: string) => {
+    const headers = ["Item", "Status", "Owner"]
+    const rows = [
+      [title, "Prepared", "Finance"],
+      ["Submission date", "TBD", "Compliance"],
+      ["Notes", "Review required", "Ops"],
+    ]
+    const csv = [headers, ...rows].map((row) => row.join(",")).join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `${title.toLowerCase().replace(/\\s+/g, "-")}.csv`
+    a.click()
+    window.URL.revokeObjectURL(url)
   }
 
   return (
@@ -332,7 +408,9 @@ export default function OperationsPage() {
                 <div key={ap.id} className="flex items-center justify-between border-b border-border pb-4 last:border-0">
                   <div>
                     <p className="font-medium">{ap.request}</p>
-                    <p className="text-sm text-muted-foreground">{ap.owner} • {ap.amount}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {ap.owner} • {ap.amount} • {ap.module}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className={approvalStatusStyles[ap.status]}>
@@ -506,6 +584,44 @@ export default function OperationsPage() {
                     <p className="font-medium">{item.title}</p>
                   </div>
                   <Badge variant="outline">{item.status}</Badge>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="w-5 h-5 text-primary" />
+                Local Compliance Pack
+              </CardTitle>
+              <CardDescription>Download templates tailored for regional compliance.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-2">
+              {compliancePack.map((pack) => (
+                <div key={pack.id} className="rounded-lg border border-border bg-background p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold">{pack.title}</p>
+                      <p className="text-sm text-muted-foreground">{pack.detail}</p>
+                    </div>
+                    <Badge variant="outline">{pack.region}</Badge>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="bg-transparent"
+                      onClick={() => downloadCompliancePack(pack.title)}
+                    >
+                      <DownloadCloud className="w-4 h-4 mr-2" />
+                      Download template
+                    </Button>
+                    <Button size="sm" className="bg-primary/10 text-primary hover:bg-primary/20" variant="outline">
+                      <FileText className="w-4 h-4 mr-2" />
+                      Open checklist
+                    </Button>
+                  </div>
                 </div>
               ))}
             </CardContent>

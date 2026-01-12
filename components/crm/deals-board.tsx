@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { DollarSign, Calendar } from "lucide-react"
+import { Calendar } from "lucide-react"
 import { formatNaira } from "@/lib/currency"
 import { PaginationControls } from "@/components/shared/pagination-controls"
 
@@ -68,9 +68,11 @@ export function DealsBoard({ deals }: { deals?: Deal[] }) {
   const data = deals && deals.length ? deals : mockDeals
   const [currentPage, setCurrentPage] = useState(1)
 
+  const sortedDeals = [...data].sort((a, b) => (b.expectedClose || "").localeCompare(a.expectedClose || ""))
+
   const PAGE_SIZE = 10
-  const totalPages = Math.max(1, Math.ceil(data.length / PAGE_SIZE))
-  const pagedDeals = data.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const totalPages = Math.max(1, Math.ceil(sortedDeals.length / PAGE_SIZE))
+  const pagedDeals = sortedDeals.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   useEffect(() => {
     setCurrentPage(1)
@@ -103,7 +105,7 @@ export function DealsBoard({ deals }: { deals?: Deal[] }) {
                     <p className="text-xs text-muted-foreground mt-1">{deal.company || "—"}</p>
                     <div className="mt-3 space-y-2">
                       <div className="flex items-center gap-2">
-                        <DollarSign className="w-4 h-4 text-primary" />
+                        <span className="text-sm font-semibold text-primary">₦</span>
                         <span className="text-sm font-semibold text-primary">{formatNaira(deal.value, true)}</span>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">

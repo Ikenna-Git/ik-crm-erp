@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Edit, Trash2, Plus, X, Download, MoreHorizontal, Eye } from "lucide-react"
+import { Edit, Trash2, Plus, X, Download, MoreHorizontal, Eye, CheckSquare } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { PaginationControls } from "@/components/shared/pagination-controls"
 import {
@@ -15,6 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { addApprovalRequest } from "@/lib/approvals"
 
 export interface Expense {
   id: string
@@ -63,12 +64,19 @@ type Props = {
   expenses?: Expense[]
   onAddExpense?: (data: Omit<Expense, "id">) => void
   onDeleteExpense?: (id: string) => void
+  showAmounts?: boolean
 }
 
 const formatNaira = (amount: number) =>
   new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", minimumFractionDigits: 0 }).format(amount * 805)
 
-export function ExpensesTable({ searchQuery, expenses: providedExpenses, onAddExpense, onDeleteExpense }: Props) {
+export function ExpensesTable({
+  searchQuery,
+  expenses: providedExpenses,
+  onAddExpense,
+  onDeleteExpense,
+  showAmounts = true,
+}: Props) {
   const [expenses, setExpenses] = useState<Expense[]>(providedExpenses || mockExpenses)
   const [currentPage, setCurrentPage] = useState(1)
   const [showModal, setShowModal] = useState(false)
@@ -95,9 +103,13 @@ export function ExpensesTable({ searchQuery, expenses: providedExpenses, onAddEx
       (expense.category || "").toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
+  const sortedExpenses = [...filteredExpenses].sort((a, b) =>
+    (b.date || "").localeCompare(a.date || ""),
+  )
+
   const PAGE_SIZE = 10
-  const totalPages = Math.max(1, Math.ceil(filteredExpenses.length / PAGE_SIZE))
-  const pagedExpenses = filteredExpenses.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const totalPages = Math.max(1, Math.ceil(sortedExpenses.length / PAGE_SIZE))
+  const pagedExpenses = sortedExpenses.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages)
@@ -169,6 +181,16 @@ export function ExpensesTable({ searchQuery, expenses: providedExpenses, onAddEx
     a.click()
   }
 
+  const requestApproval = (expense: Expense) => {
+    addApprovalRequest({
+      request: `Expense: ${expense.description}`,
+      owner: expense.submittedBy || "Finance",
+      amount: formatNaira(expense.amount),
+      module: "Accounting",
+    })
+    alert("Approval requested. Review it in Operations → Approvals.")
+  }
+
   return (
     <div className="space-y-4">
       {/* Stats Cards */}
@@ -176,13 +198,13 @@ export function ExpensesTable({ searchQuery, expenses: providedExpenses, onAddEx
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Approved</p>
-            <p className="text-2xl font-bold text-primary">{formatNaira(stats.approved)}</p>
+            <p className="text-2xl font-bold text-primary">{showAmounts ? formatNaira(stats.approved) : "••••"}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Pending Approval</p>
-            <p className="text-2xl font-bold text-accent">{formatNaira(stats.pending)}</p>
+            <p className="text-2xl font-bold text-accent">{showAmounts ? formatNaira(stats.pending) : "••••"}</p>
           </CardContent>
         </Card>
       </div>
@@ -239,7 +261,7 @@ export function ExpensesTable({ searchQuery, expenses: providedExpenses, onAddEx
                         {expense.category}
                       </span>
                     </td>
-                    <td className="py-4 px-4 font-semibold">{formatNaira(expense.amount)}</td>
+                    <td className="py-4 px-4 font-semibold">{showAmounts ? formatNaira(expense.amount) : "••••"}</td>
                     <td className="py-4 px-4">
                       <Badge variant="outline" className={statusColors[expense.status || "pending"]}>
                         {expense.status || "pending"}
@@ -261,6 +283,10 @@ export function ExpensesTable({ searchQuery, expenses: providedExpenses, onAddEx
                           <DropdownMenuItem onClick={() => handleEditExpense(expense)}>
                             <Edit className="w-4 h-4 mr-2" />
                             Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => requestApproval(expense)}>
+                            <CheckSquare className="w-4 h-4 mr-2" />
+                            Request approval
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="text-destructive"

@@ -152,14 +152,16 @@ export function EmployeesTable({
       emp.department.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
+  const sortedEmployees = [...filteredEmployees].sort((a, b) => b.startDate.localeCompare(a.startDate))
+
   const activeEmployees = employees.filter((e) => e.status === "active").length
   const totalSalary = employees.reduce((sum, e) => sum + e.salary, 0)
 
   const displaySalary = isUnlocked && showSalaries
 
   const PAGE_SIZE = 10
-  const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / PAGE_SIZE))
-  const pagedEmployees = filteredEmployees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const totalPages = Math.max(1, Math.ceil(sortedEmployees.length / PAGE_SIZE))
+  const pagedEmployees = sortedEmployees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages)

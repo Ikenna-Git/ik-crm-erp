@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Eye, Trash2, Truck, MoreHorizontal, Edit, X } from "lucide-react"
+import { Eye, Trash2, Truck, MoreHorizontal, Edit, X, CheckSquare } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { PaginationControls } from "@/components/shared/pagination-controls"
@@ -14,6 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { addApprovalRequest } from "@/lib/approvals"
 
 interface PurchaseOrder {
   id: string
@@ -196,6 +197,16 @@ export function OrdersTable({ searchQuery }: { searchQuery: string }) {
     setOrders((prev) => prev.filter((o) => o.id !== id))
   }
 
+  const requestApproval = (order: PurchaseOrder) => {
+    addApprovalRequest({
+      request: `Purchase order ${order.orderNo}`,
+      owner: "Procurement",
+      amount: formatNaira(order.totalValue),
+      module: "Inventory",
+    })
+    alert("Approval requested. Review it in Operations → Approvals.")
+  }
+
   return (
     <div className="space-y-4">
       {/* Order Stats */}
@@ -269,6 +280,10 @@ export function OrdersTable({ searchQuery }: { searchQuery: string }) {
                           <DropdownMenuItem onClick={() => openEditor(order)}>
                             <Edit className="w-4 h-4 mr-2" />
                             Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => requestApproval(order)}>
+                            <CheckSquare className="w-4 h-4 mr-2" />
+                            Request approval
                           </DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive" onClick={() => deleteOrder(order.id)}>
                             <Trash2 className="w-4 h-4 mr-2" />

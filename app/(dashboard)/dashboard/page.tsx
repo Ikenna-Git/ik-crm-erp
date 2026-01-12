@@ -13,8 +13,10 @@ import {
   Pie,
   Cell,
 } from "recharts"
+import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { TrendingUp, Users, DollarSign, Package } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { TrendingUp, Users, DollarSign, Package, AlertTriangle, ArrowUpRight } from "lucide-react"
 import { formatNaira } from "@/lib/currency"
 
 const revenueData = [
@@ -76,6 +78,47 @@ const recentActivity = [
     status: "info",
   },
 ]
+
+const decisionFeed = [
+  {
+    id: "dec-1",
+    title: "Overdue invoice needs a follow-up",
+    detail: "INV-2025-014 • ₦1,250,000 • 9 days overdue",
+    impact: "High",
+    action: "Review invoices",
+    href: "/dashboard/accounting",
+  },
+  {
+    id: "dec-2",
+    title: "Stock reorder recommended",
+    detail: "Wireless Mouse • Reorder 50 units",
+    impact: "Medium",
+    action: "Open inventory",
+    href: "/dashboard/inventory",
+  },
+  {
+    id: "dec-3",
+    title: "Stalled deal in negotiation",
+    detail: "Civis Suite • Northwind • 14 days idle",
+    impact: "High",
+    action: "Jump to CRM",
+    href: "/dashboard/crm",
+  },
+  {
+    id: "dec-4",
+    title: "Payroll batch pending approval",
+    detail: "January payroll • 18 employees",
+    impact: "Medium",
+    action: "Review approvals",
+    href: "/dashboard/operations",
+  },
+]
+
+const impactStyles = {
+  High: "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200",
+  Medium: "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-200",
+  Low: "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200",
+}
 
 const activityStatusStyles = {
   success: "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-200",
@@ -164,6 +207,43 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Decision Feed */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-primary" />
+            Decision Feed
+          </CardTitle>
+          <CardDescription>Priority actions that keep revenue and operations moving.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {decisionFeed.map((item) => (
+              <div
+                key={item.id}
+                className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border border-border rounded-lg p-4 bg-background/60"
+              >
+                <div>
+                  <p className="font-medium">{item.title}</p>
+                  <p className="text-sm text-muted-foreground">{item.detail}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs px-2 py-1 rounded-full ${impactStyles[item.impact]}`}>
+                    {item.impact} impact
+                  </span>
+                  <Button size="sm" asChild>
+                    <Link href={item.href} className="flex items-center gap-1">
+                      {item.action}
+                      <ArrowUpRight className="w-4 h-4" />
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Recent Activity */}
       <Card>

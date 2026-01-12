@@ -103,7 +103,7 @@ export function TasksKanban({ searchQuery }: { searchQuery: string }) {
     return matchesQuery && matchesStage && matchesPriority && matchesMonth
   })
 
-  const sortedTasks = [...filteredTasks].sort((a, b) => a.startDate.localeCompare(b.startDate))
+  const sortedTasks = [...filteredTasks].sort((a, b) => b.startDate.localeCompare(a.startDate))
 
   const PAGE_SIZE = 10
   const totalPages = Math.max(1, Math.ceil(sortedTasks.length / PAGE_SIZE))
@@ -249,7 +249,7 @@ export function TasksKanban({ searchQuery }: { searchQuery: string }) {
             acc[key].push(task)
             return acc
           }, {})
-          const groupKeys = Object.keys(grouped).sort()
+          const groupKeys = Object.keys(grouped).sort((a, b) => b.localeCompare(a))
           return (
             <div key={stage.id} className={`${stage.color} rounded-lg p-4 min-h-96`}>
               <div className="mb-4">

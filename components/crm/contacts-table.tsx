@@ -5,9 +5,27 @@ import type React from "react"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Edit, Trash2, Plus, X, Download, MoreHorizontal, Eye } from "lucide-react"
+import {
+  Activity,
+  CheckCircle2,
+  Download,
+  Edit,
+  Eye,
+  FileText,
+  Mail,
+  MessageCircle,
+  MessageSquare,
+  MoreHorizontal,
+  Phone,
+  Plus,
+  Send,
+  Trash2,
+  X,
+} from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { PaginationControls } from "@/components/shared/pagination-controls"
+import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -72,6 +90,72 @@ const formatNaira = (amount: number = 0) => {
   }).format(amount * 805)
 }
 
+type TimelineEvent = {
+  id: string
+  type: "call" | "email" | "invoice" | "task" | "note" | "whatsapp" | "sms"
+  title: string
+  detail: string
+  time: string
+}
+
+const timelineIcons = {
+  call: Phone,
+  email: Mail,
+  invoice: FileText,
+  task: CheckCircle2,
+  note: MessageSquare,
+  whatsapp: MessageCircle,
+  sms: Send,
+}
+
+const timelineStyles = {
+  call: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200",
+  email: "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-200",
+  invoice: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-200",
+  task: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-200",
+  note: "bg-slate-100 text-slate-700 dark:bg-slate-700/40 dark:text-slate-200",
+  whatsapp: "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-200",
+  sms: "bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-200",
+}
+
+const buildContactTimeline = (contact: Contact): TimelineEvent[] => [
+  {
+    id: `${contact.id}-call`,
+    type: "call",
+    title: "Discovery call completed",
+    detail: `Spoke with ${contact.name} about ${contact.company || "their team"} goals.`,
+    time: "3 days ago",
+  },
+  {
+    id: `${contact.id}-email`,
+    type: "email",
+    title: "Proposal email sent",
+    detail: "Shared Civis implementation scope and pricing.",
+    time: "2 days ago",
+  },
+  {
+    id: `${contact.id}-invoice`,
+    type: "invoice",
+    title: "Invoice drafted",
+    detail: "Drafted onboarding invoice for review.",
+    time: "Yesterday",
+  },
+  {
+    id: `${contact.id}-task`,
+    type: "task",
+    title: "Follow-up scheduled",
+    detail: "Assigned follow-up task to sales owner.",
+    time: "Today",
+  },
+  {
+    id: `${contact.id}-note`,
+    type: "note",
+    title: "Relationship notes added",
+    detail: "Added next steps and decision criteria.",
+    time: "Just now",
+  },
+]
+
 type ContactsTableProps = {
   searchQuery: string
   contacts?: Contact[]
@@ -91,6 +175,11 @@ export function ContactsTable({
   const [currentPage, setCurrentPage] = useState(1)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [timelineContact, setTimelineContact] = useState<Contact | null>(null)
+  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([])
+  const [composerOpen, setComposerOpen] = useState(false)
+  const [composerType, setComposerType] = useState<"email" | "whatsapp" | "sms">("email")
+  const [composerMessage, setComposerMessage] = useState("")
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -119,6 +208,13 @@ export function ContactsTable({
   const PAGE_SIZE = 10
   const totalPages = Math.max(1, Math.ceil(filteredContacts.length / PAGE_SIZE))
   const pagedContacts = filteredContacts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  useEffect(() => {
+    if (!timelineContact) {
+      setTimelineEvents([])
+      return
+    }
+    setTimelineEvents(buildContactTimeline(timelineContact))
+  }, [timelineContact])
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages)
@@ -176,6 +272,48 @@ export function ContactsTable({
     })
     setEditingId(contact.id)
     setShowModal(true)
+  }
+
+  const appendTimelineEvent = (event: TimelineEvent) => {
+    setTimelineEvents((prev) => [event, ...prev])
+  }
+
+  const openComposer = (type: "email" | "whatsapp" | "sms") => {
+    setComposerType(type)
+    setComposerMessage("")
+    setComposerOpen(true)
+  }
+
+  const sendMessage = () => {
+    if (!timelineContact) return
+    const labels = {
+      email: "Email sent",
+      whatsapp: "WhatsApp message sent",
+      sms: "SMS sent",
+    }
+    const detail =
+      composerMessage.trim() ||
+      `Message sent to ${timelineContact.name} (${timelineContact.phone || "no phone on file"}).`
+    appendTimelineEvent({
+      id: `evt-${Date.now()}`,
+      type: composerType,
+      title: labels[composerType],
+      detail,
+      time: "Just now",
+    })
+    setComposerOpen(false)
+    setComposerMessage("")
+  }
+
+  const logCall = () => {
+    if (!timelineContact) return
+    appendTimelineEvent({
+      id: `evt-${Date.now()}`,
+      type: "call",
+      title: "Call logged",
+      detail: `Spoke with ${timelineContact.name} about next steps.`,
+      time: "Just now",
+    })
   }
 
   const downloadContactsCSV = () => {
@@ -257,6 +395,10 @@ export function ContactsTable({
                           <DropdownMenuItem onClick={() => alert(JSON.stringify(contact, null, 2))}>
                             <Eye className="w-4 h-4 mr-2" />
                             View details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setTimelineContact(contact)}>
+                            <Activity className="w-4 h-4 mr-2" />
+                            View timeline
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleEdit(contact)}>
                             <Edit className="w-4 h-4 mr-2" />
@@ -364,6 +506,107 @@ export function ContactsTable({
                   </Button>
                 </div>
               </form>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {timelineContact && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-2xl mx-4">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <div>
+                <CardTitle>Customer Timeline</CardTitle>
+                <CardDescription>Every touchpoint across CRM, tasks, and finance.</CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setTimelineContact(null)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border border-border rounded-lg p-3 bg-muted/20">
+                <div>
+                  <p className="font-medium">{timelineContact.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {timelineContact.company || "No company"} • {timelineContact.email}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className={statusColors[timelineContact.status]}>
+                    {timelineContact.status}
+                  </Badge>
+                  <Button size="sm" variant="outline" className="bg-transparent" onClick={() => openComposer("email")}>
+                    Send email
+                  </Button>
+                  <Button size="sm" variant="outline" className="bg-transparent" onClick={() => openComposer("whatsapp")}>
+                    WhatsApp
+                  </Button>
+                  <Button size="sm" variant="outline" className="bg-transparent" onClick={() => openComposer("sms")}>
+                    SMS
+                  </Button>
+                  <Button size="sm" onClick={logCall}>
+                    Log call
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {timelineEvents.map((event, idx) => {
+                  const Icon = timelineIcons[event.type]
+                  return (
+                    <div key={event.id} className="flex gap-4">
+                      <div className="flex flex-col items-center">
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center ${timelineStyles[event.type]}`}>
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        {idx < timelineEvents.length - 1 && <div className="w-0.5 h-8 bg-border mt-2" />}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="text-sm font-semibold">{event.title}</p>
+                            <p className="text-xs text-muted-foreground">{event.detail}</p>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{event.time}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {composerOpen && timelineContact && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <Card className="w-full max-w-lg mx-4">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <div>
+                <CardTitle>
+                  {composerType === "email" ? "Send Email" : composerType === "whatsapp" ? "Send WhatsApp" : "Send SMS"}
+                </CardTitle>
+                <CardDescription>
+                  To {timelineContact.name} {timelineContact.phone ? `• ${timelineContact.phone}` : ""}
+                </CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setComposerOpen(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Textarea
+                placeholder="Write your message..."
+                value={composerMessage}
+                onChange={(event) => setComposerMessage(event.target.value)}
+              />
+              <div className="flex gap-3 justify-end">
+                <Button variant="outline" className="bg-transparent" onClick={() => setComposerOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={sendMessage}>Send</Button>
+              </div>
             </CardContent>
           </Card>
         </div>
