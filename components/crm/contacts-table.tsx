@@ -5,8 +5,15 @@ import type React from "react"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Edit, Trash2, Plus, X, Download } from "lucide-react"
+import { Edit, Trash2, Plus, X, Download, MoreHorizontal, Eye } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { PaginationControls } from "@/components/shared/pagination-controls"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface Contact {
   id: string
@@ -19,43 +26,42 @@ interface Contact {
   lastContact?: string
 }
 
-const mockContacts: Contact[] = [
-  {
-    id: "1",
-    name: "Sarah Johnson",
-    email: "sarah@company.com",
-    phone: "+1 (555) 123-4567",
-    company: "Tech Solutions Inc",
-    status: "customer",
-    revenue: 45000,
-    lastContact: "2 days ago",
-  },
-  {
-    id: "2",
-    name: "Michael Chen",
-    email: "michael@startup.io",
-    phone: "+1 (555) 234-5678",
-    company: "StartUp Labs",
-    status: "prospect",
-    revenue: 0,
-    lastContact: "1 week ago",
-  },
-  {
-    id: "3",
-    name: "Emma Davis",
-    email: "emma@enterprise.com",
-    phone: "+1 (555) 345-6789",
-    company: "Enterprise Corp",
-    status: "lead",
-    revenue: 0,
-    lastContact: "3 days ago",
-  },
+const contactFirstNames = ["Sarah", "Michael", "Emma", "John", "Lisa", "Ava", "Noah", "Grace", "Daniel", "Olivia"]
+const contactLastNames = ["Johnson", "Chen", "Davis", "Smith", "Anderson", "Okafor", "Umeh", "Martins", "Williams", "Brown"]
+const contactCompanies = [
+  "Tech Solutions Inc",
+  "StartUp Labs",
+  "Enterprise Corp",
+  "Northwind",
+  "Acme Corp",
+  "Globex",
+  "Blue Ridge",
+  "NovaWorks",
 ]
+
+const buildMockContacts = (count: number) =>
+  Array.from({ length: count }, (_, idx) => {
+    const first = contactFirstNames[idx % contactFirstNames.length]
+    const last = contactLastNames[(idx * 2) % contactLastNames.length]
+    const statusOptions: Contact["status"][] = ["lead", "prospect", "customer"]
+    return {
+      id: `CON-${(idx + 1).toString().padStart(3, "0")}`,
+      name: `${first} ${last}`,
+      email: `${first.toLowerCase()}.${last.toLowerCase()}@example.com`,
+      phone: `+1 (555) ${(410 + idx).toString().padStart(3, "0")}-${(7000 + idx).toString().padStart(4, "0")}`,
+      company: contactCompanies[idx % contactCompanies.length],
+      status: statusOptions[idx % statusOptions.length],
+      revenue: idx % 3 === 0 ? 25000 + (idx % 10) * 5000 : 0,
+      lastContact: `${(idx % 7) + 1} days ago`,
+    }
+  })
+
+const mockContacts: Contact[] = buildMockContacts(70)
 
 const statusColors = {
   customer: "bg-primary/10 text-primary",
   prospect: "bg-accent/10 text-accent",
-  lead: "bg-secondary/10 text-secondary",
+  lead: "bg-muted text-muted-foreground dark:bg-slate-700/40 dark:text-slate-200",
 }
 
 const formatNaira = (amount: number = 0) => {
@@ -71,11 +77,20 @@ type ContactsTableProps = {
   contacts?: Contact[]
   onAddContact?: (data: Omit<Contact, "id" | "status" | "revenue" | "lastContact"> & { status: Contact["status"] }) => void
   onDeleteContact?: (id: string) => void
+  onUpdateContact?: (id: string, data: Partial<Contact>) => void
 }
 
-export function ContactsTable({ searchQuery, contacts: providedContacts, onAddContact, onDeleteContact }: ContactsTableProps) {
+export function ContactsTable({
+  searchQuery,
+  contacts: providedContacts,
+  onAddContact,
+  onDeleteContact,
+  onUpdateContact,
+}: ContactsTableProps) {
   const [contacts, setContacts] = useState<Contact[]>(providedContacts || mockContacts)
+  const [currentPage, setCurrentPage] = useState(1)
   const [showModal, setShowModal] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -90,32 +105,56 @@ export function ContactsTable({ searchQuery, contacts: providedContacts, onAddCo
     }
   }, [providedContacts])
 
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
+
   const filteredContacts = contacts.filter(
     (contact) =>
       contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       contact.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contact.company.toLowerCase().includes(searchQuery.toLowerCase()),
+      (contact.company || "").toLowerCase().includes(searchQuery.toLowerCase()),
   )
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(filteredContacts.length / PAGE_SIZE))
+  const pagedContacts = filteredContacts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+  }, [currentPage, totalPages])
 
   const handleAddContact = (e: React.FormEvent) => {
     e.preventDefault()
-    const payload = { ...formData }
-    if (onAddContact) {
-      onAddContact(payload)
-    } else {
-      const newContact: Contact = {
-        id: Date.now().toString(),
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        company: formData.company,
-        status: formData.status,
-        revenue: 0,
-        lastContact: "Just now",
+    if (editingId) {
+      const payload = { ...formData }
+      if (onUpdateContact) {
+        onUpdateContact(editingId, payload)
+      } else {
+        setContacts((prev) =>
+          prev.map((c) => (c.id === editingId ? { ...c, ...payload, lastContact: c.lastContact || "Updated" } : c)),
+        )
       }
-      setContacts([...contacts, newContact])
+    } else {
+      const payload = { ...formData }
+      if (onAddContact) {
+        onAddContact(payload)
+      } else {
+        const newContact: Contact = {
+          id: Date.now().toString(),
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          company: formData.company,
+          status: formData.status,
+          revenue: 0,
+          lastContact: "Just now",
+        }
+        setContacts([...contacts, newContact])
+      }
     }
     setFormData({ name: "", email: "", phone: "", company: "", status: "lead" })
+    setEditingId(null)
     setShowModal(false)
   }
 
@@ -125,6 +164,18 @@ export function ContactsTable({ searchQuery, contacts: providedContacts, onAddCo
     } else {
       setContacts(contacts.filter((c) => c.id !== id))
     }
+  }
+
+  const handleEdit = (contact: Contact) => {
+    setFormData({
+      name: contact.name,
+      email: contact.email,
+      phone: contact.phone || "",
+      company: contact.company || "",
+      status: contact.status,
+    })
+    setEditingId(contact.id)
+    setShowModal(true)
   }
 
   const downloadContactsCSV = () => {
@@ -177,7 +228,7 @@ export function ContactsTable({ searchQuery, contacts: providedContacts, onAddCo
                 </tr>
               </thead>
               <tbody>
-                {filteredContacts.map((contact) => (
+                {pagedContacts.map((contact) => (
                   <tr key={contact.id} className="border-b border-border hover:bg-muted/50 transition">
                     <td className="py-4 px-4">
                       <div>
@@ -195,23 +246,43 @@ export function ContactsTable({ searchQuery, contacts: providedContacts, onAddCo
                     </td>
                     <td className="py-4 px-4">{contact.revenue > 0 ? formatNaira(contact.revenue) : "—"}</td>
                     <td className="py-4 px-4 text-muted-foreground">{contact.lastContact}</td>
-                    <td className="py-4 px-4 flex gap-2">
-                      <Button variant="ghost" size="sm">
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive"
-                        onClick={() => handleDeleteContact(contact.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                    <td className="py-4 px-4">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="p-2">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => alert(JSON.stringify(contact, null, 2))}>
+                            <Eye className="w-4 h-4 mr-2" />
+                            View details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEdit(contact)}>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => handleDeleteContact(contact.id)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="pt-4">
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
           </div>
         </CardContent>
       </Card>
@@ -221,7 +292,7 @@ export function ContactsTable({ searchQuery, contacts: providedContacts, onAddCo
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle>Add New Contact</CardTitle>
+              <CardTitle>{editingId ? "Edit Contact" : "Add New Contact"}</CardTitle>
               <Button variant="ghost" size="sm" onClick={() => setShowModal(false)}>
                 <X className="w-4 h-4" />
               </Button>
@@ -289,7 +360,7 @@ export function ContactsTable({ searchQuery, contacts: providedContacts, onAddCo
                     Cancel
                   </Button>
                   <Button type="submit" className="flex-1">
-                    Add Contact
+                    {editingId ? "Save Contact" : "Add Contact"}
                   </Button>
                 </div>
               </form>

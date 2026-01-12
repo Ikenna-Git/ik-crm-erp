@@ -1,6 +1,8 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { PaginationControls } from "@/components/shared/pagination-controls"
 
 interface TimelineItem {
   id: string
@@ -11,50 +13,53 @@ interface TimelineItem {
   status: "planning" | "in-progress" | "on-hold" | "completed"
 }
 
-const mockTimeline: TimelineItem[] = [
-  {
-    id: "1",
-    project: "Website Redesign",
-    startDate: "2025-01-15",
-    endDate: "2025-03-31",
-    progress: 65,
-    status: "in-progress",
-  },
-  {
-    id: "2",
-    project: "Mobile App Development",
-    startDate: "2024-12-01",
-    endDate: "2025-06-30",
-    progress: 45,
-    status: "in-progress",
-  },
-  {
-    id: "3",
-    project: "Data Migration",
-    startDate: "2025-02-01",
-    endDate: "2025-04-30",
-    progress: 10,
-    status: "planning",
-  },
-  {
-    id: "4",
-    project: "Marketing Campaign",
-    startDate: "2024-12-15",
-    endDate: "2025-01-31",
-    progress: 100,
-    status: "completed",
-  },
+const timelineProjects = [
+  "Website Redesign",
+  "Mobile App Development",
+  "Data Migration",
+  "Marketing Campaign",
+  "Customer Portal",
+  "ERP Upgrade",
+  "Support Revamp",
+  "Analytics Refresh",
 ]
 
+const timelineStatuses: TimelineItem["status"][] = ["planning", "in-progress", "on-hold", "completed"]
+
+const buildMockTimeline = (count: number): TimelineItem[] =>
+  Array.from({ length: count }, (_, idx) => ({
+    id: `TL-${(idx + 1).toString().padStart(3, "0")}`,
+    project: timelineProjects[idx % timelineProjects.length],
+    startDate: new Date(2025, (idx % 6), (idx % 27) + 1).toISOString().slice(0, 10),
+    endDate: new Date(2025, (idx % 6) + 2, (idx % 27) + 10).toISOString().slice(0, 10),
+    progress: idx % 4 === 0 ? 100 : 15 + (idx % 6) * 12,
+    status: timelineStatuses[idx % timelineStatuses.length],
+  }))
+
+const mockTimeline: TimelineItem[] = buildMockTimeline(70)
+
 const statusColors = {
-  planning: "bg-blue-200",
-  "in-progress": "bg-yellow-200",
-  "on-hold": "bg-orange-200",
-  completed: "bg-green-200",
+  planning: "bg-blue-200 dark:bg-blue-500/30",
+  "in-progress": "bg-yellow-200 dark:bg-yellow-500/30",
+  "on-hold": "bg-orange-200 dark:bg-orange-500/30",
+  completed: "bg-green-200 dark:bg-green-500/30",
 }
 
 export function TimelineView({ searchQuery }: { searchQuery: string }) {
+  const [currentPage, setCurrentPage] = useState(1)
   const filteredItems = mockTimeline.filter((item) => item.project.toLowerCase().includes(searchQuery.toLowerCase()))
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE))
+  const pagedItems = filteredItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+  }, [currentPage, totalPages])
 
   return (
     <Card>
@@ -64,7 +69,7 @@ export function TimelineView({ searchQuery }: { searchQuery: string }) {
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          {filteredItems.map((item) => {
+          {pagedItems.map((item) => {
             // Simple timeline visualization
             const today = new Date("2025-02-01")
             const start = new Date(item.startDate)
@@ -97,6 +102,9 @@ export function TimelineView({ searchQuery }: { searchQuery: string }) {
               </div>
             )
           })}
+        </div>
+        <div className="pt-6">
+          <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
         </div>
       </CardContent>
     </Card>

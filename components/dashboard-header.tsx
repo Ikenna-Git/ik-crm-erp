@@ -1,11 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Bell, Search, User } from "lucide-react"
+import Link from "next/link"
+import { Bell, User, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export function DashboardHeader() {
   const [userName, setUserName] = useState("")
+  const [timestamp, setTimestamp] = useState("")
 
   useEffect(() => {
     const user = localStorage.getItem("user")
@@ -15,26 +18,46 @@ export function DashboardHeader() {
     }
   }, [])
 
+  useEffect(() => {
+    const updateClock = () => {
+      const now = new Date()
+      setTimestamp(
+        `${now.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })} • ${now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`,
+      )
+    }
+    updateClock()
+    const timer = window.setInterval(updateClock, 60000)
+    return () => window.clearInterval(timer)
+  }, [])
+
   return (
     <header className="border-b border-border bg-card px-6 py-4 flex items-center justify-between">
       <div className="flex-1">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search..."
-            className="w-full pl-10 pr-4 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-          />
+        <div className="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 max-w-xl">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold">Civis Pulse</p>
+            <p className="text-xs text-muted-foreground">{timestamp || "Loading time..."}</p>
+          </div>
+          <div className="ml-auto hidden md:flex items-center gap-2 text-xs">
+            <span className="px-2.5 py-1 rounded-full bg-muted text-muted-foreground">Sync: Local</span>
+            <span className="px-2.5 py-1 rounded-full bg-muted text-muted-foreground">Mode: Live</span>
+          </div>
         </div>
       </div>
 
       <div className="flex items-center gap-4">
+        <ThemeToggle />
         <Button variant="ghost" size="sm">
           <Bell className="w-5 h-5" />
         </Button>
-        <Button variant="ghost" size="sm" className="flex items-center gap-2">
-          <User className="w-5 h-5" />
-          <span className="text-sm">{userName}</span>
+        <Button variant="ghost" size="sm" className="flex items-center gap-2" asChild>
+          <Link href="/dashboard/profile">
+            <User className="w-5 h-5" />
+            <span className="text-sm">{userName}</span>
+          </Link>
         </Button>
       </div>
     </header>

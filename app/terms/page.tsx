@@ -11,7 +11,7 @@ export default function TermsPage() {
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">I</span>
+              <span className="text-primary-foreground font-bold text-sm">C</span>
             </div>
             <span className="font-bold text-primary">Civis</span>
           </Link>
@@ -116,7 +116,7 @@ export default function TermsPage() {
             <h2 className="text-2xl font-bold text-foreground mb-4">10. Contact Information</h2>
             <p>If you have any questions about these Terms and Conditions, please contact us at:</p>
             <ul className="mt-2 space-y-2">
-              <li>Email: support@ikenna.ng</li>
+              <li>Email: support@civis.ng</li>
               <li>Address: Lagos, Nigeria</li>
             </ul>
           </section>

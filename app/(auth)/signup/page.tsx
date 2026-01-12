@@ -46,7 +46,7 @@ export default function SignupPage() {
         <div className="max-w-md space-y-4">
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
-              I
+              C
             </div>
             <span className="text-2xl font-bold text-primary">Civis</span>
           </div>
@@ -115,14 +115,16 @@ export default function SignupPage() {
               <span className="h-px flex-1 bg-border" />
             </div>
 
-            <div className="flex flex-col md:flex-row gap-2">
-              <Button variant="outline" className="flex-1 bg-transparent">
-                <span className="mr-2 inline-flex items-center justify-center w-5 h-5 rounded-full bg-white text-[10px] font-bold text-black border border-border">
-                  G
-                </span>
+            <div className="flex flex-row flex-wrap gap-2">
+              <Button variant="outline" className="flex-1 min-w-[200px] bg-transparent">
+                <img
+                  src="https://www.gstatic.com/images/branding/googleg/1x/googleg_standard_color_128dp.png"
+                  alt="Google"
+                  className="w-5 h-5 mr-2"
+                />
                 Continue with Google
               </Button>
-              <Button variant="outline" className="flex-1 bg-transparent">
+              <Button variant="outline" className="flex-1 min-w-[200px] bg-transparent">
                 <span className="mr-2 text-xl"></span>
                 Continue with Apple
               </Button>

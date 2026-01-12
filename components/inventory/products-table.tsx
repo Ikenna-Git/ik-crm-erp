@@ -2,12 +2,19 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Edit, Trash2, Plus, X, Download } from "lucide-react"
+import { Edit, Trash2, Plus, X, Download, MoreHorizontal, Eye } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { PaginationControls } from "@/components/shared/pagination-controls"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface Product {
   id: string
@@ -21,53 +28,41 @@ interface Product {
 }
 
 const statusColors = {
-  active: "bg-green-100 text-green-800",
-  inactive: "bg-yellow-100 text-yellow-800",
-  discontinued: "bg-red-100 text-red-800",
+  active: "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-200",
+  inactive: "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-200",
+  discontinued: "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200",
 }
 
-const mockProducts: Product[] = [
-  {
-    id: "1",
-    sku: "PROD-001",
-    name: 'Laptop Pro 15"',
-    category: "Electronics",
-    price: 1299,
-    cost: 800,
-    supplier: "TechGear Inc",
-    status: "active",
-  },
-  {
-    id: "2",
-    sku: "PROD-002",
-    name: "Wireless Mouse",
-    category: "Accessories",
-    price: 29,
-    cost: 12,
-    supplier: "PeripheralCo",
-    status: "active",
-  },
-  {
-    id: "3",
-    sku: "PROD-003",
-    name: "USB-C Cable",
-    category: "Cables",
-    price: 15,
-    cost: 5,
-    supplier: "CableMaster",
-    status: "active",
-  },
-  {
-    id: "4",
-    sku: "PROD-004",
-    name: 'Monitor 4K 27"',
-    category: "Electronics",
-    price: 449,
-    cost: 250,
-    supplier: "DisplayTech",
-    status: "inactive",
-  },
+const productNames = [
+  'Laptop Pro 15"',
+  "Wireless Mouse",
+  "USB-C Cable",
+  'Monitor 4K 27"',
+  "Ergo Keyboard",
+  "Desk Lamp",
+  "Noise Canceling Headset",
+  "Docking Station",
 ]
+
+const productCategories = ["Electronics", "Accessories", "Cables", "Office", "Peripherals"]
+const productSuppliers = ["TechGear Inc", "PeripheralCo", "CableMaster", "DisplayTech", "OfficeWorks"]
+
+const buildMockProducts = (count: number): Product[] =>
+  Array.from({ length: count }, (_, idx) => ({
+    id: `PROD-${(idx + 1).toString().padStart(3, "0")}`,
+    sku: `PROD-${(idx + 1).toString().padStart(4, "0")}`,
+    name: productNames[idx % productNames.length],
+    category: productCategories[idx % productCategories.length],
+    price: 25 + (idx % 10) * 75,
+    cost: 10 + (idx % 8) * 45,
+    supplier: productSuppliers[idx % productSuppliers.length],
+    status: idx % 7 === 0 ? "inactive" : idx % 9 === 0 ? "discontinued" : "active",
+  }))
+
+const mockProducts: Product[] = buildMockProducts(70)
+
+const STORAGE_KEY = "civis_inventory_products"
+const IMPORT_EVENT = "civis-inventory-import"
 
 const formatNaira = (amount: number) => {
   return new Intl.NumberFormat("en-NG", {
@@ -79,7 +74,9 @@ const formatNaira = (amount: number) => {
 
 export function ProductsTable({ searchQuery }: { searchQuery: string }) {
   const [products, setProducts] = useState<Product[]>(mockProducts)
+  const [currentPage, setCurrentPage] = useState(1)
   const [showModal, setShowModal] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     sku: "",
     name: "",
@@ -87,7 +84,51 @@ export function ProductsTable({ searchQuery }: { searchQuery: string }) {
     price: "",
     cost: "",
     supplier: "",
+    status: "active" as Product["status"],
   })
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed)) {
+          const merged = [
+            ...parsed,
+            ...mockProducts.filter((seed) => !parsed.some((item: Product) => item.id === seed.id)),
+          ]
+          setProducts(merged)
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
+          return
+        }
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(mockProducts))
+    } catch (err) {
+      console.warn("Failed to load products", err)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const handler = (event: Event) => {
+      const custom = event as CustomEvent<{ type?: string; items?: Product[] }>
+      if (custom.detail?.type === "products" && Array.isArray(custom.detail.items)) {
+        setProducts(custom.detail.items)
+      }
+    }
+    window.addEventListener(IMPORT_EVENT, handler)
+    return () => window.removeEventListener(IMPORT_EVENT, handler)
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(products))
+    } catch (err) {
+      console.warn("Failed to persist products", err)
+    }
+  }, [products])
 
   const filteredProducts = products.filter(
     (product) =>
@@ -96,29 +137,60 @@ export function ProductsTable({ searchQuery }: { searchQuery: string }) {
       product.category.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PAGE_SIZE))
+  const pagedProducts = filteredProducts.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+  }, [currentPage, totalPages])
+
   const avgMargin = (
     products.reduce((sum, p) => sum + ((p.price - p.cost) / p.price) * 100, 0) / products.length
   ).toFixed(1)
 
   const handleAddProduct = (e: React.FormEvent) => {
     e.preventDefault()
-    const newProduct: Product = {
-      id: Date.now().toString(),
+    const payload: Product = {
+      id: editingId || Date.now().toString(),
       sku: formData.sku,
       name: formData.name,
       category: formData.category,
       price: Number.parseFloat(formData.price),
       cost: Number.parseFloat(formData.cost),
       supplier: formData.supplier,
-      status: "active",
+      status: formData.status,
     }
-    setProducts([...products, newProduct])
-    setFormData({ sku: "", name: "", category: "", price: "", cost: "", supplier: "" })
+    if (editingId) {
+      setProducts((prev) => prev.map((p) => (p.id === editingId ? payload : p)))
+      setEditingId(null)
+    } else {
+      setProducts([...products, payload])
+    }
+    setFormData({ sku: "", name: "", category: "", price: "", cost: "", supplier: "", status: "active" })
     setShowModal(false)
   }
 
   const handleDeleteProduct = (id: string) => {
     setProducts(products.filter((p) => p.id !== id))
+  }
+
+  const handleEditProduct = (product: Product) => {
+    setEditingId(product.id)
+    setFormData({
+      sku: product.sku,
+      name: product.name,
+      category: product.category,
+      price: String(product.price),
+      cost: String(product.cost),
+      supplier: product.supplier,
+      status: product.status,
+    })
+    setShowModal(true)
   }
 
   const downloadProductsCSV = () => {
@@ -196,7 +268,7 @@ export function ProductsTable({ searchQuery }: { searchQuery: string }) {
                 </tr>
               </thead>
               <tbody>
-                {filteredProducts.map((product) => {
+                {pagedProducts.map((product) => {
                   const margin = (((product.price - product.cost) / product.price) * 100).toFixed(0)
                   return (
                     <tr key={product.id} className="border-b border-border hover:bg-muted/50 transition">
@@ -211,24 +283,44 @@ export function ProductsTable({ searchQuery }: { searchQuery: string }) {
                           {product.status}
                         </Badge>
                       </td>
-                      <td className="py-4 px-4 flex gap-2">
-                        <Button variant="ghost" size="sm">
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive"
-                          onClick={() => handleDeleteProduct(product.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                      <td className="py-4 px-4">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="p-2">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => alert(JSON.stringify(product, null, 2))}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              View details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditProduct(product)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => handleDeleteProduct(product.id)}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
+          </div>
+          <div className="pt-4">
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
           </div>
         </CardContent>
       </Card>
@@ -238,7 +330,7 @@ export function ProductsTable({ searchQuery }: { searchQuery: string }) {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4 max-h-screen overflow-y-auto">
             <CardHeader className="flex flex-row items-center justify-between pb-3 sticky top-0 bg-background">
-              <CardTitle>Add New Product</CardTitle>
+              <CardTitle>{editingId ? "Edit Product" : "Add New Product"}</CardTitle>
               <Button variant="ghost" size="sm" onClick={() => setShowModal(false)}>
                 <X className="w-4 h-4" />
               </Button>
@@ -301,6 +393,18 @@ export function ProductsTable({ searchQuery }: { searchQuery: string }) {
                     required
                   />
                 </div>
+                <div>
+                  <label className="text-sm font-medium">Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value as Product["status"] })}
+                    className="w-full px-3 py-2 border border-border rounded-md bg-background"
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="discontinued">Discontinued</option>
+                  </select>
+                </div>
                 <div className="flex gap-3 pt-4">
                   <Button
                     type="button"
@@ -311,7 +415,7 @@ export function ProductsTable({ searchQuery }: { searchQuery: string }) {
                     Cancel
                   </Button>
                   <Button type="submit" className="flex-1">
-                    Add Product
+                    {editingId ? "Save Changes" : "Add Product"}
                   </Button>
                 </div>
               </form>

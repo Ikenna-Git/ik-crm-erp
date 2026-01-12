@@ -70,7 +70,7 @@ export default function PricingPage() {
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">I</span>
+              <span className="text-primary-foreground font-bold text-sm">C</span>
             </div>
             <span className="font-bold text-primary">Civis</span>
           </Link>
@@ -174,9 +174,7 @@ export default function PricingPage() {
         {/* CTA Section */}
         <div className="bg-primary text-primary-foreground rounded-lg p-12 text-center space-y-4">
           <h2 className="text-3xl font-bold">Ready to get started?</h2>
-          <p className="text-lg opacity-90">
-            Join thousands of Nigerian businesses using Civis to manage their operations.
-          </p>
+          <p className="text-lg opacity-90">Join thousands of businesses using Civis to manage their operations.</p>
           <Button className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
             Start Your Free Trial
           </Button>

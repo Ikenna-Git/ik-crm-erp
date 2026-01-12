@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Plus, Search } from "lucide-react"
+import { Plus, Upload, Sparkles } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import {
   Dialog,
@@ -14,13 +14,15 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ProductsTable } from "@/components/inventory/products-table"
 import { StockLevels } from "@/components/inventory/stock-levels"
 import { OrdersTable } from "@/components/inventory/orders-table"
 
 export default function InventoryPage() {
-  const [searchQuery, setSearchQuery] = useState("")
+  const searchQuery = ""
   const [openProductDialog, setOpenProductDialog] = useState(false)
+  const [importNotice, setImportNotice] = useState("")
   const [productForm, setProductForm] = useState({
     name: "",
     sku: "",
@@ -35,6 +37,144 @@ export default function InventoryPage() {
       setProductForm({ name: "", sku: "", price: "", cost: "", category: "" })
       setOpenProductDialog(false)
     }
+  }
+
+  const splitCsvLine = (line: string) => {
+    const result: string[] = []
+    let current = ""
+    let inQuotes = false
+    for (let i = 0; i < line.length; i += 1) {
+      const char = line[i]
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"'
+          i += 1
+        } else {
+          inQuotes = !inQuotes
+        }
+      } else if (char === "," && !inQuotes) {
+        result.push(current)
+        current = ""
+      } else {
+        current += char
+      }
+    }
+    result.push(current)
+    return result.map((value) => value.trim())
+  }
+
+  const parseCsv = (text: string) => {
+    const lines = text.split(/\r?\n/).filter((line) => line.trim().length > 0)
+    if (!lines.length) return []
+    const headers = splitCsvLine(lines[0]).map((h) => h.toLowerCase())
+    return lines.slice(1).map((line) => {
+      const values = splitCsvLine(line)
+      const record: Record<string, string> = {}
+      headers.forEach((header, idx) => {
+        record[header] = values[idx] ?? ""
+      })
+      return record
+    })
+  }
+
+  const parseNumber = (value: string) => {
+    const cleaned = String(value || "").replace(/[^0-9.-]/g, "")
+    return Number.parseFloat(cleaned || "0")
+  }
+
+  const downloadTemplate = (type: "products" | "stock" | "orders") => {
+    const templates = {
+      products: {
+        headers: ["sku", "name", "category", "price", "cost", "supplier", "status"],
+        sample: ["PROD-001", "Laptop Pro 15", "Electronics", "1299", "800", "TechGear Inc", "active"],
+        filename: "inventory-products-template.csv",
+      },
+      stock: {
+        headers: ["sku", "name", "currentStock", "reorderPoint", "reorderQuantity", "warehouseLocation", "status"],
+        sample: ["PROD-002", "Wireless Mouse", "8", "15", "50", "B-5-2", "critical"],
+        filename: "inventory-stock-template.csv",
+      },
+      orders: {
+        headers: ["orderNo", "supplier", "items", "totalValue", "expectedDelivery", "status"],
+        sample: ["PO-2025-001", "TechGear Inc", "50", "32500", "2025-02-05", "ordered"],
+        filename: "inventory-orders-template.csv",
+      },
+    }
+    const template = templates[type]
+    const csv = [template.headers.join(","), template.sample.join(",")].join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = template.filename
+    a.click()
+    window.URL.revokeObjectURL(url)
+  }
+
+  const handleImport = async (file: File, type: "products" | "stock" | "orders") => {
+    const text = await file.text()
+    const rows = parseCsv(text)
+    if (!rows.length) return setImportNotice("No rows found in file.")
+
+    const keyMap = {
+      products: "civis_inventory_products",
+      stock: "civis_inventory_stock_levels",
+      orders: "civis_inventory_orders",
+    }
+
+    const existing = (() => {
+      try {
+        const stored = localStorage.getItem(keyMap[type])
+        return stored ? JSON.parse(stored) : []
+      } catch {
+        return []
+      }
+    })()
+
+    let mapped: any[] = []
+    if (type === "products") {
+      mapped = rows.map((row, idx) => ({
+        id: `IMP-PROD-${Date.now()}-${idx}`,
+        sku: row.sku || `PROD-IMP-${idx + 1}`,
+        name: row.name || "Imported Product",
+        category: row.category || "General",
+        price: parseNumber(row.price),
+        cost: parseNumber(row.cost),
+        supplier: row.supplier || "Supplier",
+        status: (row.status as any) || "active",
+      }))
+    }
+    if (type === "stock") {
+      mapped = rows.map((row, idx) => ({
+        id: `IMP-STOCK-${Date.now()}-${idx}`,
+        sku: row.sku || `PROD-IMP-${idx + 1}`,
+        name: row.name || "Imported Item",
+        currentStock: parseNumber(row.currentstock),
+        reorderPoint: parseNumber(row.reorderpoint),
+        reorderQuantity: parseNumber(row.reorderquantity),
+        warehouseLocation: row.warehouselocation || "A-0-0",
+        status: (row.status as any) || "ok",
+      }))
+    }
+    if (type === "orders") {
+      mapped = rows.map((row, idx) => ({
+        id: `IMP-ORDER-${Date.now()}-${idx}`,
+        orderNo: row.orderno || `PO-IMP-${idx + 1}`,
+        supplier: row.supplier || "Supplier",
+        items: parseNumber(row.items),
+        totalValue: parseNumber(row.totalvalue),
+        orderDate: new Date().toISOString().slice(0, 10),
+        expectedDelivery: row.expecteddelivery || new Date().toISOString().slice(0, 10),
+        status: (row.status as any) || "draft",
+      }))
+    }
+
+    const merged = [...mapped, ...existing]
+    localStorage.setItem(keyMap[type], JSON.stringify(merged))
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("civis-inventory-import", { detail: { type, items: merged } }))
+    }
+    setImportNotice(`Imported ${mapped.length} ${type}. Switch tabs to view.`)
   }
 
   return (
@@ -119,23 +259,31 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Search products, SKU, orders..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
+      {/* Inventory Pulse */}
+      <div className="rounded-xl border border-border bg-card/70 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <p className="font-semibold">Inventory Pulse</p>
+            <p className="text-sm text-muted-foreground">Imports ready. Track products, stock, and orders.</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">Templates: 3</span>
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">Auto reorder: Enabled</span>
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">Sync: Local</span>
+        </div>
       </div>
 
       {/* Tabs */}
       <Tabs defaultValue="products" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="stock">Stock Levels</TabsTrigger>
           <TabsTrigger value="orders">Purchase Orders</TabsTrigger>
+          <TabsTrigger value="import">Import</TabsTrigger>
         </TabsList>
 
         {/* Products Tab */}
@@ -151,6 +299,47 @@ export default function InventoryPage() {
         {/* Orders Tab */}
         <TabsContent value="orders" className="space-y-4">
           <OrdersTable searchQuery={searchQuery} />
+        </TabsContent>
+
+        <TabsContent value="import" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Import Inventory Data</CardTitle>
+              <CardDescription>Download a CSV template and upload your data.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {importNotice ? <div className="text-sm text-primary">{importNotice}</div> : null}
+              <div className="grid md:grid-cols-3 gap-4">
+                {[
+                  { type: "products", title: "Products CSV" },
+                  { type: "stock", title: "Stock Levels CSV" },
+                  { type: "orders", title: "Purchase Orders CSV" },
+                ].map((item) => (
+                  <div key={item.type} className="border border-border rounded-lg p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Upload className="w-4 h-4 text-primary" />
+                      <p className="font-medium">{item.title}</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="bg-transparent w-full"
+                      onClick={() => downloadTemplate(item.type as "products" | "stock" | "orders")}
+                    >
+                      Download template
+                    </Button>
+                    <Input
+                      type="file"
+                      accept=".csv"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) handleImport(file, item.type as "products" | "stock" | "orders")
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

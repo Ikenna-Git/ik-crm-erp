@@ -1,16 +1,24 @@
 "use client"
 
-import { useState } from "react"
-import { ChevronLeft, ChevronRight, BookOpen, FileText } from "lucide-react"
+import { useEffect, useState } from "react"
+import { ChevronLeft, ChevronRight, BookOpen, FileText, MoreHorizontal, Plus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 const DOCS = [
   {
     id: 1,
     title: "Getting Started with Civis",
     category: "Basics",
-    content: `Welcome to Civis's ERP and CRM platform! This guide will help you get up and running quickly.
+    content: `Welcome to Civis' ERP and CRM platform! This guide will help you get up and running quickly.
 
 Civis is a comprehensive business management solution designed to streamline your operations across multiple departments. Whether you're managing customer relationships, accounting, inventory, or projects, Civis provides the tools you need.
 
@@ -130,7 +138,7 @@ Reports Available:
     category: "Projects",
     content: `Plan, execute, and track projects efficiently using the Projects module.
 
-Deliver projects on time and within budget using Civis's comprehensive project management tools.
+Deliver projects on time and within budget using Civis' comprehensive project management tools.
 
 Project Planning:
 - Define project scope and objectives
@@ -252,7 +260,7 @@ Best Practices:
     id: 8,
     title: "Security & Permissions",
     category: "Security",
-    content: `Protect your data with Civis's comprehensive security features.
+    content: `Protect your data with Civis' comprehensive security features.
 
 Security is paramount in Civis. We implement industry-leading practices to protect your business data.
 
@@ -339,32 +347,116 @@ Support:
 ]
 
 const ITEMS_PER_PAGE = 3
+const STORAGE_KEY = "civis_docs"
 
 export default function DocsPage() {
+  const [docs, setDocs] = useState(DOCS)
   const [currentPage, setCurrentPage] = useState(1)
+  const [showEditor, setShowEditor] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [showViewer, setShowViewer] = useState(false)
+  const [activeDoc, setActiveDoc] = useState<typeof DOCS[number] | null>(null)
+  const [form, setForm] = useState({
+    title: "",
+    category: "",
+    content: "",
+    media: "",
+  })
 
-  const totalPages = Math.ceil(DOCS.length / ITEMS_PER_PAGE)
-  const startIdx = (currentPage - 1) * ITEMS_PER_PAGE
-  const endIdx = startIdx + ITEMS_PER_PAGE
-  const currentDocs = DOCS.slice(startIdx, endIdx)
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) {
+          setDocs(parsed)
+          return
+        }
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(DOCS))
+    } catch (err) {
+      console.warn("Failed to load docs", err)
+    }
+  }, [])
 
-  const handlePrevious = () => {
-    setCurrentPage((prev) => Math.max(prev - 1, 1))
+  const persist = (nextDocs: typeof DOCS) => {
+    setDocs(nextDocs)
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(nextDocs))
+      } catch (err) {
+        console.warn("Failed to persist docs", err)
+      }
+    }
   }
 
-  const handleNext = () => {
-    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+  const totalPages = Math.ceil(docs.length / ITEMS_PER_PAGE)
+  const startIdx = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIdx = startIdx + ITEMS_PER_PAGE
+  const currentDocs = docs.slice(startIdx, endIdx)
+
+  const handlePrevious = () => setCurrentPage((prev) => Math.max(prev - 1, 1))
+  const handleNext = () => setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+
+  const openEditor = (doc?: typeof DOCS[number]) => {
+    if (doc) {
+      setEditingId(doc.id)
+      setForm({ title: doc.title, category: doc.category, content: doc.content, media: (doc as any).media || "" })
+    } else {
+      setEditingId(null)
+      setForm({ title: "", category: "", content: "", media: "" })
+    }
+    setShowEditor(true)
+  }
+
+  const submitDoc = () => {
+    const now = new Date().toLocaleDateString("en-GB", { month: "short", day: "numeric", year: "numeric" })
+    if (editingId) {
+      const updated = docs.map((d) =>
+        d.id === editingId ? { ...d, ...form, lastUpdated: now } : d,
+      ) as typeof DOCS
+      persist(updated)
+    } else {
+      const newDoc = {
+        id: Date.now(),
+        title: form.title || "Untitled",
+        category: form.category || "General",
+        content: form.content,
+        lastUpdated: now,
+        media: form.media,
+      } as any
+      persist([newDoc, ...docs])
+    }
+    setShowEditor(false)
+    setEditingId(null)
+    setForm({ title: "", category: "", content: "", media: "" })
+  }
+
+  const deleteDoc = (id: number) => {
+    persist(docs.filter((d) => d.id !== id) as typeof DOCS)
+  }
+
+  const viewDoc = (doc: typeof DOCS[number]) => {
+    setActiveDoc(doc)
+    setShowViewer(true)
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-2">
-        <BookOpen className="w-8 h-8 text-primary" />
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Documentation</h1>
-          <p className="text-muted-foreground">Learn how to use Civis's ERP and CRM platform</p>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <BookOpen className="w-8 h-8 text-primary" />
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Documentation</h1>
+            <p className="text-muted-foreground">Learn, update, and share Civis guides, media, and newsletters.</p>
+          </div>
         </div>
+        <Button onClick={() => openEditor()} className="gap-2">
+          <Plus className="w-4 h-4" />
+          Add Document
+        </Button>
       </div>
 
       {/* Docs Grid */}
@@ -385,14 +477,44 @@ export default function DocsPage() {
                     </CardDescription>
                   </div>
                 </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="p-2">
+                      <MoreHorizontal className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => viewDoc(doc)}>
+                      Read full
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => openEditor(doc)}>
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="text-destructive" onClick={() => deleteDoc(doc.id)}>
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </CardHeader>
             <CardContent>
               <p className="text-foreground whitespace-pre-line text-sm leading-relaxed line-clamp-6">{doc.content}</p>
-              <Button variant="outline" className="mt-4 gap-2 bg-transparent">
-                <FileText className="w-4 h-4" />
-                Read Full Article
-              </Button>
+              <div className="flex items-center gap-2 mt-4">
+                <Button variant="outline" className="gap-2 bg-transparent" onClick={() => viewDoc(doc)}>
+                  <FileText className="w-4 h-4" />
+                  Read Full
+                </Button>
+                {("media" in doc && (doc as any).media) ? (
+                  <a
+                    href={(doc as any).media}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Open media
+                  </a>
+                ) : null}
+              </div>
             </CardContent>
           </Card>
         ))}
@@ -443,6 +565,90 @@ export default function DocsPage() {
           </Button>
         </div>
       </div>
+
+      {/* Editor Modal */}
+      {showEditor && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-3xl mx-4">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <div>
+                <CardTitle>{editingId ? "Edit Document" : "Add Document"}</CardTitle>
+                <CardDescription>Add articles, updates, media links, or newsletters.</CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setShowEditor(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium">Title</label>
+                  <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Category</label>
+                  <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Content</label>
+                <Textarea
+                  rows={8}
+                  value={form.content}
+                  onChange={(e) => setForm({ ...form, content: e.target.value })}
+                  placeholder="Write or paste your update, newsletter, or article..."
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Media URL (image/video/doc link)</label>
+                <Input
+                  value={form.media}
+                  onChange={(e) => setForm({ ...form, media: e.target.value })}
+                  placeholder="https://..."
+                />
+              </div>
+              <div className="flex gap-3 justify-end">
+                <Button variant="outline" className="bg-transparent" onClick={() => setShowEditor(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={submitDoc}>{editingId ? "Save changes" : "Add document"}</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Viewer Modal */}
+      {showViewer && activeDoc && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-4xl mx-4">
+            <CardHeader className="flex flex-row items-start justify-between pb-3">
+              <div>
+                <CardTitle>{activeDoc.title}</CardTitle>
+                <CardDescription>
+                  {activeDoc.category} • Updated {activeDoc.lastUpdated}
+                </CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setShowViewer(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="whitespace-pre-line leading-relaxed">{activeDoc.content}</p>
+              {("media" in activeDoc && (activeDoc as any).media) && (
+                <a
+                  href={(activeDoc as any).media}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sm text-primary hover:underline"
+                >
+                  Open attached media
+                </a>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

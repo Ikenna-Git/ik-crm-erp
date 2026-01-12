@@ -10,6 +10,7 @@ import {
   Users,
   TrendingUp,
   Settings,
+  Workflow,
   LogOut,
   ImageIcon,
   BookOpen,
@@ -28,6 +29,7 @@ const navigation = [
   { name: "Docs", href: "/dashboard/docs", icon: BookOpen },
   { name: "Demo", href: "/dashboard/demo", icon: Play },
   { name: "Analytics", href: "/dashboard/analytics", icon: TrendingUp },
+  { name: "Operations", href: "/dashboard/operations", icon: Workflow },
 ]
 
 export function DashboardSidebar() {
@@ -44,7 +46,7 @@ export function DashboardSidebar() {
       <div className="p-6 border-b border-border">
         <Link href="/dashboard" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">I</span>
+            <span className="text-primary-foreground font-bold text-sm">C</span>
           </div>
           <span className="font-bold text-lg">Civis</span>
         </Link>
@@ -54,7 +56,10 @@ export function DashboardSidebar() {
       <nav className="flex-1 p-4 space-y-2 overflow-auto">
         {navigation.map((item) => {
           const Icon = item.icon
-          const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+          const isOverview = item.href === "/dashboard"
+          const isActive = isOverview
+            ? pathname === "/dashboard"
+            : pathname === item.href || pathname.startsWith(item.href + "/")
 
           return (
             <Link
@@ -73,9 +78,11 @@ export function DashboardSidebar() {
 
       {/* Footer */}
       <div className="p-4 border-t border-border space-y-2">
-        <Button variant="outline" className="w-full justify-start gap-2 bg-transparent">
-          <Settings className="w-4 h-4" />
-          Settings
+        <Button variant="outline" className="w-full justify-start gap-2 bg-transparent" asChild>
+          <Link href="/dashboard/settings">
+            <Settings className="w-4 h-4" />
+            Settings
+          </Link>
         </Button>
         <Button
           variant="outline"

@@ -46,7 +46,7 @@ export default function FeaturesPage() {
       items: [
         "Project boards and dashboards",
         "Kanban task management",
-        ...(flags.raptorMini ? ["Gantt chart timeline views"] : []),
+        "Gantt chart timeline views",
         "Team collaboration tools",
         "Time and budget tracking",
       ],
@@ -82,7 +82,7 @@ export default function FeaturesPage() {
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">I</span>
+              <span className="text-primary-foreground font-bold text-sm">C</span>
             </div>
             <span className="font-bold text-primary">Civis</span>
           </Link>

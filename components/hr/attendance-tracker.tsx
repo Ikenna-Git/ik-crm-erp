@@ -15,10 +15,10 @@ interface AttendanceRecord {
 }
 
 const statusConfig = {
-  present: { badge: "bg-green-100 text-green-800", icon: CheckCircle },
-  absent: { badge: "bg-red-100 text-red-800", icon: XCircle },
-  late: { badge: "bg-yellow-100 text-yellow-800", icon: Clock },
-  "on-leave": { badge: "bg-blue-100 text-blue-800", icon: Calendar },
+  present: { badge: "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-200", icon: CheckCircle },
+  absent: { badge: "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200", icon: XCircle },
+  late: { badge: "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-200", icon: Clock },
+  "on-leave": { badge: "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200", icon: Calendar },
 }
 
 const mockAttendance: AttendanceRecord[] = [

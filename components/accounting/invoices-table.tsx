@@ -6,8 +6,15 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Edit, Trash2, Plus, X, Download, Eye } from "lucide-react"
+import { Edit, Trash2, Plus, X, Download, Eye, MoreHorizontal } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { PaginationControls } from "@/components/shared/pagination-controls"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 export interface Invoice {
   id: string
@@ -20,23 +27,27 @@ export interface Invoice {
 }
 
 const statusColors = {
-  paid: "bg-green-100 text-green-800 border-green-200",
-  sent: "bg-blue-100 text-blue-800 border-blue-200",
-  draft: "bg-gray-100 text-gray-800 border-gray-200",
-  overdue: "bg-red-100 text-red-800 border-red-200",
+  paid: "bg-green-100 text-green-800 border-green-200 dark:bg-green-500/20 dark:text-green-200 dark:border-green-500/40",
+  sent: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-500/20 dark:text-blue-200 dark:border-blue-500/40",
+  draft: "bg-gray-100 text-gray-800 border-gray-200 dark:bg-slate-700/40 dark:text-slate-200 dark:border-slate-500/40",
+  overdue: "bg-red-100 text-red-800 border-red-200 dark:bg-red-500/20 dark:text-red-200 dark:border-red-500/40",
 }
 
-const mockInvoices: Invoice[] = [
-  {
-    id: "1",
-    number: "INV-2025-001",
-    client: "Acme Corp",
-    amount: 12000,
-    status: "paid",
-    date: "2025-01-15",
-    dueDate: "2025-02-15",
-  },
-]
+const invoiceClients = ["Acme Corp", "Northwind", "Globex", "Venture Labs", "Nimbus", "Zenith"]
+const statusOptions: Invoice["status"][] = ["draft", "sent", "paid", "overdue"]
+
+const buildMockInvoices = (count: number): Invoice[] =>
+  Array.from({ length: count }, (_, idx) => ({
+    id: `INV-${(idx + 1).toString().padStart(3, "0")}`,
+    number: `INV-2025-${(idx + 1).toString().padStart(3, "0")}`,
+    client: invoiceClients[idx % invoiceClients.length],
+    amount: 85000 + (idx % 8) * 60000,
+    status: statusOptions[idx % statusOptions.length],
+    date: new Date(2025, (idx % 12), (idx % 27) + 1).toISOString().slice(0, 10),
+    dueDate: new Date(2025, (idx % 12), (idx % 27) + 10).toISOString().slice(0, 10),
+  }))
+
+const mockInvoices: Invoice[] = buildMockInvoices(70)
 
 type Props = {
   searchQuery: string
@@ -50,7 +61,9 @@ const formatNaira = (amount: number) =>
 
 export function InvoicesTable({ searchQuery, invoices: providedInvoices, onAddInvoice, onDeleteInvoice }: Props) {
   const [invoices, setInvoices] = useState<Invoice[]>(providedInvoices || mockInvoices)
+  const [currentPage, setCurrentPage] = useState(1)
   const [showModal, setShowModal] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     number: "",
     client: "",
@@ -63,11 +76,23 @@ export function InvoicesTable({ searchQuery, invoices: providedInvoices, onAddIn
     if (providedInvoices) setInvoices(providedInvoices)
   }, [providedInvoices])
 
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery])
+
   const filteredInvoices = invoices.filter(
     (invoice) =>
       invoice.number.toLowerCase().includes(searchQuery.toLowerCase()) ||
       invoice.client.toLowerCase().includes(searchQuery.toLowerCase()),
   )
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.max(1, Math.ceil(filteredInvoices.length / PAGE_SIZE))
+  const pagedInvoices = filteredInvoices.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+  }, [currentPage, totalPages])
 
   const stats = {
     paid: invoices.filter((i) => i.status === "paid").reduce((sum, i) => sum + i.amount, 0),
@@ -77,15 +102,21 @@ export function InvoicesTable({ searchQuery, invoices: providedInvoices, onAddIn
 
   const handleAddInvoice = (e: React.FormEvent) => {
     e.preventDefault()
+    const existing = editingId ? invoices.find((inv) => inv.id === editingId) : undefined
     const payload: Omit<Invoice, "id"> = {
       number: formData.number,
       client: formData.client,
       amount: Number.parseFloat(formData.amount),
-      status: "draft",
+      status: existing?.status || "draft",
       date: formData.date,
       dueDate: formData.dueDate,
     }
-    if (onAddInvoice) {
+    if (editingId) {
+      setInvoices((prev) =>
+        prev.map((inv) => (inv.id === editingId ? { ...inv, ...payload } : inv)),
+      )
+      setEditingId(null)
+    } else if (onAddInvoice) {
       onAddInvoice(payload)
     } else {
       setInvoices((prev) => [...prev, { id: Date.now().toString(), ...payload }])
@@ -100,6 +131,18 @@ export function InvoicesTable({ searchQuery, invoices: providedInvoices, onAddIn
     } else {
       setInvoices(invoices.filter((inv) => inv.id !== id))
     }
+  }
+
+  const handleEditInvoice = (invoice: Invoice) => {
+    setEditingId(invoice.id)
+    setFormData({
+      number: invoice.number,
+      client: invoice.client,
+      amount: String(invoice.amount),
+      date: invoice.date || "",
+      dueDate: invoice.dueDate || "",
+    })
+    setShowModal(true)
   }
 
   const downloadInvoicesCSV = () => {
@@ -170,7 +213,7 @@ export function InvoicesTable({ searchQuery, invoices: providedInvoices, onAddIn
                 </tr>
               </thead>
               <tbody>
-                {filteredInvoices.map((invoice) => (
+                {pagedInvoices.map((invoice) => (
                   <tr key={invoice.id} className="border-b border-border hover:bg-muted/50 transition">
                     <td className="py-4 px-4 font-medium">{invoice.number}</td>
                     <td className="py-4 px-4">{invoice.client}</td>
@@ -181,26 +224,47 @@ export function InvoicesTable({ searchQuery, invoices: providedInvoices, onAddIn
                       </Badge>
                     </td>
                     <td className="py-4 px-4 text-muted-foreground">{invoice.dueDate || "—"}</td>
-                    <td className="py-4 px-4 flex gap-2">
-                      <Button variant="ghost" size="sm">
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <Download className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive"
-                        onClick={() => handleDeleteInvoice(invoice.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                    <td className="py-4 px-4">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="p-2">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => alert(JSON.stringify(invoice, null, 2))}>
+                            <Eye className="w-4 h-4 mr-2" />
+                            View details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditInvoice(invoice)}>
+                            <Edit className="w-4 h-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => downloadInvoicesCSV()}>
+                            <Download className="w-4 h-4 mr-2" />
+                            Download PDF
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => handleDeleteInvoice(invoice.id)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="pt-4">
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
           </div>
         </CardContent>
       </Card>
@@ -210,7 +274,7 @@ export function InvoicesTable({ searchQuery, invoices: providedInvoices, onAddIn
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle>Add New Invoice</CardTitle>
+              <CardTitle>{editingId ? "Edit Invoice" : "Add New Invoice"}</CardTitle>
               <Button variant="ghost" size="sm" onClick={() => setShowModal(false)}>
                 <X className="w-4 h-4" />
               </Button>
@@ -267,7 +331,7 @@ export function InvoicesTable({ searchQuery, invoices: providedInvoices, onAddIn
                     Cancel
                   </Button>
                   <Button type="submit" className="flex-1">
-                    Add Invoice
+                    {editingId ? "Save Changes" : "Add Invoice"}
                   </Button>
                 </div>
               </form>
