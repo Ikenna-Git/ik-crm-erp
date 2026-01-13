@@ -72,7 +72,7 @@ const buildProviders = () => {
 export const authOptions: AuthOptions = {
   adapter: PrismaAdapter(prisma),
   providers: buildProviders(),
-  session: { strategy: "database" },
+  session: { strategy: "jwt" },
   pages: {
     signIn: "/login",
   },
