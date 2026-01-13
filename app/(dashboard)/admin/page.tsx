@@ -2,28 +2,31 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, Users, Settings, BarChart3, Lock } from "lucide-react"
 
 export default function AdminPage() {
   const router = useRouter()
+  const { data: session, status } = useSession()
   const [user, setUser] = useState<any>(null)
   const [isUnauthorized, setIsUnauthorized] = useState(false)
 
   useEffect(() => {
-    const userData = localStorage.getItem("user")
-    if (userData) {
-      const parsedUser = JSON.parse(userData)
-      if (parsedUser.role === "admin") {
-        setUser(parsedUser)
+    if (status === "unauthenticated") {
+      router.push("/login")
+      return
+    }
+    if (status === "authenticated") {
+      const role = session?.user?.role
+      if (role === "ADMIN" || role === "SUPER_ADMIN") {
+        setUser(session.user)
       } else {
         setIsUnauthorized(true)
       }
-    } else {
-      router.push("/login")
     }
-  }, [router])
+  }, [router, session, status])
 
   if (isUnauthorized) {
     return (
@@ -46,6 +49,7 @@ export default function AdminPage() {
     )
   }
 
+  if (status === "loading") return <div>Loading...</div>
   if (!user) return <div>Loading...</div>
 
   const adminSections = [

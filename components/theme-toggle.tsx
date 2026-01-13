@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { Moon, Sun } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { preferencesUpdatedEventName } from "@/lib/user-settings"
+import { themeUpdatedEventName } from "@/lib/user-settings"
 
 export function ThemeToggle() {
   const [mounted, setMounted] = useState(false)
@@ -26,10 +26,10 @@ export function ThemeToggle() {
         document.documentElement.classList.toggle("dark", stored === "dark")
       }
     }
-    window.addEventListener(preferencesUpdatedEventName, syncTheme)
+    window.addEventListener(themeUpdatedEventName, syncTheme)
     window.addEventListener("storage", syncTheme)
     return () => {
-      window.removeEventListener(preferencesUpdatedEventName, syncTheme)
+      window.removeEventListener(themeUpdatedEventName, syncTheme)
       window.removeEventListener("storage", syncTheme)
     }
   }, [])

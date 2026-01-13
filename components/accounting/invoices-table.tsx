@@ -54,6 +54,7 @@ type Props = {
   searchQuery: string
   invoices?: Invoice[]
   onAddInvoice?: (data: Omit<Invoice, "id">) => void
+  onUpdateInvoice?: (id: string, data: Partial<Invoice>) => void
   onDeleteInvoice?: (id: string) => void
   showAmounts?: boolean
 }
@@ -124,9 +125,13 @@ export function InvoicesTable({
       dueDate: formData.dueDate,
     }
     if (editingId) {
-      setInvoices((prev) =>
-        prev.map((inv) => (inv.id === editingId ? { ...inv, ...payload } : inv)),
-      )
+      if (onUpdateInvoice) {
+        onUpdateInvoice(editingId, payload)
+      } else {
+        setInvoices((prev) =>
+          prev.map((inv) => (inv.id === editingId ? { ...inv, ...payload } : inv)),
+        )
+      }
       setEditingId(null)
     } else if (onAddInvoice) {
       onAddInvoice(payload)

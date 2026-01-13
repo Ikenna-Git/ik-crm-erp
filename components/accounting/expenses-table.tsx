@@ -63,6 +63,7 @@ type Props = {
   searchQuery: string
   expenses?: Expense[]
   onAddExpense?: (data: Omit<Expense, "id">) => void
+  onUpdateExpense?: (id: string, data: Partial<Expense>) => void
   onDeleteExpense?: (id: string) => void
   showAmounts?: boolean
 }
@@ -132,7 +133,11 @@ export function ExpensesTable({
       submittedBy: formData.submittedBy,
     }
     if (editingId) {
-      setExpenses((prev) => prev.map((exp) => (exp.id === editingId ? { ...exp, ...payload } : exp)))
+      if (onUpdateExpense) {
+        onUpdateExpense(editingId, payload)
+      } else {
+        setExpenses((prev) => prev.map((exp) => (exp.id === editingId ? { ...exp, ...payload } : exp)))
+      }
       setEditingId(null)
     } else if (onAddExpense) {
       onAddExpense(payload)

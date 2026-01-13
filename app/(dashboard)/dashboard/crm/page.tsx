@@ -8,6 +8,7 @@ import { Plus, Sparkles } from "lucide-react"
 import { ContactsTable } from "@/components/crm/contacts-table"
 import { DealsBoard } from "@/components/crm/deals-board"
 import { ActivitiesTimeline } from "@/components/crm/activities-timeline"
+import { getSessionHeaders } from "@/lib/user-settings"
 import {
   Dialog,
   DialogContent,
@@ -71,7 +72,7 @@ export default function CRMPage() {
     name: "",
     email: "",
     phone: "",
-    status: "prospect",
+    status: "lead",
   })
 
   const parseJsonSafe = async (res: Response) => {
@@ -83,31 +84,48 @@ export default function CRMPage() {
     }
   }
 
+  const formatLastContact = (value?: string | null) => {
+    if (!value) return "—"
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return "—"
+    return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+  }
+
+  const mapContact = (contact: any) => ({
+    id: contact.id,
+    name: contact.name,
+    email: contact.email,
+    phone: contact.phone,
+    company: contact.company?.name || contact.companyName || "",
+    status: String(contact.status || "prospect").toLowerCase(),
+    revenue: contact.revenue || 0,
+    lastContact: formatLastContact(contact.lastContact),
+  })
+
+  const mapDeal = (deal: any) => ({
+    id: deal.id,
+    title: deal.title,
+    company: deal.company?.name || deal.companyName || deal.companyId || "",
+    value: deal.value,
+    stage: String(deal.stage || "prospect").toLowerCase(),
+    owner: deal.owner?.name || deal.ownerName || deal.ownerId || "",
+    expectedClose: deal.expectedClose ? new Date(deal.expectedClose).toISOString().slice(0, 10) : undefined,
+  })
+
   const loadData = async () => {
     try {
       setLoading(true)
       const [contactsRes, dealsRes] = await Promise.all([
-        fetch("/api/crm/contacts"),
-        fetch("/api/crm/deals"),
+        fetch("/api/crm/contacts", { headers: { ...getSessionHeaders() } }),
+        fetch("/api/crm/deals", { headers: { ...getSessionHeaders() } }),
       ])
       const contactsJson = contactsRes.ok ? await parseJsonSafe(contactsRes) : null
       const dealsJson = dealsRes.ok ? await parseJsonSafe(dealsRes) : null
 
       const loadedContacts =
-        contactsJson?.contacts?.length > 0
-          ? contactsJson.contacts.map((c: any) => ({
-              id: c.id,
-              name: c.name,
-              email: c.email,
-              phone: c.phone,
-              company: c.companyId || "",
-              status: c.status || "prospect",
-              revenue: c.revenue || 0,
-              lastContact: c.lastContact || "—",
-            }))
-          : fallbackContacts
+        contactsJson?.contacts?.length > 0 ? contactsJson.contacts.map(mapContact) : fallbackContacts
 
-      const loadedDeals = dealsJson?.deals?.length ? dealsJson.deals : fallbackDeals
+      const loadedDeals = dealsJson?.deals?.length ? dealsJson.deals.map(mapDeal) : fallbackDeals
 
       setContacts(loadedContacts)
       setDeals(loadedDeals)
@@ -120,25 +138,29 @@ export default function CRMPage() {
     }
   }
 
-  const handleAddContactAPI = async (payload: { name: string; email: string; phone?: string; company?: string; status: string }) => {
+  const handleAddContactAPI = async (payload: {
+    name: string
+    email: string
+    phone?: string
+    company?: string
+    status: string
+  }) => {
     try {
       const res = await fetch("/api/crm/contacts", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: payload.name, email: payload.email, phone: payload.phone }),
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({
+          name: payload.name,
+          email: payload.email,
+          phone: payload.phone,
+          company: payload.company,
+          status: payload.status,
+          lastContact: new Date().toISOString(),
+        }),
       })
       const data = await parseJsonSafe(res)
       if (!res.ok) throw new Error(data?.error || "Failed to add contact")
-      const contact = {
-        id: data.contact.id,
-        name: data.contact.name,
-        email: data.contact.email,
-        phone: data.contact.phone,
-        company: payload.company || "",
-        status: (payload.status as any) || "prospect",
-        revenue: 0,
-        lastContact: "Just now",
-      }
+      const contact = mapContact(data.contact)
       setContacts((prev) => [...prev, contact])
       return contact
     } catch (err) {
@@ -154,8 +176,21 @@ export default function CRMPage() {
     }
   }
 
-  const handleDeleteContact = (id: string) => {
-    setContacts((prev) => prev.filter((c) => c.id !== id))
+  const handleDeleteContact = async (id: string) => {
+    try {
+      const res = await fetch(`/api/crm/contacts?id=${id}`, {
+        method: "DELETE",
+        headers: { ...getSessionHeaders() },
+      })
+      if (!res.ok) {
+        const data = await parseJsonSafe(res)
+        throw new Error(data?.error || "Failed to delete contact")
+      }
+    } catch (err) {
+      console.warn("Failed to delete contact", err)
+    } finally {
+      setContacts((prev) => prev.filter((c) => c.id !== id))
+    }
   }
 
   useEffect(() => {
@@ -165,13 +200,28 @@ export default function CRMPage() {
   const handleAddContact = async () => {
     if (formData.name && formData.email) {
       await handleAddContactAPI(formData)
-      setFormData({ name: "", email: "", phone: "", status: "prospect" })
+      setFormData({ name: "", email: "", phone: "", status: "lead" })
       setOpenAddDialog(false)
     }
   }
 
-  const handleUpdateContact = (id: string, data: any) => {
-    setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, ...data, lastContact: "Updated just now" } : c)))
+  const handleUpdateContact = async (id: string, data: any) => {
+    try {
+      const res = await fetch("/api/crm/contacts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({ id, ...data, lastContact: new Date().toISOString() }),
+      })
+      const payload = await parseJsonSafe(res)
+      if (!res.ok) throw new Error(payload?.error || "Failed to update contact")
+      const updated = mapContact(payload.contact)
+      setContacts((prev) => prev.map((c) => (c.id === id ? updated : c)))
+    } catch (err) {
+      console.warn("Failed to update contact", err)
+      setContacts((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, ...data, lastContact: "Updated just now" } : c)),
+      )
+    }
   }
 
   return (
@@ -231,9 +281,9 @@ export default function CRMPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="lead">Lead</SelectItem>
                     <SelectItem value="prospect">Prospect</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="customer">Customer</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

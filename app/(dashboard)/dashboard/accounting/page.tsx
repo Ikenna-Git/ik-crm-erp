@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { InvoicesTable, type Invoice } from "@/components/accounting/invoices-table"
 import { ExpensesTable, type Expense } from "@/components/accounting/expenses-table"
 import { FinancialReports } from "@/components/accounting/financial-reports"
+import { getSessionHeaders } from "@/lib/user-settings"
 
 const invoiceClients = ["Acme Corp", "Northwind", "Globex", "Venture Labs", "Nimbus", "Zenith"]
 const expenseCategories = ["utilities", "travel", "equipment", "software", "office", "meals"]
@@ -133,6 +134,30 @@ export default function AccountingPage() {
     return Number.parseFloat(cleaned || "0")
   }
 
+  const mapInvoice = (inv: any): Invoice => ({
+    id: inv.id,
+    number: inv.invoiceNumber,
+    client: inv.clientName,
+    amount: inv.amount,
+    status: String(inv.status || "DRAFT").toLowerCase() as Invoice["status"],
+    date: inv.issueDate
+      ? new Date(inv.issueDate).toISOString().slice(0, 10)
+      : inv.createdAt
+        ? new Date(inv.createdAt).toISOString().slice(0, 10)
+        : undefined,
+    dueDate: inv.dueDate ? new Date(inv.dueDate).toISOString().slice(0, 10) : undefined,
+  })
+
+  const mapExpense = (exp: any): Expense => ({
+    id: exp.id,
+    description: exp.description,
+    category: exp.category,
+    amount: exp.amount,
+    date: exp.date ? new Date(exp.date).toISOString().slice(0, 10) : undefined,
+    status: String(exp.status || "PENDING").toLowerCase() as Expense["status"],
+    submittedBy: exp.submittedBy || "System",
+  })
+
   const downloadTemplate = (type: "invoices" | "expenses") => {
     const headers =
       type === "invoices"
@@ -189,34 +214,18 @@ export default function AccountingPage() {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [invRes, expRes] = await Promise.all([fetch("/api/accounting/invoices"), fetch("/api/accounting/expenses")])
+      const [invRes, expRes] = await Promise.all([
+        fetch("/api/accounting/invoices", { headers: { ...getSessionHeaders() } }),
+        fetch("/api/accounting/expenses", { headers: { ...getSessionHeaders() } }),
+      ])
       const invJson = invRes.ok ? await parseJsonSafe(invRes) : null
       const expJson = expRes.ok ? await parseJsonSafe(expRes) : null
 
       const mappedInvoices =
-        invJson?.invoices?.length > 0
-          ? invJson.invoices.map((i: any) => ({
-              id: i.id,
-              number: i.invoiceNumber,
-              client: i.clientName,
-              amount: i.amount,
-              status: i.status,
-              dueDate: i.dueDate,
-            }))
-          : fallbackInvoices
+        invJson?.invoices?.length > 0 ? invJson.invoices.map(mapInvoice) : fallbackInvoices
 
       const mappedExpenses =
-        expJson?.expenses?.length > 0
-          ? expJson.expenses.map((e: any) => ({
-              id: e.id,
-              description: e.description,
-              category: e.category,
-              amount: e.amount,
-              date: e.date,
-              status: e.status || "pending",
-              submittedBy: e.submittedBy || "System",
-            }))
-          : fallbackExpenses
+        expJson?.expenses?.length > 0 ? expJson.expenses.map(mapExpense) : fallbackExpenses
 
       setInvoices(mappedInvoices)
       setExpenses(mappedExpenses)
@@ -261,92 +270,183 @@ export default function AccountingPage() {
     setFinanceNotice("Finance view locked.")
   }
 
-  const handleAddInvoice = async () => {
-    if (!invoiceForm.invoiceNumber || !invoiceForm.amount) return
+  const createInvoice = async (payload: Omit<Invoice, "id">) => {
     try {
       const res = await fetch("/api/accounting/invoices", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
         body: JSON.stringify({
-          invoiceNumber: invoiceForm.invoiceNumber,
-          clientName: invoiceForm.clientName,
-          amount: Number(invoiceForm.amount),
-          dueDate: invoiceForm.dueDate,
-          status: invoiceForm.status,
+          invoiceNumber: payload.number,
+          clientName: payload.client,
+          amount: payload.amount,
+          dueDate: payload.dueDate,
+          issueDate: payload.date,
+          status: payload.status,
         }),
       })
       const data = await parseJsonSafe(res)
       if (!res.ok) throw new Error(data.error || "Failed to add invoice")
-      setInvoices((prev) => [
-        ...prev,
-        {
-          id: data.invoice.id,
-          number: data.invoice.invoiceNumber,
-          client: data.invoice.clientName,
-          amount: data.invoice.amount,
-          status: data.invoice.status,
-          dueDate: data.invoice.dueDate,
-        },
-      ])
-      setInvoiceForm({ invoiceNumber: "", clientName: "", amount: "", dueDate: "", status: "draft" })
-      setOpenInvoiceDialog(false)
+      const mapped = mapInvoice(data.invoice)
+      setInvoices((prev) => [mapped, ...prev])
+      return mapped
     } catch (err) {
       const localInvoice: Invoice = {
         id: `INV-${Date.now()}`,
-        number: invoiceForm.invoiceNumber,
-        client: invoiceForm.clientName || "Draft Client",
-        amount: Number(invoiceForm.amount),
-        status: invoiceForm.status as Invoice["status"],
-        dueDate: invoiceForm.dueDate || new Date().toISOString().slice(0, 10),
+        number: payload.number,
+        client: payload.client || "Draft Client",
+        amount: payload.amount,
+        status: payload.status,
+        dueDate: payload.dueDate || new Date().toISOString().slice(0, 10),
+        date: payload.date || new Date().toISOString().slice(0, 10),
       }
-      setInvoices((prev) => [...prev, localInvoice])
-      setInvoiceForm({ invoiceNumber: "", clientName: "", amount: "", dueDate: "", status: "draft" })
-      setOpenInvoiceDialog(false)
+      setInvoices((prev) => [localInvoice, ...prev])
+      return localInvoice
     }
   }
 
-  const handleAddExpense = async () => {
-    if (!expenseForm.description || !expenseForm.amount) return
+  const createExpense = async (payload: Omit<Expense, "id">) => {
     try {
       const res = await fetch("/api/accounting/expenses", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
         body: JSON.stringify({
-          description: expenseForm.description,
-          amount: Number(expenseForm.amount),
-          category: expenseForm.category,
-          date: expenseForm.date,
+          description: payload.description,
+          amount: payload.amount,
+          category: payload.category,
+          date: payload.date,
+          status: payload.status,
+          submittedBy: payload.submittedBy,
         }),
       })
       const data = await parseJsonSafe(res)
       if (!res.ok) throw new Error(data.error || "Failed to add expense")
-      setExpenses((prev) => [
-        ...prev,
-        {
-          id: data.expense.id,
-          description: data.expense.description,
-          category: data.expense.category,
-          amount: data.expense.amount,
-          date: data.expense.date,
-          status: "pending",
-          submittedBy: data.expense.submittedBy || "You",
-        },
-      ])
-      setExpenseForm({ description: "", amount: "", category: "office-supplies", date: "" })
-      setOpenExpenseDialog(false)
+      const mapped = mapExpense(data.expense)
+      setExpenses((prev) => [mapped, ...prev])
+      return mapped
     } catch (err) {
       const localExpense: Expense = {
         id: `EXP-${Date.now()}`,
-        description: expenseForm.description,
-        category: expenseForm.category as Expense["category"],
-        amount: Number(expenseForm.amount),
-        date: expenseForm.date || new Date().toISOString().slice(0, 10),
-        status: "pending",
-        submittedBy: "You",
+        description: payload.description,
+        category: payload.category,
+        amount: payload.amount,
+        date: payload.date || new Date().toISOString().slice(0, 10),
+        status: payload.status || "pending",
+        submittedBy: payload.submittedBy || "You",
       }
-      setExpenses((prev) => [...prev, localExpense])
-      setExpenseForm({ description: "", amount: "", category: "office-supplies", date: "" })
-      setOpenExpenseDialog(false)
+      setExpenses((prev) => [localExpense, ...prev])
+      return localExpense
+    }
+  }
+
+  const handleAddInvoice = async () => {
+    if (!invoiceForm.invoiceNumber || !invoiceForm.amount) return
+    await createInvoice({
+      number: invoiceForm.invoiceNumber,
+      client: invoiceForm.clientName || "Draft Client",
+      amount: Number(invoiceForm.amount),
+      status: invoiceForm.status as Invoice["status"],
+      date: new Date().toISOString().slice(0, 10),
+      dueDate: invoiceForm.dueDate,
+    })
+    setInvoiceForm({ invoiceNumber: "", clientName: "", amount: "", dueDate: "", status: "draft" })
+    setOpenInvoiceDialog(false)
+  }
+
+  const handleAddExpense = async () => {
+    if (!expenseForm.description || !expenseForm.amount) return
+    await createExpense({
+      description: expenseForm.description,
+      amount: Number(expenseForm.amount),
+      category: expenseForm.category,
+      date: expenseForm.date,
+      status: "pending",
+      submittedBy: "You",
+    })
+    setExpenseForm({ description: "", amount: "", category: "office-supplies", date: "" })
+    setOpenExpenseDialog(false)
+  }
+
+  const handleUpdateInvoice = async (id: string, data: Partial<Invoice>) => {
+    try {
+      const res = await fetch("/api/accounting/invoices", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({
+          id,
+          invoiceNumber: data.number,
+          clientName: data.client,
+          amount: data.amount,
+          status: data.status,
+          dueDate: data.dueDate,
+          issueDate: data.date,
+        }),
+      })
+      const json = await parseJsonSafe(res)
+      if (!res.ok) throw new Error(json.error || "Failed to update invoice")
+      const updated = mapInvoice(json.invoice)
+      setInvoices((prev) => prev.map((inv) => (inv.id === id ? updated : inv)))
+    } catch (err) {
+      setInvoices((prev) =>
+        prev.map((inv) => (inv.id === id ? { ...inv, ...data, date: data.date || inv.date } : inv)),
+      )
+    }
+  }
+
+  const handleDeleteInvoice = async (id: string) => {
+    try {
+      const res = await fetch(`/api/accounting/invoices?id=${id}`, {
+        method: "DELETE",
+        headers: { ...getSessionHeaders() },
+      })
+      if (!res.ok) {
+        const json = await parseJsonSafe(res)
+        throw new Error(json.error || "Failed to delete invoice")
+      }
+    } catch (err) {
+      console.warn("Failed to delete invoice", err)
+    } finally {
+      setInvoices((prev) => prev.filter((inv) => inv.id !== id))
+    }
+  }
+
+  const handleUpdateExpense = async (id: string, data: Partial<Expense>) => {
+    try {
+      const res = await fetch("/api/accounting/expenses", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({
+          id,
+          description: data.description,
+          amount: data.amount,
+          category: data.category,
+          date: data.date,
+          status: data.status,
+          submittedBy: data.submittedBy,
+        }),
+      })
+      const json = await parseJsonSafe(res)
+      if (!res.ok) throw new Error(json.error || "Failed to update expense")
+      const updated = mapExpense(json.expense)
+      setExpenses((prev) => prev.map((exp) => (exp.id === id ? updated : exp)))
+    } catch (err) {
+      setExpenses((prev) => prev.map((exp) => (exp.id === id ? { ...exp, ...data } : exp)))
+    }
+  }
+
+  const handleDeleteExpense = async (id: string) => {
+    try {
+      const res = await fetch(`/api/accounting/expenses?id=${id}`, {
+        method: "DELETE",
+        headers: { ...getSessionHeaders() },
+      })
+      if (!res.ok) {
+        const json = await parseJsonSafe(res)
+        throw new Error(json.error || "Failed to delete expense")
+      }
+    } catch (err) {
+      console.warn("Failed to delete expense", err)
+    } finally {
+      setExpenses((prev) => prev.filter((exp) => exp.id !== id))
     }
   }
 
@@ -354,11 +454,11 @@ export default function AccountingPage() {
   const handleExportReports = async (target: "desktop" | "email") => {
     try {
       if (target === "desktop") {
-        const res = await fetch("/api/reports/export", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "accounting", target: "desktop" }),
-        })
+      const res = await fetch("/api/reports/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({ type: "accounting", target: "desktop" }),
+      })
         if (!res.ok) throw new Error("Failed to export")
         const blob = await res.blob()
         const url = window.URL.createObjectURL(blob)
@@ -372,7 +472,7 @@ export default function AccountingPage() {
 
       const res = await fetch("/api/reports/export", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
         body: JSON.stringify({ type: "accounting", target: "email", email: exportEmail }),
       })
       const data = await res.json()
@@ -645,12 +745,26 @@ export default function AccountingPage() {
 
         {/* Invoices Tab */}
         <TabsContent value="invoices" className="space-y-4">
-          <InvoicesTable searchQuery={searchQuery} invoices={invoices} showAmounts={financeUnlocked} />
+          <InvoicesTable
+            searchQuery={searchQuery}
+            invoices={invoices}
+            showAmounts={financeUnlocked}
+            onAddInvoice={createInvoice}
+            onUpdateInvoice={handleUpdateInvoice}
+            onDeleteInvoice={handleDeleteInvoice}
+          />
         </TabsContent>
 
         {/* Expenses Tab */}
         <TabsContent value="expenses" className="space-y-4">
-          <ExpensesTable searchQuery={searchQuery} expenses={expenses} showAmounts={financeUnlocked} />
+          <ExpensesTable
+            searchQuery={searchQuery}
+            expenses={expenses}
+            showAmounts={financeUnlocked}
+            onAddExpense={createExpense}
+            onUpdateExpense={handleUpdateExpense}
+            onDeleteExpense={handleDeleteExpense}
+          />
         </TabsContent>
 
         {/* Reports Tab */}

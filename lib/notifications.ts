@@ -1,74 +1,119 @@
+import { getSessionHeaders } from "@/lib/user-settings"
+
 export type NotificationItem = {
   id: string
   title: string
   description?: string
   source?: string
-  channel?: "in-app" | "email"
+  channel?: string
   createdAt: string
   read: boolean
+  type?: string
 }
 
-const STORAGE_KEY = "civis_notifications"
 export const notificationsEventName = "civis-notifications-updated"
 
-const readNotifications = (): NotificationItem[] => {
+const notifyUpdate = () => {
+  if (typeof window === "undefined") return
+  window.dispatchEvent(new CustomEvent(notificationsEventName))
+}
+
+const parseNotification = (item: any): NotificationItem => ({
+  id: item.id,
+  title: item.title,
+  description: item.message || "",
+  source: item.source || undefined,
+  channel: item.channel || undefined,
+  createdAt: item.createdAt,
+  read: Boolean(item.read),
+  type: item.type || undefined,
+})
+
+export const getNotifications = async (): Promise<NotificationItem[]> => {
   if (typeof window === "undefined") return []
   try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (!stored) return []
-    const parsed = JSON.parse(stored)
-    return Array.isArray(parsed) ? parsed : []
+    const res = await fetch("/api/notifications", {
+      headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+      cache: "no-store",
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    return Array.isArray(data.notifications) ? data.notifications.map(parseNotification) : []
   } catch {
     return []
   }
 }
 
-const writeNotifications = (notifications: NotificationItem[]) => {
-  if (typeof window === "undefined") return
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications))
-    window.dispatchEvent(new CustomEvent(notificationsEventName, { detail: notifications }))
-  } catch {
-    // ignore storage errors
-  }
-}
-
-export const getNotifications = () => readNotifications()
-
-export const addNotification = (
-  payload: Omit<NotificationItem, "id" | "createdAt" | "read">,
-) => {
+export const addNotification = async (payload: {
+  title: string
+  description?: string
+  type?: string
+  source?: string
+  channel?: string
+  deliverEmail?: boolean
+}) => {
   if (typeof window === "undefined") return null
-  const existing = readNotifications()
-  const entry: NotificationItem = {
-    id: `ntf-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`,
-    createdAt: new Date().toISOString(),
-    read: false,
-    ...payload,
+  try {
+    const res = await fetch("/api/notifications", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) return null
+    notifyUpdate()
+    const data = await res.json()
+    return data.notification ? parseNotification(data.notification) : null
+  } catch {
+    return null
   }
-  const next = [entry, ...existing]
-  writeNotifications(next)
-  return entry
 }
 
-export const markNotificationRead = (id: string) => {
+export const markNotificationRead = async (id: string) => {
   if (typeof window === "undefined") return []
-  const existing = readNotifications()
-  const next = existing.map((item) => (item.id === id ? { ...item, read: true } : item))
-  writeNotifications(next)
-  return next
+  try {
+    const res = await fetch("/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+      body: JSON.stringify({ id }),
+    })
+    if (!res.ok) return []
+    notifyUpdate()
+    const data = await res.json()
+    return Array.isArray(data.notifications) ? data.notifications.map(parseNotification) : []
+  } catch {
+    return []
+  }
 }
 
-export const markAllNotificationsRead = () => {
+export const markAllNotificationsRead = async () => {
   if (typeof window === "undefined") return []
-  const existing = readNotifications()
-  const next = existing.map((item) => ({ ...item, read: true }))
-  writeNotifications(next)
-  return next
+  try {
+    const res = await fetch("/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+      body: JSON.stringify({ markAll: true }),
+    })
+    if (!res.ok) return []
+    notifyUpdate()
+    const data = await res.json()
+    return Array.isArray(data.notifications) ? data.notifications.map(parseNotification) : []
+  } catch {
+    return []
+  }
 }
 
-export const clearNotifications = () => {
+export const clearNotifications = async () => {
   if (typeof window === "undefined") return []
-  writeNotifications([])
-  return []
+  try {
+    const res = await fetch("/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+      body: JSON.stringify({ clear: true }),
+    })
+    if (!res.ok) return []
+    notifyUpdate()
+    return []
+  } catch {
+    return []
+  }
 }

@@ -2,8 +2,9 @@
 
 import type React from "react"
 
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { DashboardHeader } from "@/components/dashboard-header"
 
@@ -13,18 +14,25 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const { data: session, status } = useSession()
+  const isAuthenticated = status === "authenticated"
+  const loading = status === "loading"
 
   useEffect(() => {
-    const user = localStorage.getItem("user")
-    if (!user) {
+    if (status === "unauthenticated") {
       router.push("/login")
-    } else {
-      setIsAuthenticated(true)
     }
-    setLoading(false)
-  }, [router])
+  }, [router, status])
+
+  useEffect(() => {
+    if (!session?.user) return
+    const payload = {
+      name: session.user.name || "",
+      email: session.user.email || "",
+      role: session.user.role || "user",
+    }
+    localStorage.setItem("user", JSON.stringify(payload))
+  }, [session])
 
   if (loading) {
     return (

@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { ChevronLeft, ChevronRight, BookOpen, FileText, MoreHorizontal, Plus, X } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { ChevronLeft, ChevronRight, BookOpen, FileText, MoreHorizontal, Plus, X, Upload, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -12,10 +12,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { getSessionHeaders } from "@/lib/user-settings"
 
-const DOCS = [
+type DocItem = {
+  id: string
+  title: string
+  category?: string
+  content: string
+  mediaUrl?: string
+  updatedAt: string
+}
+
+const DOCS_SEED: DocItem[] = [
   {
-    id: 1,
+    id: "doc-1",
     title: "Getting Started with Civis",
     category: "Basics",
     content: `Welcome to Civis' ERP and CRM platform! This guide will help you get up and running quickly.
@@ -35,10 +45,10 @@ Getting Started:
 3. Invite team members
 4. Configure your preferred modules
 5. Start managing your business!`,
-    lastUpdated: "Nov 1, 2025",
+    updatedAt: new Date("2025-11-01").toISOString(),
   },
   {
-    id: 2,
+    id: "doc-2",
     title: "CRM Module Guide",
     category: "CRM",
     content: `Master the Customer Relationship Management module to build stronger customer relationships.
@@ -63,10 +73,10 @@ Tips & Tricks:
 - Create templates for common activities
 - Set up alerts for high-value deals
 - Integrate with email for seamless communication`,
-    lastUpdated: "Oct 28, 2025",
+    updatedAt: new Date("2025-10-28").toISOString(),
   },
   {
-    id: 3,
+    id: "doc-3",
     title: "Accounting & Finance",
     category: "Accounting",
     content: `Learn how to manage your finances with the Accounting module.
@@ -95,10 +105,10 @@ Advanced Features:
 
 Security:
 All financial data is encrypted and backed up regularly. Access is controlled through role-based permissions.`,
-    lastUpdated: "Oct 25, 2025",
+    updatedAt: new Date("2025-10-25").toISOString(),
   },
   {
-    id: 4,
+    id: "doc-4",
     title: "Inventory Management",
     category: "Inventory",
     content: `Optimize your inventory with smart stock tracking and management.
@@ -130,10 +140,10 @@ Reports Available:
 - Inventory turnover analysis
 - Supplier performance report
 - Expiration tracking`,
-    lastUpdated: "Oct 20, 2025",
+    updatedAt: new Date("2025-10-20").toISOString(),
   },
   {
-    id: 5,
+    id: "doc-5",
     title: "Project Management",
     category: "Projects",
     content: `Plan, execute, and track projects efficiently using the Projects module.
@@ -167,10 +177,10 @@ Team Collaboration:
 - Comment on tasks
 - Attach documents
 - Notify stakeholders`,
-    lastUpdated: "Oct 18, 2025",
+    updatedAt: new Date("2025-10-18").toISOString(),
   },
   {
-    id: 6,
+    id: "doc-6",
     title: "HR & Employee Management",
     category: "HR",
     content: `Manage your workforce effectively with the HR module.
@@ -210,10 +220,10 @@ Reports:
 - Attendance reports
 - Headcount reports
 - Cost allocation reports`,
-    lastUpdated: "Oct 15, 2025",
+    updatedAt: new Date("2025-10-15").toISOString(),
   },
   {
-    id: 7,
+    id: "doc-7",
     title: "Analytics & Reporting",
     category: "Analytics",
     content: `Gain insights into your business operations with comprehensive analytics.
@@ -254,10 +264,10 @@ Best Practices:
 - Compare period-over-period
 - Share reports with stakeholders
 - Archive historical reports`,
-    lastUpdated: "Oct 12, 2025",
+    updatedAt: new Date("2025-10-12").toISOString(),
   },
   {
-    id: 8,
+    id: "doc-8",
     title: "Security & Permissions",
     category: "Security",
     content: `Protect your data with Civis' comprehensive security features.
@@ -298,10 +308,10 @@ Compliance:
 - Retention policies
 - Export capabilities
 - Legal holds`,
-    lastUpdated: "Oct 10, 2025",
+    updatedAt: new Date("2025-10-10").toISOString(),
   },
   {
-    id: 9,
+    id: "doc-9",
     title: "Integration & API",
     category: "Advanced",
     content: `Extend Civis with integrations and API access.
@@ -342,115 +352,243 @@ Support:
 - Code samples
 - Technical support
 - Community forum`,
-    lastUpdated: "Oct 8, 2025",
+    updatedAt: new Date("2025-10-08").toISOString(),
   },
 ]
 
 const ITEMS_PER_PAGE = 3
-const STORAGE_KEY = "civis_docs"
+
+const formatDocDate = (value: string) =>
+  new Date(value).toLocaleDateString("en-GB", { month: "short", day: "numeric", year: "numeric" })
 
 export default function DocsPage() {
-  const [docs, setDocs] = useState(DOCS)
+  const [docs, setDocs] = useState<DocItem[]>(DOCS_SEED)
   const [currentPage, setCurrentPage] = useState(1)
   const [showEditor, setShowEditor] = useState(false)
-  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [showViewer, setShowViewer] = useState(false)
-  const [activeDoc, setActiveDoc] = useState<typeof DOCS[number] | null>(null)
+  const [activeDoc, setActiveDoc] = useState<DocItem | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [apiError, setApiError] = useState("")
+  const [uploadError, setUploadError] = useState("")
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState("")
   const [form, setForm] = useState({
     title: "",
     category: "",
     content: "",
-    media: "",
+    mediaUrl: "",
   })
 
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (Array.isArray(parsed)) {
-          setDocs(parsed)
-          return
-        }
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(DOCS))
-    } catch (err) {
-      console.warn("Failed to load docs", err)
-    }
-  }, [])
+  const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
-  const persist = (nextDocs: typeof DOCS) => {
-    setDocs(nextDocs)
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(nextDocs))
-      } catch (err) {
-        console.warn("Failed to persist docs", err)
-      }
+  useEffect(() => {
+    if (!selectedFile) {
+      setPreviewUrl("")
+      return
+    }
+    const preview = URL.createObjectURL(selectedFile)
+    setPreviewUrl(preview)
+    return () => URL.revokeObjectURL(preview)
+  }, [selectedFile])
+
+  const parseJsonSafe = async (res: Response) => {
+    const text = await res.text()
+    try {
+      return JSON.parse(text)
+    } catch {
+      throw new Error(`Invalid JSON response: ${text.slice(0, 120)}`)
     }
   }
 
-  const totalPages = Math.ceil(docs.length / ITEMS_PER_PAGE)
-  const startIdx = (currentPage - 1) * ITEMS_PER_PAGE
-  const endIdx = startIdx + ITEMS_PER_PAGE
-  const currentDocs = docs.slice(startIdx, endIdx)
+  const mapDoc = (doc: any): DocItem => ({
+    id: doc.id,
+    title: doc.title,
+    category: doc.category || "General",
+    content: doc.content || "",
+    mediaUrl: doc.mediaUrl || "",
+    updatedAt: doc.updatedAt || doc.createdAt || new Date().toISOString(),
+  })
+
+  const loadDocs = async () => {
+    setLoading(true)
+    setApiError("")
+    try {
+      const res = await fetch("/api/docs", {
+        headers: { ...getSessionHeaders() },
+      })
+      if (res.status === 503) {
+        setApiError("Database not configured — showing demo docs.")
+        setDocs(DOCS_SEED)
+        return
+      }
+      const data = await parseJsonSafe(res)
+      if (!res.ok) throw new Error(data?.error || "Failed to load docs")
+      const items = Array.isArray(data.docs) ? data.docs.map(mapDoc) : []
+      setDocs(items.length ? items : DOCS_SEED)
+    } catch (err: any) {
+      console.error("Failed to load docs", err)
+      setApiError(err?.message || "Failed to load docs")
+      setDocs(DOCS_SEED)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadDocs()
+  }, [])
+
+  const totalPages = Math.max(1, Math.ceil(docs.length / ITEMS_PER_PAGE))
+  const currentDocs = useMemo(() => {
+    const startIdx = (currentPage - 1) * ITEMS_PER_PAGE
+    const endIdx = startIdx + ITEMS_PER_PAGE
+    return docs.slice(startIdx, endIdx)
+  }, [docs, currentPage])
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(Math.max(1, totalPages))
+    }
+  }, [currentPage, totalPages])
 
   const handlePrevious = () => setCurrentPage((prev) => Math.max(prev - 1, 1))
   const handleNext = () => setCurrentPage((prev) => Math.min(prev + 1, totalPages))
 
-  const openEditor = (doc?: typeof DOCS[number]) => {
+  const openEditor = (doc?: DocItem) => {
     if (doc) {
       setEditingId(doc.id)
-      setForm({ title: doc.title, category: doc.category, content: doc.content, media: (doc as any).media || "" })
+      setForm({
+        title: doc.title,
+        category: doc.category || "",
+        content: doc.content,
+        mediaUrl: doc.mediaUrl || "",
+      })
     } else {
       setEditingId(null)
-      setForm({ title: "", category: "", content: "", media: "" })
+      setForm({ title: "", category: "", content: "", mediaUrl: "" })
     }
+    setSelectedFile(null)
+    setPreviewUrl("")
+    setUploadError("")
     setShowEditor(true)
   }
 
-  const submitDoc = () => {
-    const now = new Date().toLocaleDateString("en-GB", { month: "short", day: "numeric", year: "numeric" })
-    if (editingId) {
-      const updated = docs.map((d) =>
-        d.id === editingId ? { ...d, ...form, lastUpdated: now } : d,
-      ) as typeof DOCS
-      persist(updated)
-    } else {
-      const newDoc = {
-        id: Date.now(),
-        title: form.title || "Untitled",
-        category: form.category || "General",
-        content: form.content,
-        lastUpdated: now,
-        media: form.media,
-      } as any
-      persist([newDoc, ...docs])
+  const uploadToCloudinary = async (file: File, folder: string) => {
+    const formData = new FormData()
+    formData.append("file", file)
+    formData.append("folder", folder)
+
+    const res = await fetch("/api/uploads/cloudinary", {
+      method: "POST",
+      headers: { ...getSessionHeaders() },
+      body: formData,
+    })
+    const data = await parseJsonSafe(res)
+    if (!res.ok) throw new Error(data?.error || "Upload failed")
+    return data as { url: string }
+  }
+
+  const submitDoc = async () => {
+    if (!form.title.trim()) return
+    setSaving(true)
+    setUploadError("")
+    try {
+      let mediaUrl = form.mediaUrl.trim()
+      if (selectedFile) {
+        const uploaded = await uploadToCloudinary(selectedFile, "civis/docs")
+        mediaUrl = uploaded.url
+      }
+
+      if (editingId) {
+        const res = await fetch("/api/docs", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+          body: JSON.stringify({
+            id: editingId,
+            title: form.title.trim(),
+            category: form.category.trim() || "General",
+            content: form.content,
+            mediaUrl,
+          }),
+        })
+        const data = await parseJsonSafe(res)
+        if (!res.ok) throw new Error(data?.error || "Failed to update doc")
+        const updated = mapDoc(data.doc)
+        setDocs((prev) => prev.map((d) => (d.id === editingId ? updated : d)))
+      } else {
+        const res = await fetch("/api/docs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+          body: JSON.stringify({
+            title: form.title.trim() || "Untitled",
+            category: form.category.trim() || "General",
+            content: form.content,
+            mediaUrl,
+          }),
+        })
+        const data = await parseJsonSafe(res)
+        if (!res.ok) throw new Error(data?.error || "Failed to create doc")
+        const created = mapDoc(data.doc)
+        setDocs((prev) => [created, ...prev])
+        setCurrentPage(1)
+      }
+
+      setShowEditor(false)
+      setEditingId(null)
+      setSelectedFile(null)
+      setPreviewUrl("")
+      setForm({ title: "", category: "", content: "", mediaUrl: "" })
+    } catch (err: any) {
+      console.warn("Failed to save doc", err)
+      setUploadError(err?.message || "Failed to save doc")
+    } finally {
+      setSaving(false)
     }
-    setShowEditor(false)
-    setEditingId(null)
-    setForm({ title: "", category: "", content: "", media: "" })
   }
 
-  const deleteDoc = (id: number) => {
-    persist(docs.filter((d) => d.id !== id) as typeof DOCS)
+  const deleteDoc = async (id: string) => {
+    try {
+      const res = await fetch(`/api/docs?id=${id}`, {
+        method: "DELETE",
+        headers: { ...getSessionHeaders() },
+      })
+      if (!res.ok) {
+        const data = await parseJsonSafe(res)
+        throw new Error(data?.error || "Failed to delete doc")
+      }
+      setDocs((prev) => prev.filter((doc) => doc.id !== id))
+    } catch (err) {
+      console.warn("Failed to delete doc", err)
+      setDocs((prev) => prev.filter((doc) => doc.id !== id))
+    }
   }
 
-  const viewDoc = (doc: typeof DOCS[number]) => {
+  const viewDoc = (doc: DocItem) => {
     setActiveDoc(doc)
     setShowViewer(true)
   }
 
+  const handleFileUpload = (file?: File | null) => {
+    if (!file) return
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setUploadError("File too large. Please upload a file under 5 MB.")
+      return
+    }
+    setSelectedFile(file)
+    setUploadError("")
+  }
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <BookOpen className="w-8 h-8 text-primary" />
           <div>
             <h1 className="text-3xl font-bold text-foreground">Documentation</h1>
             <p className="text-muted-foreground">Learn, update, and share Civis guides, media, and newsletters.</p>
+            {apiError ? <p className="text-xs text-muted-foreground mt-2">{apiError}</p> : null}
           </div>
         </div>
         <Button onClick={() => openEditor()} className="gap-2">
@@ -459,71 +597,75 @@ export default function DocsPage() {
         </Button>
       </div>
 
-      {/* Docs Grid */}
       <div className="grid gap-6">
-        {currentDocs.map((doc) => (
-          <Card key={doc.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3 flex-1">
-                  <FileText className="w-5 h-5 text-primary mt-1 flex-shrink-0" />
-                  <div className="flex-1">
-                    <CardTitle className="text-xl">{doc.title}</CardTitle>
-                    <CardDescription className="text-xs mt-2">
-                      <span className="inline-block px-2 py-1 rounded bg-primary/10 text-primary font-medium">
-                        {doc.category}
-                      </span>
-                      <span className="ml-3 text-muted-foreground">Updated {doc.lastUpdated}</span>
-                    </CardDescription>
-                  </div>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="p-2">
-                      <MoreHorizontal className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => viewDoc(doc)}>
-                      Read full
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => openEditor(doc)}>
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="text-destructive" onClick={() => deleteDoc(doc.id)}>
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-foreground whitespace-pre-line text-sm leading-relaxed line-clamp-6">{doc.content}</p>
-              <div className="flex items-center gap-2 mt-4">
-                <Button variant="outline" className="gap-2 bg-transparent" onClick={() => viewDoc(doc)}>
-                  <FileText className="w-4 h-4" />
-                  Read Full
-                </Button>
-                {("media" in doc && (doc as any).media) ? (
-                  <a
-                    href={(doc as any).media}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sm text-primary hover:underline"
-                  >
-                    Open media
-                  </a>
-                ) : null}
-              </div>
+        {loading ? (
+          <Card>
+            <CardContent className="py-10 flex items-center justify-center text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin mr-2" />
+              Loading documentation...
             </CardContent>
           </Card>
-        ))}
+        ) : (
+          currentDocs.map((doc) => (
+            <Card key={doc.id} className="hover:shadow-lg transition-shadow">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-3 flex-1">
+                    <FileText className="w-5 h-5 text-primary mt-1 flex-shrink-0" />
+                    <div className="flex-1">
+                      <CardTitle className="text-xl">{doc.title}</CardTitle>
+                      <CardDescription className="text-xs mt-2">
+                        <span className="inline-block px-2 py-1 rounded bg-primary/10 text-primary font-medium">
+                          {doc.category || "General"}
+                        </span>
+                        <span className="ml-3 text-muted-foreground">Updated {formatDocDate(doc.updatedAt)}</span>
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="p-2">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => viewDoc(doc)}>Read full</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => openEditor(doc)}>Edit</DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive" onClick={() => deleteDoc(doc.id)}>
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-foreground whitespace-pre-line text-sm leading-relaxed line-clamp-6">{doc.content}</p>
+                <div className="flex items-center gap-2 mt-4">
+                  <Button variant="outline" className="gap-2 bg-transparent" onClick={() => viewDoc(doc)}>
+                    <FileText className="w-4 h-4" />
+                    Read Full
+                  </Button>
+                  {doc.mediaUrl ? (
+                    <a
+                      href={doc.mediaUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm text-primary hover:underline"
+                    >
+                      Open media
+                    </a>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
-      {/* Pagination */}
       <div className="flex items-center justify-between pt-6 border-t border-border">
         <div className="text-sm text-muted-foreground">
-          Showing {startIdx + 1}–{Math.min(endIdx, DOCS.length)} of {DOCS.length} articles
+          Showing {docs.length === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1}–
+          {Math.min(currentPage * ITEMS_PER_PAGE, docs.length)} of {docs.length} articles
         </div>
 
         <div className="flex items-center gap-2">
@@ -538,7 +680,6 @@ export default function DocsPage() {
             Previous
           </Button>
 
-          {/* Page Numbers */}
           <div className="flex items-center gap-1">
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
               <Button
@@ -566,7 +707,6 @@ export default function DocsPage() {
         </div>
       </div>
 
-      {/* Editor Modal */}
       {showEditor && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-3xl mx-4">
@@ -599,26 +739,51 @@ export default function DocsPage() {
                   placeholder="Write or paste your update, newsletter, or article..."
                 />
               </div>
-              <div>
+              <div className="space-y-2">
                 <label className="text-sm font-medium">Media URL (image/video/doc link)</label>
                 <Input
-                  value={form.media}
-                  onChange={(e) => setForm({ ...form, media: e.target.value })}
+                  value={form.mediaUrl}
+                  onChange={(e) => setForm({ ...form, mediaUrl: e.target.value })}
                   placeholder="https://..."
                 />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Upload Media</label>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="file"
+                    accept="image/*,video/*,application/pdf"
+                    onChange={(e) => handleFileUpload(e.target.files?.[0])}
+                  />
+                  <Upload className="w-4 h-4 text-muted-foreground" />
+                </div>
+                {uploadError ? <p className="text-xs text-destructive">{uploadError}</p> : null}
+                {previewUrl ? (
+                  <p className="text-xs text-muted-foreground">Selected: {selectedFile?.name}</p>
+                ) : null}
               </div>
               <div className="flex gap-3 justify-end">
                 <Button variant="outline" className="bg-transparent" onClick={() => setShowEditor(false)}>
                   Cancel
                 </Button>
-                <Button onClick={submitDoc}>{editingId ? "Save changes" : "Add document"}</Button>
+                <Button onClick={submitDoc} disabled={saving}>
+                  {saving ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Saving...
+                    </span>
+                  ) : editingId ? (
+                    "Save changes"
+                  ) : (
+                    "Add document"
+                  )}
+                </Button>
               </div>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {/* Viewer Modal */}
       {showViewer && activeDoc && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-4xl mx-4">
@@ -626,7 +791,7 @@ export default function DocsPage() {
               <div>
                 <CardTitle>{activeDoc.title}</CardTitle>
                 <CardDescription>
-                  {activeDoc.category} • Updated {activeDoc.lastUpdated}
+                  {activeDoc.category || "General"} • Updated {formatDocDate(activeDoc.updatedAt)}
                 </CardDescription>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setShowViewer(false)}>
@@ -635,16 +800,16 @@ export default function DocsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="whitespace-pre-line leading-relaxed">{activeDoc.content}</p>
-              {("media" in activeDoc && (activeDoc as any).media) && (
+              {activeDoc.mediaUrl ? (
                 <a
-                  href={(activeDoc as any).media}
+                  href={activeDoc.mediaUrl}
                   target="_blank"
                   rel="noreferrer"
                   className="text-sm text-primary hover:underline"
                 >
                   Open attached media
                 </a>
-              )}
+              ) : null}
             </CardContent>
           </Card>
         </div>

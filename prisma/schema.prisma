@@ -27,6 +27,18 @@ enum TaskStatus {
   DONE
 }
 
+enum ContactStatus {
+  LEAD
+  PROSPECT
+  CUSTOMER
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum InvoiceStatus {
   DRAFT
   SENT
@@ -60,6 +72,7 @@ model Org {
   galleryItems GalleryItem[]
   docs         Doc[]
   notifications Notification[]
+  auditLogs    AuditLog[]
 }
 
 model User {
@@ -68,8 +81,14 @@ model User {
   orgId        String
   email        String   @unique
   name         String
-  role         Role
+  role         Role     @default(USER)
   passwordHash String?
+  title        String?
+  phone        String?
+  timezone     String?  @default("Africa/Lagos")
+  locale       String?  @default("en-NG")
+  emailVerified DateTime?
+  image         String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -77,7 +96,69 @@ model User {
   deals   Deal[]
   contacts Contact[]
   companies Company[]
+  settings UserSettings?
+  notifications Notification[]
+  auditLogs AuditLog[]
+  accounts Account[]
+  sessions Session[]
   @@index([orgId])
+}
+
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  oauth_token_secret String?
+  oauth_token       String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model UserSettings {
+  id                    String   @id @default(uuid())
+  user                  User     @relation(fields: [userId], references: [id])
+  userId                String   @unique
+  theme                 String   @default("dark")
+  density               String   @default("comfortable")
+  currency              String   @default("NGN")
+  landing               String   @default("dashboard")
+  dateFormat            String   @default("DD/MM/YYYY")
+  emailNotifications    Boolean  @default(true)
+  productNotifications  Boolean  @default(true)
+  securityNotifications Boolean  @default(true)
+  reminderNotifications Boolean  @default(true)
+  marketingNotifications Boolean @default(false)
+  smsNotifications      Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 model Contact {
@@ -87,6 +168,9 @@ model Contact {
   name      String
   email     String
   phone     String?
+  status    ContactStatus @default(LEAD)
+  revenue   Int?
+  lastContact DateTime?
   notes     String?
   tags      String?
   company   Company? @relation(fields: [companyId], references: [id])
@@ -166,6 +250,7 @@ model Invoice {
   clientName    String
   amount        Int
   status        InvoiceStatus  @default(DRAFT)
+  issueDate     DateTime?
   dueDate       DateTime?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
@@ -181,6 +266,8 @@ model Expense {
   description String
   amount      Int
   category    String
+  status      ExpenseStatus @default(PENDING)
+  submittedBy String?
   date        DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -225,6 +312,7 @@ model GalleryItem {
   url         String
   mediaType   String   // image | video | other
   description String?
+  size        Int?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -236,7 +324,9 @@ model Doc {
   org       Org      @relation(fields: [orgId], references: [id])
   orgId     String
   title     String
+  category  String?
   content   String
+  mediaUrl  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -247,12 +337,34 @@ model Notification {
   id        String           @id @default(uuid())
   org       Org              @relation(fields: [orgId], references: [id])
   orgId     String
+  user      User?            @relation(fields: [userId], references: [id])
+  userId    String?
   type      NotificationType @default(INFO)
   title     String
   message   String
+  source    String?
+  channel   String?
   read      Boolean          @default(false)
   createdAt DateTime         @default(now())
 
   @@index([orgId])
+  @@index([userId])
   @@index([read])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  org       Org      @relation(fields: [orgId], references: [id])
+  orgId     String
+  user      User?    @relation(fields: [userId], references: [id])
+  userId    String?
+  action    String
+  entity    String?
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([orgId])
+  @@index([userId])
+  @@index([createdAt])
 }

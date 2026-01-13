@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Download, Trash2, Share2, Eye, Plus, Edit, Play } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { Download, Trash2, Share2, Eye, Plus, Edit, Play, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Item, ItemContent, ItemTitle, ItemDescription, ItemFooter } from "@/components/ui/item"
 import { Input } from "@/components/ui/input"
@@ -26,18 +26,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { getSessionHeaders } from "@/lib/user-settings"
 
 type GalleryItem = {
   id: string
   title: string
-  description: string
+  description?: string
   url: string
-  size: string
+  size?: number
   uploadedDate: string
-  mediaType: "image" | "video"
+  mediaType: "image" | "video" | "other"
 }
-
-const STORAGE_KEY = "civis_gallery_items"
 
 const galleryTitles = [
   "Team Meeting",
@@ -77,12 +76,25 @@ const buildMockGallery = (count: number): GalleryItem[] =>
     title: galleryTitles[idx % galleryTitles.length],
     description: galleryDescriptions[idx % galleryDescriptions.length],
     url: galleryUrls[idx % galleryUrls.length],
-    size: `${(1.5 + (idx % 5) * 0.4).toFixed(1)} MB`,
-    uploadedDate: new Date(2025, (idx % 10) + 1, (idx % 27) + 1).toISOString().slice(0, 10),
+    size: Math.round((1.5 + (idx % 5) * 0.4) * 1024 * 1024),
+    uploadedDate: new Date(2025, (idx % 10) + 1, (idx % 27) + 1).toISOString(),
     mediaType: idx % 6 === 0 ? "video" : "image",
   }))
 
 const mockImages: GalleryItem[] = buildMockGallery(70)
+const PAGE_SIZE = 10
+
+const formatFileSize = (bytes?: number | null) => {
+  if (bytes === null || bytes === undefined) return "—"
+  const mb = bytes / (1024 * 1024)
+  return `${mb.toFixed(mb >= 10 ? 0 : 1)} MB`
+}
+
+const toMediaType = (value?: string) => {
+  if (!value) return "image"
+  if (value === "video" || value === "other" || value === "image") return value
+  return "image"
+}
 
 export default function GalleryPage() {
   const [images, setImages] = useState<GalleryItem[]>(mockImages)
@@ -92,6 +104,11 @@ export default function GalleryPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [apiError, setApiError] = useState("")
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState("")
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -102,73 +119,117 @@ export default function GalleryPage() {
 
   const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
 
-  const formatFileSize = (bytes: number) => {
-    if (!bytes && bytes !== 0) return "—"
-    const mb = bytes / (1024 * 1024)
-    return `${mb.toFixed(mb >= 10 ? 0 : 1)} MB`
+  useEffect(() => {
+    if (!selectedFile) {
+      setPreviewUrl("")
+      return
+    }
+    const preview = URL.createObjectURL(selectedFile)
+    setPreviewUrl(preview)
+    return () => URL.revokeObjectURL(preview)
+  }, [selectedFile])
+
+  const parseJsonSafe = async (res: Response) => {
+    const text = await res.text()
+    try {
+      return JSON.parse(text)
+    } catch {
+      throw new Error(`Invalid JSON response: ${text.slice(0, 120)}`)
+    }
+  }
+
+  const mapItem = (item: any): GalleryItem => ({
+    id: item.id,
+    title: item.title,
+    description: item.description || "",
+    url: item.url,
+    size: typeof item.size === "number" ? item.size : undefined,
+    uploadedDate: item.createdAt || item.updatedAt || new Date().toISOString(),
+    mediaType: toMediaType(item.mediaType) as GalleryItem["mediaType"],
+  })
+
+  const loadGallery = async () => {
+    setLoading(true)
+    setApiError("")
+    try {
+      const res = await fetch("/api/gallery", {
+        headers: { ...getSessionHeaders() },
+      })
+      if (res.status === 503) {
+        setApiError("Database not configured — showing demo gallery.")
+        setImages(mockImages)
+        return
+      }
+      const data = await parseJsonSafe(res)
+      if (!res.ok) throw new Error(data?.error || "Failed to load gallery")
+      const items = Array.isArray(data.items) ? data.items.map(mapItem) : []
+      setImages(items.length ? items : mockImages)
+    } catch (err: any) {
+      console.error("Failed to load gallery", err)
+      setApiError(err?.message || "Failed to load gallery")
+      setImages(mockImages)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
-    if (typeof window === "undefined") return
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed)) {
-          const merged = [
-            ...parsed,
-            ...mockImages.filter((seed) => !parsed.some((item: GalleryItem) => item.id === seed.id)),
-          ]
-          setImages(merged)
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
-          return
-        }
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(mockImages))
-    } catch (err) {
-      console.warn("Failed to load gallery items", err)
-    }
+    loadGallery()
   }, [])
 
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(images))
-    } catch (err) {
-      console.warn("Failed to persist gallery items", err)
-    }
-  }, [images])
-
-  const PAGE_SIZE = 10
   const totalPages = Math.max(1, Math.ceil(images.length / PAGE_SIZE))
-  const pagedImages = images.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const pagedImages = useMemo(() => {
+    return images.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  }, [images, currentPage])
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages)
   }, [currentPage, totalPages])
 
-  const handleDelete = (id: string) => {
-    setImages(images.filter((img) => img.id !== id))
-    setDeleteId(null)
+  const handleDelete = async (id: string) => {
+    try {
+      const res = await fetch(`/api/gallery?id=${id}`, {
+        method: "DELETE",
+        headers: { ...getSessionHeaders() },
+      })
+      if (!res.ok) {
+        const data = await parseJsonSafe(res)
+        throw new Error(data?.error || "Failed to delete")
+      }
+      setImages((prev) => prev.filter((img) => img.id !== id))
+    } catch (err) {
+      console.warn("Failed to delete gallery item", err)
+      setImages((prev) => prev.filter((img) => img.id !== id))
+    } finally {
+      setDeleteId(null)
+    }
   }
 
   const handleDownload = (image: GalleryItem) => {
-    console.log("[v0] Downloading:", image.title)
-    alert(`Downloading: ${image.title}`)
+    const link = document.createElement("a")
+    link.href = image.url
+    link.download = `${image.title || "media"}`
+    link.click()
   }
 
-  const handleShare = (id: string) => {
-    setSharedImage(id)
+  const handleShare = async (image: GalleryItem) => {
+    try {
+      await navigator.clipboard.writeText(image.url)
+    } catch {
+      // ignore clipboard errors
+    }
+    setSharedImage(image.id)
     setTimeout(() => setSharedImage(null), 2000)
   }
 
   const handleView = (image: GalleryItem) => {
-    console.log("[v0] Viewing:", image.title)
-    alert(`Viewing: ${image.title}`)
+    window.open(image.url, "_blank", "noopener,noreferrer")
   }
 
   const openAddDialog = () => {
     setEditingId(null)
+    setSelectedFile(null)
+    setPreviewUrl("")
     setForm({ title: "", description: "", url: "", size: "", mediaType: "image" })
     setUploadError("")
     setDialogOpen(true)
@@ -176,11 +237,13 @@ export default function GalleryPage() {
 
   const openEditDialog = (image: GalleryItem) => {
     setEditingId(image.id)
+    setSelectedFile(null)
+    setPreviewUrl("")
     setForm({
       title: image.title,
-      description: image.description,
+      description: image.description || "",
       url: image.url,
-      size: image.size,
+      size: image.size ? formatFileSize(image.size) : "",
       mediaType: image.mediaType,
     })
     setUploadError("")
@@ -193,39 +256,96 @@ export default function GalleryPage() {
       setUploadError("File too large. Please upload a file under 5 MB.")
       return
     }
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = typeof reader.result === "string" ? reader.result : ""
-      setForm((prev) => ({
-        ...prev,
-        url: result,
-        size: formatFileSize(file.size),
-        mediaType: file.type.startsWith("video") ? "video" : "image",
-      }))
-      setUploadError("")
-    }
-    reader.readAsDataURL(file)
+    setSelectedFile(file)
+    setForm((prev) => ({
+      ...prev,
+      mediaType: file.type.startsWith("video") ? "video" : "image",
+      size: formatFileSize(file.size),
+    }))
+    setUploadError("")
   }
 
-  const saveMedia = () => {
+  const uploadToCloudinary = async (file: File, folder: string) => {
+    const formData = new FormData()
+    formData.append("file", file)
+    formData.append("folder", folder)
+
+    const res = await fetch("/api/uploads/cloudinary", {
+      method: "POST",
+      headers: { ...getSessionHeaders() },
+      body: formData,
+    })
+    const data = await parseJsonSafe(res)
+    if (!res.ok) throw new Error(data?.error || "Upload failed")
+    return data as { url: string; bytes?: number; resourceType?: string }
+  }
+
+  const saveMedia = async () => {
     if (!form.title.trim()) return
-    const existing = editingId ? images.find((img) => img.id === editingId) : undefined
-    const payload: GalleryItem = {
-      id: editingId || Date.now().toString(),
-      title: form.title.trim(),
-      description: form.description.trim(),
-      url: form.url.trim(),
-      size: form.size.trim() || existing?.size || "—",
-      uploadedDate: existing?.uploadedDate || new Date().toISOString().slice(0, 10),
-      mediaType: form.mediaType,
+    setSaving(true)
+    setUploadError("")
+    try {
+      let url = form.url.trim()
+      let bytes: number | undefined
+      let mediaType = form.mediaType
+
+      if (selectedFile) {
+        const uploaded = await uploadToCloudinary(selectedFile, "civis/gallery")
+        url = uploaded.url
+        bytes = uploaded.bytes
+        mediaType = uploaded.resourceType === "video" ? "video" : form.mediaType
+      }
+
+      if (!url) {
+        setUploadError("Please upload a file or provide a URL.")
+        return
+      }
+
+      const manualSize = Number.parseFloat(form.size.replace(/[^0-9.]/g, ""))
+      const sizeValue = bytes ?? (Number.isNaN(manualSize) ? undefined : Math.round(manualSize * 1024 * 1024))
+
+      const payload = {
+        title: form.title.trim(),
+        description: form.description.trim(),
+        url,
+        mediaType,
+        size: sizeValue,
+      }
+
+      if (editingId) {
+        const res = await fetch("/api/gallery", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+          body: JSON.stringify({ id: editingId, ...payload }),
+        })
+        const data = await parseJsonSafe(res)
+        if (!res.ok) throw new Error(data?.error || "Failed to update")
+        const updated = mapItem(data.item)
+        setImages((prev) => prev.map((img) => (img.id === editingId ? updated : img)))
+      } else {
+        const res = await fetch("/api/gallery", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+          body: JSON.stringify(payload),
+        })
+        const data = await parseJsonSafe(res)
+        if (!res.ok) throw new Error(data?.error || "Failed to create")
+        const created = mapItem(data.item)
+        setImages((prev) => [created, ...prev])
+        setCurrentPage(1)
+      }
+
+      setDialogOpen(false)
+      setEditingId(null)
+      setSelectedFile(null)
+      setPreviewUrl("")
+      setForm({ title: "", description: "", url: "", size: "", mediaType: "image" })
+    } catch (err: any) {
+      console.warn("Failed to save media", err)
+      setUploadError(err?.message || "Failed to save media")
+    } finally {
+      setSaving(false)
     }
-    if (editingId) {
-      setImages((prev) => prev.map((img) => (img.id === editingId ? payload : img)))
-    } else {
-      setImages((prev) => [payload, ...prev])
-    }
-    setDialogOpen(false)
-    setEditingId(null)
   }
 
   return (
@@ -235,6 +355,7 @@ export default function GalleryPage() {
           <div>
             <h1 className="text-3xl font-bold">Gallery</h1>
             <p className="text-muted-foreground">Manage and organize your media files</p>
+            {apiError ? <p className="text-xs text-muted-foreground mt-2">{apiError}</p> : null}
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
@@ -280,6 +401,7 @@ export default function GalleryPage() {
                       <SelectContent>
                         <SelectItem value="image">Image</SelectItem>
                         <SelectItem value="video">Video</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -289,7 +411,7 @@ export default function GalleryPage() {
                       id="media-size"
                       value={form.size}
                       onChange={(e) => setForm({ ...form, size: e.target.value })}
-                      placeholder="e.g., 12 MB"
+                      placeholder="Auto-filled from upload"
                     />
                   </div>
                 </div>
@@ -302,7 +424,7 @@ export default function GalleryPage() {
                     onChange={(e) => handleFileUpload(e.target.files?.[0])}
                   />
                   {uploadError ? <p className="text-xs text-destructive">{uploadError}</p> : null}
-                  <p className="text-xs text-muted-foreground">Max 5 MB. Uploading a file will replace the URL.</p>
+                  <p className="text-xs text-muted-foreground">Max 5 MB. Uploading replaces the URL.</p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="media-url">Thumbnail URL</Label>
@@ -313,12 +435,16 @@ export default function GalleryPage() {
                     placeholder="https://..."
                   />
                 </div>
-                {form.url ? (
+                {previewUrl || form.url ? (
                   <div className="rounded-lg border border-border p-3 bg-muted/30">
                     {form.mediaType === "video" ? (
-                      <video src={form.url} controls className="w-full h-48 rounded-md object-cover" />
+                      <video
+                        src={previewUrl || form.url}
+                        controls
+                        className="w-full h-48 rounded-md object-cover"
+                      />
                     ) : (
-                      <img src={form.url} alt="Preview" className="w-full h-48 rounded-md object-cover" />
+                      <img src={previewUrl || form.url} alt="Preview" className="w-full h-48 rounded-md object-cover" />
                     )}
                   </div>
                 ) : null}
@@ -326,7 +452,18 @@ export default function GalleryPage() {
                   <Button variant="outline" className="bg-transparent" onClick={() => setDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button onClick={saveMedia}>{editingId ? "Save Changes" : "Add Media"}</Button>
+                  <Button onClick={saveMedia} disabled={saving}>
+                    {saving ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Saving...
+                      </span>
+                    ) : editingId ? (
+                      "Save Changes"
+                    ) : (
+                      "Add Media"
+                    )}
+                  </Button>
                 </div>
               </div>
             </DialogContent>
@@ -335,7 +472,12 @@ export default function GalleryPage() {
       </div>
 
       <div className="flex-1 overflow-auto p-6">
-        {images.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center h-full text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin mr-2" />
+            Loading gallery...
+          </div>
+        ) : images.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <p className="text-muted-foreground mb-4">No images yet</p>
@@ -349,7 +491,6 @@ export default function GalleryPage() {
                 key={image.id}
                 className="rounded-lg border border-border overflow-hidden hover:shadow-md transition-shadow"
               >
-                {/* Image Container */}
                 <div className="relative bg-muted h-48 overflow-hidden group">
                   <img
                     src={image.url || "/placeholder.svg"}
@@ -370,13 +511,12 @@ export default function GalleryPage() {
                   </button>
                 </div>
 
-                {/* Item Info */}
                 <Item className="flex-col rounded-none border-0">
                   <ItemContent>
                     <ItemTitle>{image.title}</ItemTitle>
                     <ItemDescription>{image.description}</ItemDescription>
                     <ItemDescription className="text-xs mt-2">
-                      {image.size} • {new Date(image.uploadedDate).toLocaleDateString()}
+                      {formatFileSize(image.size)} • {new Date(image.uploadedDate).toLocaleDateString()}
                     </ItemDescription>
                   </ItemContent>
 
@@ -395,7 +535,7 @@ export default function GalleryPage() {
                       <Button
                         size="sm"
                         variant={sharedImage === image.id ? "default" : "outline"}
-                        onClick={() => handleShare(image.id)}
+                        onClick={() => handleShare(image)}
                         title="Share image"
                         className="flex-1"
                       >
@@ -439,7 +579,6 @@ export default function GalleryPage() {
         ) : null}
       </div>
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -10,6 +10,8 @@ import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Plus, CheckSquare, Lock, Globe, FileText, DownloadCloud } from "lucide-react"
 import { ApprovalRequest, approvalsStorageKey, getApprovals } from "@/lib/approvals"
+import { getSessionHeaders } from "@/lib/user-settings"
+import { useSession } from "next-auth/react"
 
 const timelineSeed = [
   { id: "t1", title: "Invoice INV-2025-014 paid", detail: "Acme Corp • ₦1,250,000", time: "2 hours ago", type: "finance" },
@@ -152,12 +154,17 @@ const approvalStatusStyles: Record<string, string> = {
 }
 
 export default function OperationsPage() {
+  const { data: session } = useSession()
+  const role = session?.user?.role
+  const canManage = role === "ADMIN" || role === "SUPER_ADMIN"
   const [timeline] = useState(timelineSeed)
   const [workflows, setWorkflows] = useState(workflowSeed)
   const [approvals, setApprovals] = useState<ApprovalRequest[]>(approvalsSeed)
   const [integrations, setIntegrations] = useState(integrationsSeed)
   const [insights, setInsights] = useState(insightsSeed)
-  const [auditLogs] = useState(auditSeed)
+  const [auditLogs, setAuditLogs] = useState(auditSeed)
+  const [auditLoading, setAuditLoading] = useState(false)
+  const [auditError, setAuditError] = useState("")
   const [compliance, setCompliance] = useState(complianceSeed)
   const [reports, setReports] = useState(reportsSeed)
 
@@ -215,6 +222,42 @@ export default function OperationsPage() {
   }, [])
 
   useEffect(() => {
+    const loadAuditLogs = async () => {
+      setAuditLoading(true)
+      setAuditError("")
+      try {
+        const res = await fetch("/api/audit", {
+          headers: { ...getSessionHeaders() },
+        })
+        if (res.status === 503) {
+          setAuditError("Database not configured — showing demo audit logs.")
+          setAuditLogs(auditSeed)
+          return
+        }
+        const text = await res.text()
+        const data = JSON.parse(text)
+        if (!res.ok) throw new Error(data?.error || "Failed to load audit logs")
+        const mapped = Array.isArray(data.logs)
+          ? data.logs.map((log: any) => ({
+              id: log.id,
+              actor: log.user?.name || log.user?.email || "System",
+              action: log.action,
+              time: new Date(log.createdAt).toLocaleString(),
+            }))
+          : auditSeed
+        setAuditLogs(mapped.length ? mapped : auditSeed)
+      } catch (err: any) {
+        console.warn("Audit log fetch failed", err)
+        setAuditError(err?.message || "Failed to load audit logs")
+        setAuditLogs(auditSeed)
+      } finally {
+        setAuditLoading(false)
+      }
+    }
+    loadAuditLogs()
+  }, [])
+
+  useEffect(() => {
     if (typeof window === "undefined") return
     localStorage.setItem(STORAGE.workflows, JSON.stringify(workflows))
   }, [workflows])
@@ -235,6 +278,7 @@ export default function OperationsPage() {
   }, [approvals])
 
   const addWorkflow = () => {
+    if (!canManage) return
     const name = workflowForm.name.trim()
     const trigger = workflowForm.trigger.trim()
     const action = workflowForm.action.trim()
@@ -247,14 +291,17 @@ export default function OperationsPage() {
   }
 
   const toggleWorkflow = (id: string) => {
+    if (!canManage) return
     setWorkflows((prev) => prev.map((wf) => (wf.id === id ? { ...wf, active: !wf.active } : wf)))
   }
 
   const updateApproval = (id: string, status: "approved" | "rejected") => {
+    if (!canManage) return
     setApprovals((prev) => prev.map((ap) => (ap.id === id ? { ...ap, status } : ap)))
   }
 
   const toggleIntegration = (id: string) => {
+    if (!canManage) return
     setIntegrations((prev) => prev.map((intg) => (intg.id === id ? { ...intg, connected: !intg.connected } : intg)))
   }
 
@@ -263,6 +310,7 @@ export default function OperationsPage() {
   }
 
   const saveReport = () => {
+    if (!canManage) return
     if (!reportForm.name) return
     setReports((prev) => [
       {
@@ -310,6 +358,11 @@ export default function OperationsPage() {
         <p className="text-muted-foreground">
           Workflows, approvals, integrations, AI insights, audit trails, and compliance in one place.
         </p>
+        {!canManage ? (
+          <p className="text-xs text-muted-foreground">
+            You have view-only access. Admin or super admin is required to manage workflows and approvals.
+          </p>
+        ) : null}
       </div>
 
       <Tabs defaultValue="timeline" className="w-full">
@@ -369,7 +422,7 @@ export default function OperationsPage() {
               <Button
                 className="md:col-span-3 w-fit"
                 onClick={addWorkflow}
-                disabled={!workflowForm.name.trim() || !workflowForm.trigger.trim() || !workflowForm.action.trim()}
+                disabled={!canManage || !workflowForm.name.trim() || !workflowForm.trigger.trim() || !workflowForm.action.trim()}
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Add Workflow
@@ -389,7 +442,7 @@ export default function OperationsPage() {
                     <Badge variant="outline" className={wf.active ? "text-green-600" : "text-muted-foreground"}>
                       {wf.active ? "Active" : "Paused"}
                     </Badge>
-                    <Switch checked={wf.active} onCheckedChange={() => toggleWorkflow(wf.id)} />
+                    <Switch checked={wf.active} onCheckedChange={() => toggleWorkflow(wf.id)} disabled={!canManage} />
                   </div>
                 </CardContent>
               </Card>
@@ -416,7 +469,12 @@ export default function OperationsPage() {
                     <Badge variant="outline" className={approvalStatusStyles[ap.status]}>
                       {ap.status}
                     </Badge>
-                    <Button size="sm" className="bg-green-600 text-white hover:bg-green-700" onClick={() => updateApproval(ap.id, "approved")}>
+                    <Button
+                      size="sm"
+                      className="bg-green-600 text-white hover:bg-green-700"
+                      onClick={() => updateApproval(ap.id, "approved")}
+                      disabled={!canManage}
+                    >
                       Approve
                     </Button>
                     <Button
@@ -424,6 +482,7 @@ export default function OperationsPage() {
                       variant="outline"
                       className="border-red-500 text-red-600 hover:bg-red-50 dark:border-red-500/70 dark:text-red-300 dark:hover:bg-red-950/30"
                       onClick={() => updateApproval(ap.id, "rejected")}
+                      disabled={!canManage}
                     >
                       Reject
                     </Button>
@@ -447,7 +506,12 @@ export default function OperationsPage() {
                     <Badge variant="outline" className={intg.connected ? "text-green-600" : "text-muted-foreground"}>
                       {intg.connected ? "Connected" : "Not connected"}
                     </Badge>
-                    <Button variant="outline" className="bg-transparent" onClick={() => toggleIntegration(intg.id)}>
+                    <Button
+                      variant="outline"
+                      className="bg-transparent"
+                      onClick={() => toggleIntegration(intg.id)}
+                      disabled={!canManage}
+                    >
                       {intg.connected ? "Disconnect" : "Connect"}
                     </Button>
                   </div>
@@ -520,7 +584,7 @@ export default function OperationsPage() {
                 value={reportForm.notes}
                 onChange={(e) => setReportForm({ ...reportForm, notes: e.target.value })}
               />
-              <Button className="w-fit" onClick={saveReport}>
+              <Button className="w-fit" onClick={saveReport} disabled={!canManage}>
                 Save Report
               </Button>
             </CardContent>
@@ -557,15 +621,23 @@ export default function OperationsPage() {
               <CardDescription>Track who changed what and when.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {auditLogs.map((log) => (
-                <div key={log.id} className="flex items-center justify-between border-b border-border pb-3 last:border-0">
-                  <div>
-                    <p className="font-medium">{log.action}</p>
-                    <p className="text-sm text-muted-foreground">{log.actor}</p>
+              {auditError ? <p className="text-xs text-muted-foreground">{auditError}</p> : null}
+              {auditLoading ? (
+                <p className="text-sm text-muted-foreground">Loading audit logs...</p>
+              ) : (
+                auditLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="flex items-center justify-between border-b border-border pb-3 last:border-0"
+                  >
+                    <div>
+                      <p className="font-medium">{log.action}</p>
+                      <p className="text-sm text-muted-foreground">{log.actor}</p>
+                    </div>
+                    <div className="text-xs text-muted-foreground">{log.time}</div>
                   </div>
-                  <div className="text-xs text-muted-foreground">{log.time}</div>
-                </div>
-              ))}
+                ))
+              )}
             </CardContent>
           </Card>
         </TabsContent>

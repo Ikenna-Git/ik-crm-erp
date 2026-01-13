@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { signOut } from "next-auth/react"
 import {
   BarChart3,
   DollarSign,
@@ -39,7 +40,7 @@ export function DashboardSidebar() {
 
   const handleLogout = () => {
     localStorage.removeItem("user")
-    window.location.href = "/"
+    signOut({ callbackUrl: "/" })
   }
 
   return (

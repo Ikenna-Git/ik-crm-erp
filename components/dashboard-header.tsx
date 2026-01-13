@@ -16,7 +16,7 @@ import {
   notificationsEventName,
   type NotificationItem,
 } from "@/lib/notifications"
-import { getUserProfile, profileUpdatedEventName } from "@/lib/user-settings"
+import { userUpdatedEventName } from "@/lib/user-settings"
 
 export function DashboardHeader() {
   const [userName, setUserName] = useState("")
@@ -32,29 +32,42 @@ export function DashboardHeader() {
 
   useEffect(() => {
     const loadUser = () => {
-      const profile = getUserProfile()
-      const fallback = profile.email ? profile.email.split("@")[0] : "User"
-      setUserName(profile.name || fallback)
+      try {
+        const raw = localStorage.getItem("user")
+        if (!raw) {
+          setUserName("User")
+          return
+        }
+        const parsed = JSON.parse(raw)
+        const fallback = parsed?.email ? parsed.email.split("@")[0] : "User"
+        setUserName(parsed?.name || fallback)
+      } catch {
+        setUserName("User")
+      }
     }
     loadUser()
-    window.addEventListener(profileUpdatedEventName, loadUser)
+    window.addEventListener(userUpdatedEventName, loadUser)
     window.addEventListener("storage", loadUser)
     return () => {
-      window.removeEventListener(profileUpdatedEventName, loadUser)
+      window.removeEventListener(userUpdatedEventName, loadUser)
       window.removeEventListener("storage", loadUser)
     }
   }, [])
 
   useEffect(() => {
-    const refreshNotifications = () => {
-      setNotifications(getNotifications())
+    const refreshNotifications = async () => {
+      const items = await getNotifications()
+      setNotifications(items)
     }
     refreshNotifications()
-    window.addEventListener(notificationsEventName, refreshNotifications)
-    window.addEventListener("storage", refreshNotifications)
+    const handleUpdate = () => {
+      refreshNotifications()
+    }
+    window.addEventListener(notificationsEventName, handleUpdate)
+    window.addEventListener("storage", handleUpdate)
     return () => {
-      window.removeEventListener(notificationsEventName, refreshNotifications)
-      window.removeEventListener("storage", refreshNotifications)
+      window.removeEventListener(notificationsEventName, handleUpdate)
+      window.removeEventListener("storage", handleUpdate)
     }
   }, [])
 
@@ -114,11 +127,21 @@ export function DashboardHeader() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setNotifications(markAllNotificationsRead())}
+                  onClick={async () => {
+                    const next = await markAllNotificationsRead()
+                    setNotifications(next)
+                  }}
                 >
                   Mark all read
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => setNotifications(clearNotifications())}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={async () => {
+                    const next = await clearNotifications()
+                    setNotifications(next)
+                  }}
+                >
                   Clear
                 </Button>
               </div>
@@ -131,7 +154,10 @@ export function DashboardHeader() {
                     className={`w-full text-left px-4 py-3 border-b border-border last:border-b-0 hover:bg-muted/50 transition ${
                       item.read ? "bg-background" : "bg-primary/5"
                     }`}
-                    onClick={() => setNotifications(markNotificationRead(item.id))}
+                    onClick={async () => {
+                      const next = await markNotificationRead(item.id)
+                      setNotifications(next)
+                    }}
                   >
                     <div className="flex items-start gap-3">
                       <span className={`mt-1 h-2.5 w-2.5 rounded-full ${item.read ? "bg-muted" : "bg-primary"}`} />

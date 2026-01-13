@@ -2,9 +2,10 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { getProviders, signIn } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -16,6 +17,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [oauthReady, setOauthReady] = useState({ google: false, apple: false })
+
+  useEffect(() => {
+    const loadProviders = async () => {
+      const providers = await getProviders()
+      setOauthReady({
+        google: Boolean(providers?.google),
+        apple: Boolean(providers?.apple),
+      })
+    }
+    loadProviders()
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,7 +41,15 @@ export default function LoginPage() {
         return
       }
 
-      localStorage.setItem("user", JSON.stringify({ email, name: email.split("@")[0], role: "user" }))
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      })
+      if (result?.error) {
+        setError("Login failed. Please try again.")
+        return
+      }
       router.push("/dashboard")
     } catch (err) {
       setError("Login failed. Please try again.")
@@ -101,17 +122,27 @@ export default function LoginPage() {
             </div>
 
             <div className="flex flex-row flex-wrap gap-2">
-              <Button variant="outline" className="flex-1 min-w-[200px] bg-transparent">
+              <Button
+                variant="outline"
+                className="flex-1 min-w-[200px] bg-transparent"
+                onClick={() => signIn("google")}
+                disabled={!oauthReady.google}
+              >
                 <img
                   src="https://www.gstatic.com/images/branding/googleg/1x/googleg_standard_color_128dp.png"
                   alt="Google"
                   className="w-5 h-5 mr-2"
                 />
-                Continue with Google
+                {oauthReady.google ? "Continue with Google" : "Google (setup needed)"}
               </Button>
-              <Button variant="outline" className="flex-1 min-w-[200px] bg-transparent">
+              <Button
+                variant="outline"
+                className="flex-1 min-w-[200px] bg-transparent"
+                onClick={() => signIn("apple")}
+                disabled={!oauthReady.apple}
+              >
                 <span className="mr-2 text-xl"></span>
-                Continue with Apple
+                {oauthReady.apple ? "Continue with Apple" : "Apple (setup needed)"}
               </Button>
             </div>
 

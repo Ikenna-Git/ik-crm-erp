@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,49 +13,92 @@ import {
   DEFAULT_NOTIFICATION_SETTINGS,
   DEFAULT_PREFERENCES,
   DEFAULT_PROFILE,
-  getNotificationSettings,
-  getUserPreferences,
-  getUserProfile,
-  saveNotificationSettings,
-  saveUserPreferences,
-  saveUserProfile,
+  applyThemePreference,
+  getSessionHeaders,
+  syncLocalUser,
 } from "@/lib/user-settings"
 
 export default function ProfilePage() {
+  const { data: session } = useSession()
   const [profile, setProfile] = useState(DEFAULT_PROFILE)
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES)
   const [notificationSettings, setNotificationSettings] = useState(DEFAULT_NOTIFICATION_SETTINGS)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    setProfile(getUserProfile())
-    setPreferences(getUserPreferences())
-    setNotificationSettings(getNotificationSettings())
+    const loadSettings = async () => {
+      try {
+        setLoading(true)
+        setError("")
+        const res = await fetch("/api/user/settings", {
+          headers: { "Content-Type": "application/json", ...getSessionHeaders(session?.user) },
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data?.error || "Failed to load profile")
+        setProfile(data.profile || DEFAULT_PROFILE)
+        const loadedPreferences = data.preferences || DEFAULT_PREFERENCES
+        setPreferences(loadedPreferences)
+        setNotificationSettings(data.notifications || DEFAULT_NOTIFICATION_SETTINGS)
+        applyThemePreference(loadedPreferences.theme)
+      } catch (err: any) {
+        setError(err?.message || "Failed to load profile settings")
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadSettings()
   }, [])
 
-  const pushChangeNotification = (title: string, description: string) => {
-    const target = profile.email || "your inbox"
-    const emailNote = notificationSettings.email ? ` Email copy sent to ${target}.` : ""
-    addNotification({
+  const pushChangeNotification = async (title: string, description: string) => {
+    await addNotification({
       title,
-      description: `${description}${emailNote}`,
+      description,
       source: "Profile",
       channel: notificationSettings.email ? "email" : "in-app",
+      deliverEmail: notificationSettings.email,
     })
   }
 
-  const handleProfileSave = () => {
-    const next = saveUserProfile(profile)
-    setProfile(next)
-    pushChangeNotification("Profile updated", "Saved your latest profile details.")
+  const handleProfileSave = async () => {
+    try {
+      setError("")
+      const res = await fetch("/api/user/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders(session?.user) },
+        body: JSON.stringify({ profile }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to update profile")
+      const nextProfile = data.profile || profile
+      setProfile(nextProfile)
+      syncLocalUser(nextProfile)
+      await pushChangeNotification("Profile updated", "Saved your latest profile details.")
+    } catch (err: any) {
+      setError(err?.message || "Failed to update profile")
+    }
   }
 
-  const handlePreferencesSave = () => {
-    const nextPreferences = saveUserPreferences(preferences)
-    const nextNotifications = saveNotificationSettings(notificationSettings)
-    setPreferences(nextPreferences)
-    setNotificationSettings(nextNotifications)
-    pushChangeNotification("Preferences updated", `Theme set to ${nextPreferences.theme}.`)
+  const handlePreferencesSave = async () => {
+    try {
+      setError("")
+      const res = await fetch("/api/user/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders(session?.user) },
+        body: JSON.stringify({ preferences, notifications: notificationSettings }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to update preferences")
+      const nextPreferences = data.preferences || preferences
+      const nextNotifications = data.notifications || notificationSettings
+      setPreferences(nextPreferences)
+      setNotificationSettings(nextNotifications)
+      applyThemePreference(nextPreferences.theme)
+      await pushChangeNotification("Preferences updated", `Theme set to ${nextPreferences.theme}.`)
+    } catch (err: any) {
+      setError(err?.message || "Failed to update preferences")
+    }
   }
 
   return (
@@ -62,6 +106,8 @@ export default function ProfilePage() {
       <div className="space-y-1">
         <h1 className="text-3xl font-bold">My Profile</h1>
         <p className="text-muted-foreground">View and update your personal information.</p>
+        {loading && <p className="text-xs text-muted-foreground">Loading profile...</p>}
+        {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
