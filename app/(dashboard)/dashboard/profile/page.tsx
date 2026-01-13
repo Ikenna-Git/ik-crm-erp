@@ -7,47 +7,56 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { addNotification } from "@/lib/notifications"
+import {
+  DEFAULT_NOTIFICATION_SETTINGS,
+  DEFAULT_PREFERENCES,
+  DEFAULT_PROFILE,
+  getNotificationSettings,
+  getUserPreferences,
+  getUserProfile,
+  saveNotificationSettings,
+  saveUserPreferences,
+  saveUserProfile,
+} from "@/lib/user-settings"
 
 export default function ProfilePage() {
-  const [profile, setProfile] = useState({
-    name: "Adaeze Okafor",
-    email: "adaeze@civis.io",
-    title: "Operations Lead",
-    phone: "+234 801 000 1234",
-    timezone: "Africa/Lagos",
-  })
-
-  const [preferences, setPreferences] = useState({
-    theme: "dark",
-    notifications: true,
-  })
-
-  const storageKeys = {
-    profile: "civis_profile_page_profile",
-    preferences: "civis_profile_page_preferences",
-  }
+  const [profile, setProfile] = useState(DEFAULT_PROFILE)
+  const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES)
+  const [notificationSettings, setNotificationSettings] = useState(DEFAULT_NOTIFICATION_SETTINGS)
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    const load = (key: string, setter: (v: any) => void) => {
-      try {
-        const raw = localStorage.getItem(key)
-        if (raw) setter(JSON.parse(raw))
-      } catch (err) {
-        console.warn("Failed to load profile", err)
-      }
-    }
-    load(storageKeys.profile, setProfile)
-    load(storageKeys.preferences, setPreferences)
+    setProfile(getUserProfile())
+    setPreferences(getUserPreferences())
+    setNotificationSettings(getNotificationSettings())
   }, [])
 
-  const persist = (key: string, value: any) => {
-    if (typeof window === "undefined") return
-    try {
-      localStorage.setItem(key, JSON.stringify(value))
-    } catch (err) {
-      console.warn("Failed to save profile", err)
+  const pushChangeNotification = (title: string, description: string) => {
+    addNotification({ title, description, source: "Profile", channel: "in-app" })
+    if (notificationSettings.email) {
+      const target = profile.email || "your inbox"
+      addNotification({
+        title: "Email notification sent",
+        description: `A copy was sent to ${target}.`,
+        source: "Email",
+        channel: "email",
+      })
     }
+  }
+
+  const handleProfileSave = () => {
+    const next = saveUserProfile(profile)
+    setProfile(next)
+    pushChangeNotification("Profile updated", "Saved your latest profile details.")
+  }
+
+  const handlePreferencesSave = () => {
+    const nextPreferences = saveUserPreferences(preferences)
+    const nextNotifications = saveNotificationSettings(notificationSettings)
+    setPreferences(nextPreferences)
+    setNotificationSettings(nextNotifications)
+    pushChangeNotification("Preferences updated", `Theme set to ${nextPreferences.theme}.`)
   }
 
   return (
@@ -117,7 +126,7 @@ export default function ProfilePage() {
                 </Select>
               </div>
             </div>
-            <Button className="w-fit" onClick={() => persist(storageKeys.profile, profile)}>
+            <Button className="w-fit" onClick={handleProfileSave}>
               Save changes
             </Button>
           </CardContent>
@@ -133,7 +142,9 @@ export default function ProfilePage() {
               <Label>Theme</Label>
               <Select
                 value={preferences.theme}
-                onValueChange={(value) => setPreferences({ ...preferences, theme: value })}
+                onValueChange={(value) =>
+                  setPreferences({ ...preferences, theme: value as "light" | "dark" | "system" })
+                }
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -151,11 +162,11 @@ export default function ProfilePage() {
                 <p className="text-sm text-muted-foreground">Product updates and reminders</p>
               </div>
               <Switch
-                checked={preferences.notifications}
-                onCheckedChange={(v) => setPreferences({ ...preferences, notifications: v })}
+                checked={notificationSettings.email}
+                onCheckedChange={(v) => setNotificationSettings({ ...notificationSettings, email: v })}
               />
             </div>
-            <Button className="w-fit" onClick={() => persist(storageKeys.preferences, preferences)}>
+            <Button className="w-fit" onClick={handlePreferencesSave}>
               Save preferences
             </Button>
           </CardContent>

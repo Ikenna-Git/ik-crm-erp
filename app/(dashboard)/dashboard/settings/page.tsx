@@ -9,6 +9,18 @@ import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { addNotification } from "@/lib/notifications"
+import {
+  DEFAULT_NOTIFICATION_SETTINGS,
+  DEFAULT_PREFERENCES,
+  DEFAULT_PROFILE,
+  getNotificationSettings,
+  getUserPreferences,
+  getUserProfile,
+  saveNotificationSettings,
+  saveUserPreferences,
+  saveUserProfile,
+} from "@/lib/user-settings"
 
 const timezones = ["Africa/Lagos", "UTC", "Europe/London", "America/New_York"]
 const currencies = ["NGN", "USD", "EUR", "GBP"]
@@ -16,29 +28,11 @@ const industries = ["Technology", "Finance", "Retail", "Manufacturing", "Healthc
 const roles = ["user", "admin", "super_admin"]
 
 export default function SettingsPage() {
-  const [profile, setProfile] = useState({
-    name: "Adaeze Okafor",
-    title: "Operations Lead",
-    phone: "+234 801 000 1234",
-    timezone: "Africa/Lagos",
-    locale: "en-NG",
-  })
+  const [profile, setProfile] = useState(DEFAULT_PROFILE)
 
-  const [preferences, setPreferences] = useState({
-    theme: "dark",
-    density: "comfortable",
-    currency: "NGN",
-    landing: "dashboard",
-    dateFormat: "DD/MM/YYYY",
-  })
+  const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES)
 
-  const [notifications, setNotifications] = useState({
-    product: true,
-    security: true,
-    reminders: true,
-    marketing: false,
-    sms: false,
-  })
+  const [notifications, setNotifications] = useState(DEFAULT_NOTIFICATION_SETTINGS)
 
   const [security, setSecurity] = useState({
     twoFactor: true,
@@ -65,9 +59,6 @@ export default function SettingsPage() {
   const [showPasswords, setShowPasswords] = useState(false)
 
   const storageKeys = {
-    profile: "civis_settings_profile",
-    preferences: "civis_settings_preferences",
-    notifications: "civis_settings_notifications",
     security: "civis_settings_security",
     org: "civis_settings_org",
   }
@@ -82,9 +73,9 @@ export default function SettingsPage() {
         console.warn("Failed to load settings", err)
       }
     }
-    load(storageKeys.profile, setProfile)
-    load(storageKeys.preferences, setPreferences)
-    load(storageKeys.notifications, setNotifications)
+    setProfile(getUserProfile())
+    setPreferences(getUserPreferences())
+    setNotifications(getNotificationSettings())
     load(storageKeys.security, setSecurity)
     load(storageKeys.org, setOrg)
   }, [])
@@ -96,6 +87,59 @@ export default function SettingsPage() {
     } catch (err) {
       console.warn("Failed to save settings", err)
     }
+  }
+
+  const pushChangeNotification = (title: string, description: string, emailOptIn = notifications.email) => {
+    addNotification({ title, description, source: "Settings", channel: "in-app" })
+    if (emailOptIn) {
+      const target = profile.email || "your inbox"
+      addNotification({
+        title: "Email notification sent",
+        description: `A copy was sent to ${target}.`,
+        source: "Email",
+        channel: "email",
+      })
+    }
+  }
+
+  const handleProfileSave = () => {
+    const next = saveUserProfile(profile)
+    setProfile(next)
+    pushChangeNotification("Profile updated", "Saved your profile details.")
+  }
+
+  const handlePreferencesSave = () => {
+    const next = saveUserPreferences(preferences)
+    setPreferences(next)
+    pushChangeNotification("Preferences updated", `Theme set to ${next.theme}.`)
+  }
+
+  const handleNotificationsSave = () => {
+    const next = saveNotificationSettings(notifications)
+    setNotifications(next)
+    pushChangeNotification("Notifications updated", "Notification channels updated.", next.email)
+  }
+
+  const handleSecuritySave = () => {
+    persist(storageKeys.security, security)
+    pushChangeNotification("Security updated", "Security settings saved.")
+  }
+
+  const handleOrgSave = () => {
+    persist(storageKeys.org, org)
+    pushChangeNotification("Organization updated", "Organization settings saved.")
+  }
+
+  const handleInvite = () => {
+    if (!org.inviteEmail) {
+      pushChangeNotification("Invite needed", "Add an email address to send an invite.")
+      return
+    }
+    pushChangeNotification("Invite sent", `Invitation sent to ${org.inviteEmail}.`)
+  }
+
+  const handlePasswordChange = () => {
+    pushChangeNotification("Password update requested", "Password change submitted.")
   }
 
   return (
@@ -176,7 +220,7 @@ export default function SettingsPage() {
                   />
                 </div>
               </div>
-              <Button className="w-fit" onClick={() => persist(storageKeys.profile, profile)}>
+              <Button className="w-fit" onClick={handleProfileSave}>
                 Save profile
               </Button>
             </CardContent>
@@ -223,7 +267,7 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div className="self-end">
-                  <Button className="w-full" onClick={() => persist(storageKeys.security, security)}>
+                  <Button className="w-full" onClick={handleSecuritySave}>
                     Update security
                   </Button>
                 </div>
@@ -253,7 +297,7 @@ export default function SettingsPage() {
                   <span className="text-sm text-muted-foreground">Show passwords</span>
                 </div>
               </div>
-              <Button className="w-fit" variant="secondary">
+              <Button className="w-fit" variant="secondary" onClick={handlePasswordChange}>
                 Change password
               </Button>
             </CardContent>
@@ -270,7 +314,12 @@ export default function SettingsPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <Label>Theme</Label>
-                  <Select value={preferences.theme} onValueChange={(value) => setPreferences({ ...preferences, theme: value })}>
+                  <Select
+                    value={preferences.theme}
+                    onValueChange={(value) =>
+                      setPreferences({ ...preferences, theme: value as "light" | "dark" | "system" })
+                    }
+                  >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -285,7 +334,9 @@ export default function SettingsPage() {
                   <Label>Density</Label>
                   <Select
                     value={preferences.density}
-                    onValueChange={(value) => setPreferences({ ...preferences, density: value })}
+                    onValueChange={(value) =>
+                      setPreferences({ ...preferences, density: value as "comfortable" | "compact" })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -338,7 +389,7 @@ export default function SettingsPage() {
                   />
                 </div>
               </div>
-              <Button className="w-fit" onClick={() => persist(storageKeys.preferences, preferences)}>
+              <Button className="w-fit" onClick={handlePreferencesSave}>
                 Save preferences
               </Button>
             </CardContent>
@@ -353,6 +404,7 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {[
+                { key: "email", title: "Email copies", desc: "Send email copies of important updates." },
                 { key: "product", title: "Product updates", desc: "New features, releases, and roadmap." },
                 { key: "security", title: "Security alerts", desc: "Login alerts, suspicious activity." },
                 { key: "reminders", title: "Reminders", desc: "Tasks, invoices, and approval reminders." },
@@ -372,7 +424,7 @@ export default function SettingsPage() {
                   />
                 </div>
               ))}
-              <Button className="w-fit" onClick={() => persist(storageKeys.notifications, notifications)}>
+              <Button className="w-fit" onClick={handleNotificationsSave}>
                 Update notifications
               </Button>
             </CardContent>
@@ -440,7 +492,7 @@ export default function SettingsPage() {
                   />
                 </div>
               </div>
-              <Button className="w-fit" onClick={() => persist(storageKeys.org, org)}>
+              <Button className="w-fit" onClick={handleOrgSave}>
                 Save organization
               </Button>
 
@@ -468,7 +520,9 @@ export default function SettingsPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button className="w-full">Send invite</Button>
+                  <Button className="w-full" onClick={handleInvite}>
+                    Send invite
+                  </Button>
                 </div>
               </div>
             </CardContent>
