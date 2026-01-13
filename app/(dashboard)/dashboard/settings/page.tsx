@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
 import { addNotification } from "@/lib/notifications"
 import {
   DEFAULT_NOTIFICATION_SETTINGS,
@@ -50,6 +51,10 @@ export default function SettingsPage() {
     inviteEmail: "",
     inviteRole: "user",
   })
+
+  const [teamUsers, setTeamUsers] = useState<any[]>([])
+  const [teamLoading, setTeamLoading] = useState(false)
+  const [teamError, setTeamError] = useState("")
 
   const [billing] = useState({
     plan: "Pro",
@@ -99,6 +104,30 @@ export default function SettingsPage() {
     load(storageKeys.security, setSecurity)
     load(storageKeys.org, setOrg)
   }, [])
+
+  useEffect(() => {
+    const loadTeam = async () => {
+      if (!session?.user?.role) return
+      const role = session.user.role
+      if (role !== "ADMIN" && role !== "SUPER_ADMIN") {
+        setTeamError("Admin access required to manage roles.")
+        return
+      }
+      try {
+        setTeamLoading(true)
+        setTeamError("")
+        const res = await fetch("/api/admin/users", { headers: { ...getSessionHeaders(session?.user) } })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data?.error || "Failed to load team members")
+        setTeamUsers(data.users || [])
+      } catch (err: any) {
+        setTeamError(err?.message || "Failed to load team members")
+      } finally {
+        setTeamLoading(false)
+      }
+    }
+    loadTeam()
+  }, [session])
 
   const persist = (key: string, value: any) => {
     if (typeof window === "undefined") return
@@ -202,6 +231,22 @@ export default function SettingsPage() {
     pushChangeNotification("Invite sent", `Invitation sent to ${org.inviteEmail}.`)
   }
 
+  const handleRoleUpdate = async (id: string, role: string) => {
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders(session?.user) },
+        body: JSON.stringify({ id, role }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to update role")
+      setTeamUsers((prev) => prev.map((user) => (user.id === id ? data.user : user)))
+      pushChangeNotification("Role updated", `Updated role for ${data.user.email}.`)
+    } catch (err: any) {
+      setTeamError(err?.message || "Failed to update role")
+    }
+  }
+
   const handlePasswordChange = () => {
     pushChangeNotification("Password update requested", "Password change submitted.")
   }
@@ -218,14 +263,15 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid grid-cols-2 md:grid-cols-6">
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
-          <TabsTrigger value="preferences">Preferences</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="organization">Organization</TabsTrigger>
-          <TabsTrigger value="billing">Billing</TabsTrigger>
-        </TabsList>
+      <TabsList className="grid grid-cols-2 md:grid-cols-7">
+        <TabsTrigger value="profile">Profile</TabsTrigger>
+        <TabsTrigger value="security">Security</TabsTrigger>
+        <TabsTrigger value="preferences">Preferences</TabsTrigger>
+        <TabsTrigger value="notifications">Notifications</TabsTrigger>
+        <TabsTrigger value="organization">Organization</TabsTrigger>
+        <TabsTrigger value="team">Team</TabsTrigger>
+        <TabsTrigger value="billing">Billing</TabsTrigger>
+      </TabsList>
 
         <TabsContent value="profile" className="space-y-4">
           <Card>
@@ -591,6 +637,58 @@ export default function SettingsPage() {
                   </Button>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="team" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Team & Roles</CardTitle>
+              <CardDescription>Assign access levels across your organization.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {teamLoading && <p className="text-xs text-muted-foreground">Loading team members...</p>}
+              {teamError && <p className="text-xs text-destructive">{teamError}</p>}
+              {!teamLoading && !teamUsers.length && !teamError && (
+                <p className="text-sm text-muted-foreground">No team members yet.</p>
+              )}
+              {teamUsers.map((member) => {
+                const locked =
+                  member.role === "SUPER_ADMIN" && session?.user?.role !== "SUPER_ADMIN"
+                return (
+                  <div
+                    key={member.id}
+                    className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between border-b border-border pb-4 last:border-0"
+                  >
+                    <div>
+                      <p className="font-medium">{member.name}</p>
+                      <p className="text-sm text-muted-foreground">{member.email}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {member.role === "SUPER_ADMIN" && (
+                        <Badge variant="outline" className="bg-transparent">
+                          Super Admin
+                        </Badge>
+                      )}
+                      <Select
+                        value={member.role}
+                        onValueChange={(value) => handleRoleUpdate(member.id, value)}
+                        disabled={locked}
+                      >
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="USER">User</SelectItem>
+                          <SelectItem value="ADMIN">Admin</SelectItem>
+                          <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )
+              })}
             </CardContent>
           </Card>
         </TabsContent>

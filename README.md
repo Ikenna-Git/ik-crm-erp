@@ -16,16 +16,30 @@ cd ik-crm-erp
 npm install
 ```
 
-Create `.env`:
+Create `.env.local` (recommended) or `.env`:
 ```bash
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE"
 
-# For email exports (optional but recommended)
+# For email exports + notifications (optional but recommended)
 SMTP_HOST=
 SMTP_PORT=
 SMTP_USER=
 SMTP_PASS=
 SMTP_FROM="Civis Reports <no-reply@yourdomain.com>"
+
+# NextAuth (required for login)
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="replace_with_a_long_random_secret"
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# Cloudinary (docs/gallery uploads)
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+
+# Admin defaults (demo fallback)
+DEFAULT_SUPER_ADMIN_EMAIL="ikchils@gmail.com"
 ```
 
 Initialize Prisma and DB:
@@ -42,16 +56,18 @@ npm run dev
 Open `http://localhost:3000`.
 
 ## Features (current)
-- CRM: contacts, companies, deals (pipeline), tasks
-- Accounting: invoices, expenses, CSV/email exports
-- Settings: org profile and users
+- Ops command center with decision feed + audit/decision trails
+- CRM: contacts, companies, deals, activities, CRM reports
+- Accounting: invoices, expenses, financial reports, CSV/email exports
+- Playbooks with AI suggestions and run history
+- Client portal with shareable access codes
+- Settings: profile/preferences, notifications, team roles
 - Dark/light toggle; marketing site with pricing preview
-- Variants stored for previous brand versions
 
 ## Notes
-- Data now intended for Postgres; in-memory legacy store has been replaced in API routes.
-- Email exports require SMTP envs; otherwise use desktop CSV download.
-- Auth is demo-only; role enforcement and real OAuth are not yet wired.
+- Data is Postgres-backed; demo fallbacks render if DB is missing.
+- Email exports + notifications require SMTP envs; otherwise use desktop CSV download.
+- OAuth providers are optional; credentials login works with JWT sessions.
 
 ## Scripts
 - `npm run dev` — start dev server

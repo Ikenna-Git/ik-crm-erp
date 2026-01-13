@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getUserFromRequest } from "@/lib/request-user"
 import { createAuditLog } from "@/lib/audit"
+import { createDecisionTrail, expenseSnapshot } from "@/lib/decision-trails"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable Accounting data." }, { status: 503 })
@@ -71,6 +72,7 @@ export async function PATCH(request: Request) {
     const normalizedStatus = typeof status === "string" ? status.toUpperCase() : undefined
     const safeStatus =
       (normalizedStatus && ["PENDING", "APPROVED", "REJECTED"].includes(normalizedStatus) ? normalizedStatus : undefined) as any
+    const previous = await prisma.expense.findUnique({ where: { id } })
     const expense = await prisma.expense.update({
       where: { id },
       data: {
@@ -82,6 +84,17 @@ export async function PATCH(request: Request) {
         date: date ? new Date(date) : undefined,
       },
     })
+    if (previous) {
+      await createDecisionTrail({
+        orgId: org.id,
+        userId: user.id,
+        action: "Updated expense",
+        entity: "Expense",
+        entityId: expense.id,
+        before: expenseSnapshot(previous),
+        after: expenseSnapshot(expense),
+      })
+    }
     await createAuditLog({
       orgId: org.id,
       userId: user.id,

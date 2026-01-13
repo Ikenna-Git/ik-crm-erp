@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Sparkles, Play, CheckCircle2, ClipboardList } from "lucide-react"
+import { getSessionHeaders } from "@/lib/user-settings"
 
 type PlaybookTemplate = {
   id: string
@@ -113,22 +114,53 @@ export default function PlaybooksPage() {
   const [runs, setRuns] = useState<PlaybookRun[]>(runSeed)
   const [selectedTemplate, setSelectedTemplate] = useState<PlaybookTemplate | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
   useEffect(() => {
-    if (typeof window === "undefined") return
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed)) {
-          setRuns(parsed)
+    const loadRuns = async () => {
+      try {
+        setLoading(true)
+        setError("")
+        const res = await fetch("/api/playbooks", { headers: { ...getSessionHeaders() } })
+        if (res.status === 503) throw new Error("Database not configured")
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data?.error || "Failed to load playbooks")
+        if (Array.isArray(data.runs)) {
+          setRuns(
+            data.runs.map((run: any) => ({
+              id: run.id,
+              templateId: run.templateId,
+              name: run.name,
+              category: run.category,
+              status: run.status?.charAt(0) + run.status?.slice(1).toLowerCase(),
+              progress: run.progress,
+              startedAt: new Date(run.startedAt).toLocaleDateString(),
+            })),
+          )
           return
         }
+      } catch (err: any) {
+        setError(err?.message || "Failed to load playbooks")
+        if (typeof window !== "undefined") {
+          try {
+            const stored = localStorage.getItem(STORAGE_KEY)
+            if (stored) {
+              const parsed = JSON.parse(stored)
+              if (Array.isArray(parsed)) {
+                setRuns(parsed)
+                return
+              }
+            }
+          } catch {
+            setRuns(runSeed)
+          }
+        }
+      } finally {
+        setLoading(false)
       }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(runSeed))
-    } catch {
-      setRuns(runSeed)
     }
+    loadRuns()
   }, [])
 
   useEffect(() => {
@@ -142,43 +174,104 @@ export default function PlaybooksPage() {
     }
   }, [dialogOpen])
 
-  const launchPlaybook = (template: PlaybookTemplate) => {
-    setRuns((prev) => [
-      {
-        id: `run-${Date.now()}`,
-        templateId: template.id,
-        name: template.name,
-        category: template.category,
-        status: "Active",
-        progress: 10,
-        startedAt: "Just now",
-      },
-      ...prev,
-    ])
+  const launchPlaybook = async (template: PlaybookTemplate) => {
+    try {
+      const res = await fetch("/api/playbooks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({
+          templateId: template.id,
+          name: template.name,
+          category: template.category,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to launch playbook")
+      const run = data.run
+      setRuns((prev) => [
+        {
+          id: run.id,
+          templateId: run.templateId,
+          name: run.name,
+          category: run.category,
+          status: "Active",
+          progress: run.progress,
+          startedAt: "Just now",
+        },
+        ...prev,
+      ])
+    } catch (err: any) {
+      setError(err?.message || "Failed to launch playbook")
+      setRuns((prev) => [
+        {
+          id: `run-${Date.now()}`,
+          templateId: template.id,
+          name: template.name,
+          category: template.category,
+          status: "Active",
+          progress: 10,
+          startedAt: "Just now",
+        },
+        ...prev,
+      ])
+    }
   }
 
-  const advanceRun = (id: string) => {
+  const advanceRun = async (id: string) => {
+    const target = runs.find((run) => run.id === id)
+    if (!target) return
+    const nextProgress = Math.min(target.progress + 20, 100)
+    const nextStatus = nextProgress >= 100 ? "COMPLETED" : target.status.toUpperCase()
     setRuns((prev) =>
-      prev.map((run) => {
-        if (run.id !== id) return run
-        const nextProgress = Math.min(run.progress + 20, 100)
-        return {
-          ...run,
-          progress: nextProgress,
-          status: nextProgress >= 100 ? "Completed" : run.status,
-        }
-      }),
+      prev.map((run) =>
+        run.id === id
+          ? {
+              ...run,
+              progress: nextProgress,
+              status: nextProgress >= 100 ? "Completed" : run.status,
+            }
+          : run,
+      ),
     )
+    try {
+      await fetch("/api/playbooks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({ id, progress: nextProgress, status: nextStatus }),
+      })
+    } catch {
+      // keep optimistic update
+    }
   }
 
-  const pauseRun = (id: string) => {
+  const pauseRun = async (id: string) => {
     setRuns((prev) => prev.map((run) => (run.id === id ? { ...run, status: "Paused" } : run)))
+    try {
+      await fetch("/api/playbooks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({ id, status: "PAUSED" }),
+      })
+    } catch {
+      // keep optimistic update
+    }
   }
 
   const openTemplate = (template: PlaybookTemplate) => {
     setSelectedTemplate(template)
     setDialogOpen(true)
   }
+
+  const aiRecommendations = runs.slice(0, 3).map((run) => ({
+    id: `ai-${run.id}`,
+    title: `AI suggestion for ${run.name}`,
+    note:
+      run.status === "Paused"
+        ? "Restart stalled steps and notify owners."
+        : run.status === "Completed"
+          ? "Capture learnings and convert to a reusable checklist."
+          : "Assign owners to the next two steps for faster momentum.",
+  }))
 
   return (
     <div className="p-6 space-y-6">
@@ -187,6 +280,8 @@ export default function PlaybooksPage() {
         <p className="text-muted-foreground">
           Launch proven workflows for CRM, finance, HR, and operations in one click.
         </p>
+        {loading && <p className="text-xs text-muted-foreground">Loading playbooks...</p>}
+        {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
 
       <Card>
@@ -221,6 +316,27 @@ export default function PlaybooksPage() {
               </div>
             </div>
           ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" />
+            AI Playbook Assistant
+          </CardTitle>
+          <CardDescription>Suggested next steps based on live playbooks.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {aiRecommendations.map((rec) => (
+            <div key={rec.id} className="rounded-lg border border-border bg-background p-4 space-y-2">
+              <p className="font-medium">{rec.title}</p>
+              <p className="text-sm text-muted-foreground">{rec.note}</p>
+            </div>
+          ))}
+          {!aiRecommendations.length && (
+            <p className="text-sm text-muted-foreground">Launch a playbook to get AI suggestions.</p>
+          )}
         </CardContent>
       </Card>
 

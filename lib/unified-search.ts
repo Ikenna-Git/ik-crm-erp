@@ -78,6 +78,13 @@ export const unifiedSearchItems: UnifiedSearchItem[] = [
     href: "/dashboard/projects",
   },
   {
+    id: "portal-1",
+    title: "Client Portal",
+    subtitle: "External access • Share updates",
+    category: "Portal",
+    href: "/dashboard/portal",
+  },
+  {
     id: "hr-1",
     title: "Payroll approvals",
     subtitle: "HR • Pending review",

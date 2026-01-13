@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useMemo, useState } from "react"
 import {
   LineChart,
   Line,
@@ -16,8 +17,14 @@ import {
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { TrendingUp, Users, DollarSign, Package, AlertTriangle, ArrowUpRight } from "lucide-react"
+import { TrendingUp, Users, DollarSign, Package, AlertTriangle, ArrowUpRight, SlidersHorizontal } from "lucide-react"
 import { formatNaira } from "@/lib/currency"
+import { useCachedFetch } from "@/hooks/use-cached-fetch"
+import { getSessionHeaders } from "@/lib/user-settings"
+import { KPI_CATALOG, getDefaultKpis } from "@/lib/kpis"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
+import { useSession } from "next-auth/react"
 
 const revenueData = [
   { month: "Jan", revenue: 4000, expenses: 2400 },
@@ -34,14 +41,7 @@ const salesData = [
   { name: "B2B", value: 300, fill: "#2d7c8a" },
 ]
 
-const statsCards = [
-  { icon: Users, label: "Total Contacts", value: "1,234", change: "+12%" },
-  { icon: DollarSign, label: "Revenue (MTD)", value: formatNaira(13256871), change: "+8%" },
-  { icon: Package, label: "Orders", value: "328", change: "+5%" },
-  { icon: TrendingUp, label: "Growth Rate", value: "23%", change: "+3%" },
-]
-
-const recentActivity = [
+const fallbackRecentActivity = [
   {
     id: "act-1",
     title: "Invoice INV-2025-014 marked as paid",
@@ -79,7 +79,7 @@ const recentActivity = [
   },
 ]
 
-const decisionFeed = [
+const fallbackDecisionFeed = [
   {
     id: "dec-1",
     title: "Overdue invoice needs a follow-up",
@@ -114,6 +114,20 @@ const decisionFeed = [
   },
 ]
 
+const commandFallback = {
+  stats: {
+    contacts: 1234,
+    openDeals: 18,
+    pipelineValue: 3250000,
+    revenueMtd: 13256871,
+    expensesMtd: 7800000,
+    overdueInvoices: 4,
+    pendingExpenses: 6,
+  },
+  decisions: fallbackDecisionFeed,
+  recentActivity: fallbackRecentActivity,
+}
+
 const impactStyles = {
   High: "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200",
   Medium: "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-200",
@@ -126,27 +140,178 @@ const activityStatusStyles = {
   info: "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-200",
 }
 
+const kpiIcons: Record<string, any> = {
+  contacts: Users,
+  openDeals: TrendingUp,
+  pipelineValue: DollarSign,
+  revenueMtd: DollarSign,
+  expensesMtd: Package,
+  overdueInvoices: AlertTriangle,
+  pendingExpenses: Package,
+}
+
 export default function DashboardPage() {
+  const { data: session } = useSession()
+  const role = session?.user?.role
+  const [kpiLayout, setKpiLayout] = useState<string[]>([])
+  const [kpiDraft, setKpiDraft] = useState<string[]>([])
+  const [kpiDialogOpen, setKpiDialogOpen] = useState(false)
+  const [kpiError, setKpiError] = useState("")
+  const [kpiSaving, setKpiSaving] = useState(false)
+
+  const commandState = useCachedFetch(
+    "civis_dashboard_command",
+    async () => {
+      const res = await fetch("/api/ops/command", { headers: { ...getSessionHeaders() } })
+      if (res.status === 503) return commandFallback
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to load dashboard insights")
+      return data
+    },
+    1000 * 60 * 5,
+  )
+
+  const commandData = commandState.data || commandFallback
+  const commandHasSignal =
+    commandData?.stats &&
+    Object.values(commandData.stats).some((value) => typeof value === "number" && value > 0)
+  const command = commandHasSignal ? commandData : commandFallback
+
+  useEffect(() => {
+    const loadKpis = async () => {
+      try {
+        const res = await fetch("/api/user/settings", { headers: { ...getSessionHeaders() } })
+        if (res.status === 503) {
+          const defaults = getDefaultKpis(role)
+          setKpiLayout(defaults)
+          setKpiDraft(defaults)
+          return
+        }
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data?.error || "Failed to load settings")
+        const incoming = Array.isArray(data.kpis) && data.kpis.length ? data.kpis : getDefaultKpis(role)
+        setKpiLayout(incoming)
+        setKpiDraft(incoming)
+      } catch (err: any) {
+        setKpiError(err?.message || "Failed to load KPI settings")
+        const defaults = getDefaultKpis(role)
+        setKpiLayout(defaults)
+        setKpiDraft(defaults)
+      }
+    }
+    loadKpis()
+  }, [role])
+
+  useEffect(() => {
+    if (kpiDialogOpen) {
+      setKpiDraft(kpiLayout.length ? kpiLayout : getDefaultKpis(role))
+    }
+  }, [kpiDialogOpen, kpiLayout, role])
+
+  const activeKpis = useMemo(() => {
+    const ids = kpiLayout.length ? kpiLayout : getDefaultKpis(role)
+    return KPI_CATALOG.filter((kpi) => ids.includes(kpi.id))
+  }, [kpiLayout, role])
+
+  const kpiCards = activeKpis.map((kpi) => {
+    const value = command.stats?.[kpi.key] ?? 0
+    const display =
+      kpi.format === "naira" ? formatNaira(Number(value)) : kpi.format === "percent" ? `${value}%` : value
+    return { ...kpi, value: display }
+  })
+
+  const decisionFeed = command.decisions?.length ? command.decisions : fallbackDecisionFeed
+  const recentActivity = command.recentActivity?.length ? command.recentActivity : fallbackRecentActivity
+
+  const toggleKpi = (id: string) => {
+    setKpiDraft((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]))
+  }
+
+  const saveKpis = async () => {
+    setKpiSaving(true)
+    setKpiError("")
+    try {
+      const res = await fetch("/api/user/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({ kpis: kpiDraft }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to save KPIs")
+      const updated = Array.isArray(data.kpis) && data.kpis.length ? data.kpis : kpiDraft
+      setKpiLayout(updated)
+      setKpiDialogOpen(false)
+    } catch (err: any) {
+      setKpiError(err?.message || "Failed to save KPI layout")
+    } finally {
+      setKpiSaving(false)
+    }
+  }
+
+  const formatActivityTime = (value: string) => {
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">Welcome Back</h1>
-        <p className="text-muted-foreground mt-1">Here's your business overview for today</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold">Welcome Back</h1>
+          <p className="text-muted-foreground mt-1">Here's your business overview for today</p>
+          {commandState.stale && <p className="text-xs text-muted-foreground">Showing cached insights.</p>}
+          {commandState.error && <p className="text-xs text-destructive">{commandState.error}</p>}
+        </div>
+        <Dialog open={kpiDialogOpen} onOpenChange={setKpiDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+              <SlidersHorizontal className="w-4 h-4" />
+              Customize KPIs
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Personalize KPI cards</DialogTitle>
+              <DialogDescription>Pick up to six KPIs to pin on your dashboard.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              {KPI_CATALOG.map((kpi) => (
+                <label key={kpi.id} className="flex items-start gap-3 border border-border rounded-lg p-3">
+                  <Checkbox
+                    checked={kpiDraft.includes(kpi.id)}
+                    onCheckedChange={() => toggleKpi(kpi.id)}
+                  />
+                  <div>
+                    <p className="font-medium">{kpi.label}</p>
+                    <p className="text-xs text-muted-foreground">{kpi.description}</p>
+                  </div>
+                </label>
+              ))}
+              {kpiError && <p className="text-xs text-destructive">{kpiError}</p>}
+              <Button onClick={saveKpis} disabled={kpiSaving || kpiDraft.length > 6}>
+                {kpiSaving ? "Saving..." : "Save KPIs"}
+              </Button>
+              {kpiDraft.length > 6 && (
+                <p className="text-xs text-destructive">Please select six or fewer KPIs.</p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {statsCards.map((stat, idx) => {
-          const Icon = stat.icon
+        {kpiCards.map((stat) => {
+          const Icon = kpiIcons[stat.id] || TrendingUp
           return (
-            <Card key={idx}>
+            <Card key={stat.id}>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-muted-foreground">{stat.label}</p>
                     <h3 className="text-2xl font-bold mt-2">{stat.value}</h3>
-                    <p className="text-xs text-primary mt-1">{stat.change} from last month</p>
+                    <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
                   </div>
                   <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
                     <Icon className="w-6 h-6 text-primary" />
@@ -263,7 +428,7 @@ export default function DashboardPage() {
                   <p className="text-sm text-muted-foreground">{activity.detail}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">{activity.time}</span>
+                  <span className="text-xs text-muted-foreground">{formatActivityTime(activity.time)}</span>
                   <span className={`text-xs px-2 py-1 rounded-full ${activityStatusStyles[activity.status]}`}>
                     {activity.status}
                   </span>

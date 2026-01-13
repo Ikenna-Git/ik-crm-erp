@@ -8,10 +8,12 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
-import { Plus, CheckSquare, Lock, Globe, FileText, DownloadCloud } from "lucide-react"
+import { Plus, CheckSquare, Lock, Globe, FileText, DownloadCloud, AlertTriangle } from "lucide-react"
 import { ApprovalRequest, approvalsStorageKey, getApprovals } from "@/lib/approvals"
 import { getSessionHeaders } from "@/lib/user-settings"
 import { useSession } from "next-auth/react"
+import { useCachedFetch } from "@/hooks/use-cached-fetch"
+import { formatNaira } from "@/lib/currency"
 
 const timelineSeed = [
   { id: "t1", title: "Invoice INV-2025-014 paid", detail: "Acme Corp • ₦1,250,000", time: "2 hours ago", type: "finance" },
@@ -81,6 +83,33 @@ const auditSeed = [
   { id: "log3", actor: "Sarah Johnson", action: "Created workflow: Low stock reorder", time: "Yesterday 14:10" },
 ]
 
+const decisionTrailSeed = [
+  {
+    id: "trail-1",
+    action: "Updated invoice",
+    entity: "Invoice",
+    createdAt: new Date().toISOString(),
+    user: { name: "Adaeze Okafor" },
+    rolledBackAt: null,
+  },
+  {
+    id: "trail-2",
+    action: "Updated deal",
+    entity: "Deal",
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(),
+    user: { name: "Emeka Umeh" },
+    rolledBackAt: null,
+  },
+  {
+    id: "trail-3",
+    action: "Updated expense",
+    entity: "Expense",
+    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+    user: { name: "Sarah Johnson" },
+    rolledBackAt: null,
+  },
+]
+
 const complianceSeed = [
   { id: "c1", title: "2FA enforced for admins", status: "complete" },
   { id: "c2", title: "Data retention policy (7 years)", status: "complete" },
@@ -140,6 +169,44 @@ const reportsSeed = [
   },
 ]
 
+const commandFallback = {
+  stats: {
+    contacts: 1240,
+    openDeals: 18,
+    pipelineValue: 4200000,
+    revenueMtd: 3250000,
+    expensesMtd: 1850000,
+    overdueInvoices: 4,
+    pendingExpenses: 6,
+    openTasks: 5,
+  },
+  decisions: [
+    {
+      id: "dec-overdue",
+      title: "Overdue invoices need attention",
+      detail: "4 invoices are overdue",
+      impact: "High",
+      action: "Review invoices",
+      href: "/dashboard/accounting",
+    },
+    {
+      id: "dec-expenses",
+      title: "Pending expenses awaiting approval",
+      detail: "6 expenses are pending",
+      impact: "Medium",
+      action: "Approve expenses",
+      href: "/dashboard/accounting",
+    },
+  ],
+  recentActivity: timelineSeed.map((item) => ({
+    id: item.id,
+    title: item.title,
+    detail: item.detail,
+    time: item.time,
+    status: "info",
+  })),
+}
+
 const STORAGE = {
   workflows: "civis_ops_workflows",
   integrations: "civis_ops_integrations",
@@ -157,7 +224,6 @@ export default function OperationsPage() {
   const { data: session } = useSession()
   const role = session?.user?.role
   const canManage = role === "ADMIN" || role === "SUPER_ADMIN"
-  const [timeline] = useState(timelineSeed)
   const [workflows, setWorkflows] = useState(workflowSeed)
   const [approvals, setApprovals] = useState<ApprovalRequest[]>(approvalsSeed)
   const [integrations, setIntegrations] = useState(integrationsSeed)
@@ -165,8 +231,34 @@ export default function OperationsPage() {
   const [auditLogs, setAuditLogs] = useState(auditSeed)
   const [auditLoading, setAuditLoading] = useState(false)
   const [auditError, setAuditError] = useState("")
+  const [decisionTrails, setDecisionTrails] = useState<any[]>([])
+  const [decisionLoading, setDecisionLoading] = useState(false)
+  const [decisionError, setDecisionError] = useState("")
+  const [rollbackBusy, setRollbackBusy] = useState("")
   const [compliance, setCompliance] = useState(complianceSeed)
   const [reports, setReports] = useState(reportsSeed)
+
+  const commandState = useCachedFetch(
+    "civis_ops_command",
+    async () => {
+      const res = await fetch("/api/ops/command", { headers: { ...getSessionHeaders() } })
+      if (res.status === 503) return commandFallback
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to load command center")
+      return data
+    },
+    1000 * 60 * 5,
+  )
+
+  const commandData = commandState.data || commandFallback
+  const commandHasSignal =
+    commandData?.stats &&
+    Object.values(commandData.stats).some((value) => typeof value === "number" && value > 0)
+  const command = commandHasSignal ? commandData : commandFallback
+  const timeline =
+    Array.isArray(command?.recentActivity) && command.recentActivity.length ? command.recentActivity : timelineSeed
+  const decisionItems =
+    Array.isArray(command?.decisions) && command.decisions.length ? command.decisions : commandFallback.decisions
 
   const [workflowForm, setWorkflowForm] = useState({
     name: "",
@@ -258,6 +350,37 @@ export default function OperationsPage() {
   }, [])
 
   useEffect(() => {
+    const loadDecisionTrails = async () => {
+      setDecisionLoading(true)
+      setDecisionError("")
+      try {
+        const res = await fetch("/api/decision-trails", {
+          headers: { ...getSessionHeaders() },
+        })
+        if (res.status === 503) {
+          setDecisionError("Database not configured — showing demo decisions.")
+          setDecisionTrails([])
+          return
+        }
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data?.error || "Failed to load decision trails")
+        const trails = Array.isArray(data.trails) ? data.trails : []
+        if (!trails.length) {
+          setDecisionError("No decision trails yet — showing demo entries.")
+          setDecisionTrails(decisionTrailSeed)
+          return
+        }
+        setDecisionTrails(trails)
+      } catch (err: any) {
+        setDecisionError(err?.message || "Failed to load decision trails")
+      } finally {
+        setDecisionLoading(false)
+      }
+    }
+    loadDecisionTrails()
+  }, [])
+
+  useEffect(() => {
     if (typeof window === "undefined") return
     localStorage.setItem(STORAGE.workflows, JSON.stringify(workflows))
   }, [workflows])
@@ -334,6 +457,27 @@ export default function OperationsPage() {
     setReports((prev) => prev.map((report) => (report.id === id ? { ...report, lastRun: timestamp } : report)))
   }
 
+  const rollbackDecision = async (id: string) => {
+    if (!canManage) return
+    try {
+      setRollbackBusy(id)
+      const res = await fetch("/api/decision-trails/rollback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({ id }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to rollback")
+      setDecisionTrails((prev) =>
+        prev.map((trail) => (trail.id === id ? { ...trail, rolledBackAt: new Date().toISOString() } : trail)),
+      )
+    } catch (err: any) {
+      setDecisionError(err?.message || "Failed to rollback decision")
+    } finally {
+      setRollbackBusy("")
+    }
+  }
+
   const downloadCompliancePack = (title: string) => {
     const headers = ["Item", "Status", "Owner"]
     const rows = [
@@ -351,6 +495,11 @@ export default function OperationsPage() {
     window.URL.revokeObjectURL(url)
   }
 
+  const formatTimelineTime = (value: string) => {
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="space-y-1">
@@ -365,8 +514,57 @@ export default function OperationsPage() {
         ) : null}
       </div>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-primary" />
+            Live Command Center
+          </CardTitle>
+          <CardDescription>
+            Live operational signals with decision-ready actions.
+            {commandState.stale ? " (cached)" : ""}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-6 lg:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-3 lg:col-span-2">
+            {[
+              { label: "Contacts", value: command.stats.contacts },
+              { label: "Open Deals", value: command.stats.openDeals },
+              { label: "Pipeline Value", value: formatNaira(command.stats.pipelineValue) },
+              { label: "Revenue (MTD)", value: formatNaira(command.stats.revenueMtd) },
+              { label: "Overdue Invoices", value: command.stats.overdueInvoices },
+              { label: "Pending Expenses", value: command.stats.pendingExpenses },
+            ].map((item) => (
+              <div key={item.label} className="rounded-lg border border-border bg-background p-4">
+                <p className="text-xs text-muted-foreground">{item.label}</p>
+                <p className="text-lg font-semibold mt-2">{item.value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="space-y-3">
+            <p className="text-sm font-semibold">Priority Decisions</p>
+            {commandState.loading ? (
+              <p className="text-sm text-muted-foreground">Loading decisions...</p>
+            ) : (
+              decisionItems.map((item: any) => (
+                <div key={item.id} className="rounded-lg border border-border bg-background p-3 space-y-1">
+                  <p className="text-sm font-medium">{item.title}</p>
+                  <p className="text-xs text-muted-foreground">{item.detail}</p>
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={item.href}>{item.action}</a>
+                  </Button>
+                </div>
+              ))
+            )}
+            {!decisionItems.length && !commandState.loading ? (
+              <p className="text-xs text-muted-foreground">No urgent decisions right now.</p>
+            ) : null}
+          </div>
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="timeline" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-8">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-9">
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
           <TabsTrigger value="workflows">Workflows</TabsTrigger>
           <TabsTrigger value="approvals">Approvals</TabsTrigger>
@@ -374,6 +572,7 @@ export default function OperationsPage() {
           <TabsTrigger value="insights">AI Insights</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="audit">Audit Log</TabsTrigger>
+          <TabsTrigger value="decisions">Decision Trails</TabsTrigger>
           <TabsTrigger value="compliance">Compliance</TabsTrigger>
         </TabsList>
 
@@ -390,7 +589,7 @@ export default function OperationsPage() {
                     <p className="font-medium">{item.title}</p>
                     <p className="text-sm text-muted-foreground">{item.detail}</p>
                   </div>
-                  <div className="text-xs text-muted-foreground">{item.time}</div>
+                  <div className="text-xs text-muted-foreground">{formatTimelineTime(item.time)}</div>
                 </div>
               ))}
             </CardContent>
@@ -637,6 +836,52 @@ export default function OperationsPage() {
                     <div className="text-xs text-muted-foreground">{log.time}</div>
                   </div>
                 ))
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="decisions" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Decision Trails</CardTitle>
+              <CardDescription>Review critical changes and roll them back if needed.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {decisionError ? <p className="text-xs text-muted-foreground">{decisionError}</p> : null}
+              {decisionLoading ? (
+                <p className="text-sm text-muted-foreground">Loading decision trails...</p>
+              ) : decisionTrails.length ? (
+                decisionTrails.map((trail) => (
+                  <div key={trail.id} className="flex flex-col gap-2 border-b border-border pb-3 last:border-0">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{trail.action}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {trail.entity} • {trail.user?.name || trail.user?.email || "System"}
+                        </p>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(trail.createdAt).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge variant="outline" className={trail.rolledBackAt ? "text-muted-foreground" : "text-primary"}>
+                        {trail.rolledBackAt ? "Rolled back" : "Active"}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!canManage || Boolean(trail.rolledBackAt) || rollbackBusy === trail.id}
+                        onClick={() => rollbackDecision(trail.id)}
+                      >
+                        {rollbackBusy === trail.id ? "Rolling back..." : "Rollback"}
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">No decision trails yet.</p>
               )}
             </CardContent>
           </Card>

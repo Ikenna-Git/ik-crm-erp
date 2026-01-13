@@ -16,14 +16,13 @@ export default function SignupPage() {
   const [formData, setFormData] = useState({ name: "", email: "", password: "" })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [oauthReady, setOauthReady] = useState({ google: false, apple: false })
+  const [oauthReady, setOauthReady] = useState({ google: false })
 
   useEffect(() => {
     const loadProviders = async () => {
       const providers = await getProviders()
       setOauthReady({
         google: Boolean(providers?.google),
-        apple: Boolean(providers?.apple),
       })
     }
     loadProviders()
@@ -151,15 +150,6 @@ export default function SignupPage() {
                   className="w-5 h-5 mr-2"
                 />
                 {oauthReady.google ? "Continue with Google" : "Google (setup needed)"}
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1 min-w-[200px] bg-transparent"
-                onClick={() => signIn("apple")}
-                disabled={!oauthReady.apple}
-              >
-                <span className="mr-2 text-xl"></span>
-                {oauthReady.apple ? "Continue with Apple" : "Apple (setup needed)"}
               </Button>
             </div>
 

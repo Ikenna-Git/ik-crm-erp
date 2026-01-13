@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getUserFromRequest } from "@/lib/request-user"
 import { createAuditLog } from "@/lib/audit"
+import { contactSnapshot, createDecisionTrail } from "@/lib/decision-trails"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable CRM data." }, { status: 503 })
@@ -98,6 +99,7 @@ export async function PATCH(request: Request) {
     const safeStatus =
       (normalizedStatus && ["LEAD", "PROSPECT", "CUSTOMER"].includes(normalizedStatus) ? normalizedStatus : undefined) as any
 
+    const previous = await prisma.contact.findUnique({ where: { id } })
     const contact = await prisma.contact.update({
       where: { id },
       data: {
@@ -114,6 +116,17 @@ export async function PATCH(request: Request) {
       },
       include: { company: true },
     })
+    if (previous) {
+      await createDecisionTrail({
+        orgId: org.id,
+        userId: user.id,
+        action: "Updated contact",
+        entity: "Contact",
+        entityId: contact.id,
+        before: contactSnapshot(previous),
+        after: contactSnapshot(contact),
+      })
+    }
     await createAuditLog({
       orgId: org.id,
       userId: user.id,

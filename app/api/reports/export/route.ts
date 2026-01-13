@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server"
 import nodemailer from "nodemailer"
 import { generateCsv } from "@/lib/reports"
+import { buildAccountingRows, buildCrmRows } from "@/lib/report-builders"
 import { getDefaultOrg } from "@/lib/defaultOrg"
 
 const REQUIRED_ENVS = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM"] as const
 
 type ExportBody = {
-  type?: "analytics" | "accounting"
+  type?: "analytics" | "accounting" | "crm"
   target?: "desktop" | "email"
   email?: string
 }
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
   const body = (await request.json()) as ExportBody
   const { type, target, email } = body
 
-  if (!type || !["analytics", "accounting"].includes(type)) {
+  if (!type || !["analytics", "accounting", "crm"].includes(type)) {
     return NextResponse.json({ error: "Invalid report type" }, { status: 400 })
   }
   if (!target || !["desktop", "email"].includes(target)) {
@@ -29,7 +30,9 @@ export async function POST(request: Request) {
   }
 
   const org = await getDefaultOrg()
-  const csv = generateCsv(type)
+  const rows =
+    type === "accounting" ? await buildAccountingRows(org.id) : type === "crm" ? await buildCrmRows(org.id) : undefined
+  const csv = generateCsv(type, rows)
   const filename = `${org.name || "report"}-${type}.csv`
 
   // Desktop download: return CSV as attachment

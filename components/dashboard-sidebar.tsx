@@ -17,12 +17,14 @@ import {
   BookOpen,
   Play,
   ClipboardList,
+  LayoutGrid,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const navigation = [
   { name: "Overview", href: "/dashboard", icon: BarChart3 },
   { name: "CRM", href: "/dashboard/crm", icon: Users },
+  { name: "Client Portal", href: "/dashboard/portal", icon: LayoutGrid },
   { name: "Accounting", href: "/dashboard/accounting", icon: DollarSign },
   { name: "Inventory", href: "/dashboard/inventory", icon: Package },
   { name: "Projects", href: "/dashboard/projects", icon: CheckSquare },

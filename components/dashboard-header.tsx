@@ -22,6 +22,7 @@ export function DashboardHeader() {
   const [userName, setUserName] = useState("")
   const [timestamp, setTimestamp] = useState("")
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
+  const [online, setOnline] = useState(true)
 
   const unreadCount = notifications.filter((item) => !item.read).length
 
@@ -83,6 +84,17 @@ export function DashboardHeader() {
     return () => window.clearInterval(timer)
   }, [])
 
+  useEffect(() => {
+    const updateStatus = () => setOnline(navigator.onLine)
+    updateStatus()
+    window.addEventListener("online", updateStatus)
+    window.addEventListener("offline", updateStatus)
+    return () => {
+      window.removeEventListener("online", updateStatus)
+      window.removeEventListener("offline", updateStatus)
+    }
+  }, [])
+
   return (
     <header className="border-b border-border bg-card px-6 py-4 flex items-center justify-between">
       <div className="flex-1">
@@ -95,7 +107,9 @@ export function DashboardHeader() {
             <p className="text-xs text-muted-foreground">{timestamp || "Loading time..."}</p>
           </div>
           <div className="ml-auto hidden md:flex items-center gap-2 text-xs">
-            <span className="px-2.5 py-1 rounded-full bg-muted text-muted-foreground">Sync: Local</span>
+            <span className="px-2.5 py-1 rounded-full bg-muted text-muted-foreground">
+              Sync: {online ? "Online" : "Offline"}
+            </span>
             <span className="px-2.5 py-1 rounded-full bg-muted text-muted-foreground">Mode: Live</span>
           </div>
         </div>

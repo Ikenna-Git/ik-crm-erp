@@ -4,10 +4,11 @@ import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Sparkles } from "lucide-react"
+import { Plus, Sparkles, Download } from "lucide-react"
 import { ContactsTable } from "@/components/crm/contacts-table"
 import { DealsBoard } from "@/components/crm/deals-board"
 import { ActivitiesTimeline } from "@/components/crm/activities-timeline"
+import { CrmReports } from "@/components/crm/crm-reports"
 import { getSessionHeaders } from "@/lib/user-settings"
 import {
   Dialog,
@@ -68,6 +69,8 @@ export default function CRMPage() {
   const [contacts, setContacts] = useState<any[]>([])
   const [deals, setDeals] = useState<any[]>([])
   const [openAddDialog, setOpenAddDialog] = useState(false)
+  const [exportEmail, setExportEmail] = useState("ikchils@gmail.com")
+  const [openExportDialog, setOpenExportDialog] = useState(false)
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -224,6 +227,41 @@ export default function CRMPage() {
     }
   }
 
+  const handleExportReports = async (target: "desktop" | "email") => {
+    try {
+      if (target === "desktop") {
+        const res = await fetch("/api/reports/export", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+          body: JSON.stringify({ type: "crm", target: "desktop" }),
+        })
+        if (!res.ok) throw new Error("Failed to export")
+        const blob = await res.blob()
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement("a")
+        link.href = url
+        link.download = "crm-report.csv"
+        link.click()
+        window.URL.revokeObjectURL(url)
+        return
+      }
+
+      const res = await fetch("/api/reports/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({ type: "crm", target: "email", email: exportEmail }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        alert(data.error || "Failed to send email")
+        return
+      }
+      alert(data.message || "Report sent")
+    } catch (err) {
+      alert("Export failed. Please try again.")
+    }
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -233,66 +271,100 @@ export default function CRMPage() {
           <p className="text-muted-foreground mt-1">Manage contacts, deals, and sales activities</p>
           {loading && <p className="text-xs text-muted-foreground">Loading...</p>}
         </div>
-        <Dialog open={openAddDialog} onOpenChange={setOpenAddDialog}>
-          <DialogTrigger asChild>
-            <Button className="flex items-center gap-2">
-              <Plus className="w-4 h-4" />
-              New Contact
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Contact</DialogTitle>
-              <DialogDescription>Create a new contact in your CRM system</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Contact Name</Label>
-                <Input
-                  id="name"
-                  placeholder="Company or contact name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="email@example.com"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
-                <Input
-                  id="phone"
-                  placeholder="+234 800 123 4567"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="status">Status</Label>
-                <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="lead">Lead</SelectItem>
-                    <SelectItem value="prospect">Prospect</SelectItem>
-                    <SelectItem value="customer">Customer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button onClick={handleAddContact} className="w-full">
-                Add Contact
+        <div className="flex gap-2 flex-wrap justify-end">
+          <Dialog open={openExportDialog} onOpenChange={setOpenExportDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+                <Download className="w-4 h-4" />
+                Export CRM
               </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Export CRM report</DialogTitle>
+                <DialogDescription>Download or email your CRM CSV report.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="crm-export-email">Email</Label>
+                  <Input
+                    id="crm-export-email"
+                    type="email"
+                    value={exportEmail}
+                    onChange={(e) => setExportEmail(e.target.value)}
+                    placeholder="name@example.com"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => handleExportReports("desktop")}>
+                    Export to Desktop
+                  </Button>
+                  <Button onClick={() => handleExportReports("email")}>Send to Email</Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={openAddDialog} onOpenChange={setOpenAddDialog}>
+            <DialogTrigger asChild>
+              <Button className="flex items-center gap-2">
+                <Plus className="w-4 h-4" />
+                New Contact
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Contact</DialogTitle>
+                <DialogDescription>Create a new contact in your CRM system</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Contact Name</Label>
+                  <Input
+                    id="name"
+                    placeholder="Company or contact name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="email@example.com"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input
+                    id="phone"
+                    placeholder="+234 800 123 4567"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="lead">Lead</SelectItem>
+                      <SelectItem value="prospect">Prospect</SelectItem>
+                      <SelectItem value="customer">Customer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button onClick={handleAddContact} className="w-full">
+                  Add Contact
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* CRM Pulse */}
@@ -321,10 +393,11 @@ export default function CRMPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="contacts" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="contacts">Contacts</TabsTrigger>
           <TabsTrigger value="deals">Sales Pipeline</TabsTrigger>
           <TabsTrigger value="activities">Activities</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
 
         {/* Contacts Tab */}
@@ -346,6 +419,10 @@ export default function CRMPage() {
         {/* Activities Tab */}
         <TabsContent value="activities" className="space-y-4">
           <ActivitiesTimeline />
+        </TabsContent>
+
+        <TabsContent value="reports" className="space-y-4">
+          <CrmReports />
         </TabsContent>
       </Tabs>
     </div>

@@ -53,6 +53,18 @@ enum NotificationType {
   ERROR
 }
 
+enum PlaybookStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum PortalStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
 model Org {
   id           String         @id @default(uuid())
   name         String
@@ -73,6 +85,9 @@ model Org {
   docs         Doc[]
   notifications Notification[]
   auditLogs    AuditLog[]
+  decisionTrails DecisionTrail[]
+  playbookRuns PlaybookRun[]
+  clientPortals ClientPortal[]
 }
 
 model User {
@@ -99,6 +114,8 @@ model User {
   settings UserSettings?
   notifications Notification[]
   auditLogs AuditLog[]
+  decisionTrails DecisionTrail[]
+  playbookRuns PlaybookRun[]
   accounts Account[]
   sessions Session[]
   @@index([orgId])
@@ -151,6 +168,7 @@ model UserSettings {
   currency              String   @default("NGN")
   landing               String   @default("dashboard")
   dateFormat            String   @default("DD/MM/YYYY")
+  kpiLayout             Json?
   emailNotifications    Boolean  @default(true)
   productNotifications  Boolean  @default(true)
   securityNotifications Boolean  @default(true)
@@ -350,6 +368,61 @@ model Notification {
   @@index([orgId])
   @@index([userId])
   @@index([read])
+}
+
+model DecisionTrail {
+  id          String   @id @default(uuid())
+  org         Org      @relation(fields: [orgId], references: [id])
+  orgId       String
+  user        User?    @relation(fields: [userId], references: [id])
+  userId      String?
+  action      String
+  entity      String
+  entityId    String?
+  before      Json?
+  after       Json?
+  metadata    Json?
+  rolledBackAt DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([orgId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model PlaybookRun {
+  id         String         @id @default(uuid())
+  org        Org            @relation(fields: [orgId], references: [id])
+  orgId      String
+  user       User?          @relation(fields: [userId], references: [id])
+  userId     String?
+  templateId String
+  name       String
+  category   String
+  status     PlaybookStatus @default(ACTIVE)
+  progress   Int            @default(0)
+  notes      String?
+  startedAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@index([orgId])
+  @@index([userId])
+}
+
+model ClientPortal {
+  id           String       @id @default(uuid())
+  org          Org          @relation(fields: [orgId], references: [id])
+  orgId        String
+  name         String
+  contactName  String?
+  contactEmail String?
+  status       PortalStatus @default(ACTIVE)
+  accessCode   String       @unique
+  summary      String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([orgId])
 }
 
 model AuditLog {

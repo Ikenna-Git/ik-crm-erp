@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   BarChart,
@@ -16,8 +17,10 @@ import {
   Pie,
   Cell,
 } from "recharts"
+import { getSessionHeaders } from "@/lib/user-settings"
+import { formatNaira } from "@/lib/currency"
 
-const monthlyData = [
+const fallbackMonthlyData = [
   { month: "Jan", revenue: 45000, expenses: 32000, profit: 13000 },
   { month: "Feb", revenue: 52000, expenses: 35000, profit: 17000 },
   { month: "Mar", revenue: 48000, expenses: 33000, profit: 15000 },
@@ -26,22 +29,58 @@ const monthlyData = [
   { month: "Jun", revenue: 67000, expenses: 40000, profit: 27000 },
 ]
 
-const expenseBreakdown = [
+const fallbackExpenseBreakdown = [
   { name: "Salaries", value: 40, fill: "#0f766e" },
   { name: "Operations", value: 25, fill: "#2d7c8a" },
   { name: "Marketing", value: 20, fill: "#48b0f7" },
   { name: "Other", value: 15, fill: "#a0d8f0" },
 ]
 
-const formatNaira = (amount: number) => {
-  return new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency: "NGN",
-    minimumFractionDigits: 0,
-  }).format(amount * 805)
-}
-
 export function FinancialReports() {
+  const [monthlyData, setMonthlyData] = useState(fallbackMonthlyData)
+  const [expenseBreakdown, setExpenseBreakdown] = useState(fallbackExpenseBreakdown)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    const loadSummary = async () => {
+      try {
+        setLoading(true)
+        setError("")
+        const res = await fetch("/api/reports/summary?type=accounting", {
+          headers: { ...getSessionHeaders() },
+        })
+        if (res.status === 503) return
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data?.error || "Failed to load reports")
+        if (data.summary?.months) {
+          setMonthlyData(
+            data.summary.months.map((entry: any) => ({
+              month: entry.month,
+              revenue: entry.revenue,
+              expenses: entry.expenses,
+              profit: entry.profit,
+            })),
+          )
+        }
+        if (data.summary?.expenseBreakdown) {
+          setExpenseBreakdown(
+            data.summary.expenseBreakdown.map((entry: any, idx: number) => ({
+              name: entry.name,
+              value: entry.value,
+              fill: fallbackExpenseBreakdown[idx % fallbackExpenseBreakdown.length].fill,
+            })),
+          )
+        }
+      } catch (err: any) {
+        setError(err?.message || "Failed to load reports")
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadSummary()
+  }, [])
+
   const totalRevenue = monthlyData.reduce((sum, m) => sum + m.revenue, 0)
   const totalExpenses = monthlyData.reduce((sum, m) => sum + m.expenses, 0)
   const totalProfit = monthlyData.reduce((sum, m) => sum + m.profit, 0)
@@ -72,6 +111,8 @@ export function FinancialReports() {
           </CardContent>
         </Card>
       </div>
+      {loading && <p className="text-xs text-muted-foreground">Updating report data...</p>}
+      {error && <p className="text-xs text-destructive">{error}</p>}
 
       {/* Revenue vs Expenses Chart */}
       <Card>

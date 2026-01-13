@@ -1,6 +1,8 @@
-type ReportType = "analytics" | "accounting"
+export type ReportType = "analytics" | "accounting" | "crm"
 
-const sampleData: Record<ReportType, Array<Record<string, string | number>>> = {
+export type ReportRow = Record<string, string | number | null | undefined>
+
+const sampleData: Record<ReportType, ReportRow[]> = {
   analytics: [
     { month: "Jan", revenue: 45000, expenses: 32000, customers: 450 },
     { month: "Feb", revenue: 52000, expenses: 35000, customers: 520 },
@@ -10,15 +12,20 @@ const sampleData: Record<ReportType, Array<Record<string, string | number>>> = {
     { month: "Jun", revenue: 67000, expenses: 41000, customers: 750 },
   ],
   accounting: [
-    { invoice: "INV-001", client: "Acme Corp", amount: 500000, status: "paid" },
-    { invoice: "INV-002", client: "Beta Ltd", amount: 320000, status: "pending" },
-    { invoice: "INV-003", client: "Gamma Inc", amount: 210000, status: "overdue" },
-    { invoice: "INV-004", client: "Delta LLC", amount: 450000, status: "paid" },
+    { type: "invoice", reference: "INV-001", client: "Acme Corp", amount: 500000, status: "paid" },
+    { type: "invoice", reference: "INV-002", client: "Beta Ltd", amount: 320000, status: "pending" },
+    { type: "expense", reference: "EXP-019", client: "Cloud Hosting", amount: 210000, status: "approved" },
+    { type: "invoice", reference: "INV-004", client: "Delta LLC", amount: 450000, status: "paid" },
+  ],
+  crm: [
+    { type: "deal", title: "Civis Suite - Northwind", stage: "proposal", value: 850000 },
+    { type: "deal", title: "ERP License - Globex", stage: "negotiation", value: 640000 },
+    { type: "contact", name: "Adaeze Okafor", status: "lead", company: "Acme Corp" },
+    { type: "contact", name: "Ibrahim Musa", status: "customer", company: "Nimbus" },
   ],
 }
 
-export function generateCsv(type: ReportType): string {
-  const rows = sampleData[type]
+export const toCsv = (rows: ReportRow[]) => {
   if (!rows?.length) return ""
   const headers = Object.keys(rows[0])
   const lines = [
@@ -35,4 +42,9 @@ export function generateCsv(type: ReportType): string {
     ),
   ]
   return lines.join("\n")
+}
+
+export const generateCsv = (type: ReportType, rows?: ReportRow[]): string => {
+  const data = rows?.length ? rows : sampleData[type]
+  return toCsv(data || [])
 }
