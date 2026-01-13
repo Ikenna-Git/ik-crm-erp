@@ -149,7 +149,7 @@ export default function SignupPage() {
                   alt="Google"
                   className="w-5 h-5 mr-2"
                 />
-                {oauthReady.google ? "Continue with Google" : "Google (setup needed)"}
+                Continue with Google
               </Button>
             </div>
 
