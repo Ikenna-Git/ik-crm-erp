@@ -33,16 +33,14 @@ export default function ProfilePage() {
   }, [])
 
   const pushChangeNotification = (title: string, description: string) => {
-    addNotification({ title, description, source: "Profile", channel: "in-app" })
-    if (notificationSettings.email) {
-      const target = profile.email || "your inbox"
-      addNotification({
-        title: "Email notification sent",
-        description: `A copy was sent to ${target}.`,
-        source: "Email",
-        channel: "email",
-      })
-    }
+    const target = profile.email || "your inbox"
+    const emailNote = notificationSettings.email ? ` Email copy sent to ${target}.` : ""
+    addNotification({
+      title,
+      description: `${description}${emailNote}`,
+      source: "Profile",
+      channel: notificationSettings.email ? "email" : "in-app",
+    })
   }
 
   const handleProfileSave = () => {

@@ -90,16 +90,14 @@ export default function SettingsPage() {
   }
 
   const pushChangeNotification = (title: string, description: string, emailOptIn = notifications.email) => {
-    addNotification({ title, description, source: "Settings", channel: "in-app" })
-    if (emailOptIn) {
-      const target = profile.email || "your inbox"
-      addNotification({
-        title: "Email notification sent",
-        description: `A copy was sent to ${target}.`,
-        source: "Email",
-        channel: "email",
-      })
-    }
+    const target = profile.email || "your inbox"
+    const emailNote = emailOptIn ? ` Email copy sent to ${target}.` : ""
+    addNotification({
+      title,
+      description: `${description}${emailNote}`,
+      source: "Settings",
+      channel: emailOptIn ? "email" : "in-app",
+    })
   }
 
   const handleProfileSave = () => {
