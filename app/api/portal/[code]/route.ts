@@ -7,7 +7,13 @@ export async function GET(_request: Request, context: { params: { code: string }
   }
   try {
     const { code } = context.params
-    const portal = await prisma.clientPortal.findUnique({ where: { accessCode: code } })
+    const portal = await prisma.clientPortal.findUnique({
+      where: { accessCode: code },
+      include: {
+        updates: { orderBy: { createdAt: "desc" }, take: 12 },
+        documents: { orderBy: { createdAt: "desc" }, take: 12 },
+      },
+    })
     if (!portal) return NextResponse.json({ error: "Portal not found" }, { status: 404 })
     return NextResponse.json({
       portal: {
@@ -17,6 +23,8 @@ export async function GET(_request: Request, context: { params: { code: string }
         summary: portal.summary,
         status: portal.status,
         updatedAt: portal.updatedAt,
+        updates: portal.updates,
+        documents: portal.documents,
       },
     })
   } catch (error) {

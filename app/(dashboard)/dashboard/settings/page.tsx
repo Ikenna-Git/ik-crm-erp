@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import { addNotification } from "@/lib/notifications"
 import {
   DEFAULT_NOTIFICATION_SETTINGS,
+  DEFAULT_DIGEST_SETTINGS,
   DEFAULT_PREFERENCES,
   DEFAULT_PROFILE,
   applyThemePreference,
@@ -25,6 +26,7 @@ const timezones = ["Africa/Lagos", "UTC", "Europe/London", "America/New_York"]
 const currencies = ["NGN", "USD", "EUR", "GBP"]
 const industries = ["Technology", "Finance", "Retail", "Manufacturing", "Healthcare"]
 const roles = ["user", "admin", "super_admin"]
+const digestDays = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
 
 export default function SettingsPage() {
   const { data: session } = useSession()
@@ -33,9 +35,12 @@ export default function SettingsPage() {
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES)
 
   const [notifications, setNotifications] = useState(DEFAULT_NOTIFICATION_SETTINGS)
+  const [digest, setDigest] = useState(DEFAULT_DIGEST_SETTINGS)
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [digestStatus, setDigestStatus] = useState("")
+  const [digestSaving, setDigestSaving] = useState(false)
 
   const [security, setSecurity] = useState({
     twoFactor: true,
@@ -93,6 +98,11 @@ export default function SettingsPage() {
         const loadedPreferences = data.preferences || DEFAULT_PREFERENCES
         setPreferences(loadedPreferences)
         setNotifications(data.notifications || DEFAULT_NOTIFICATION_SETTINGS)
+        const loadedDigest = data.digest || DEFAULT_DIGEST_SETTINGS
+        if (!loadedDigest.email) {
+          loadedDigest.email = data.profile?.email || session?.user?.email || ""
+        }
+        setDigest(loadedDigest)
         applyThemePreference(loadedPreferences.theme)
       } catch (err: any) {
         setError(err?.message || "Failed to load settings")
@@ -211,6 +221,49 @@ export default function SettingsPage() {
       }
     }
     update()
+  }
+
+  const handleDigestSave = () => {
+    const update = async () => {
+      try {
+        setDigestSaving(true)
+        setDigestStatus("")
+        const res = await fetch("/api/user/settings", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", ...getSessionHeaders(session?.user) },
+          body: JSON.stringify({ digest }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data?.error || "Failed to update digest")
+        setDigest(data.digest || digest)
+        await pushChangeNotification("Weekly digest updated", "Digest schedule saved.", true)
+        setDigestStatus("Digest preferences saved.")
+      } catch (err: any) {
+        setDigestStatus(err?.message || "Failed to save digest preferences")
+      } finally {
+        setDigestSaving(false)
+      }
+    }
+    update()
+  }
+
+  const sendDigestNow = async () => {
+    try {
+      setDigestSaving(true)
+      setDigestStatus("")
+      const res = await fetch("/api/reports/digest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders(session?.user) },
+        body: JSON.stringify({ email: digest.email, sendNow: true }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to send digest")
+      setDigestStatus(data.message || "Digest sent.")
+    } catch (err: any) {
+      setDigestStatus(err?.message || "Failed to send digest")
+    } finally {
+      setDigestSaving(false)
+    }
   }
 
   const handleSecuritySave = () => {
@@ -539,6 +592,65 @@ export default function SettingsPage() {
               <Button className="w-fit" onClick={handleNotificationsSave}>
                 Update notifications
               </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Weekly Executive Digest</CardTitle>
+              <CardDescription>Send a weekly summary of KPIs, finance, and CRM activity.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Enable weekly digest</p>
+                  <p className="text-sm text-muted-foreground">We will email a concise executive summary.</p>
+                </div>
+                <Switch checked={digest.enabled} onCheckedChange={(value) => setDigest({ ...digest, enabled: value })} />
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div>
+                  <Label>Send day</Label>
+                  <Select value={digest.day} onValueChange={(value) => setDigest({ ...digest, day: value })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {digestDays.map((day) => (
+                        <SelectItem key={day} value={day}>
+                          {day}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Send time</Label>
+                  <Input
+                    type="time"
+                    value={digest.time}
+                    onChange={(e) => setDigest({ ...digest, time: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Recipient email</Label>
+                  <Input
+                    type="email"
+                    value={digest.email}
+                    onChange={(e) => setDigest({ ...digest, email: e.target.value })}
+                    placeholder="name@example.com"
+                  />
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button className="w-fit" onClick={handleDigestSave} disabled={digestSaving}>
+                  {digestSaving ? "Saving..." : "Save digest"}
+                </Button>
+                <Button variant="outline" onClick={sendDigestNow} disabled={digestSaving}>
+                  {digestSaving ? "Sending..." : "Send test digest"}
+                </Button>
+              </div>
+              {digestStatus ? <p className="text-xs text-muted-foreground">{digestStatus}</p> : null}
             </CardContent>
           </Card>
         </TabsContent>

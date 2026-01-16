@@ -17,6 +17,21 @@ export type UserPreferences = {
   dateFormat: string
 }
 
+export type DigestSettings = {
+  enabled: boolean
+  day: string
+  time: string
+  email: string
+}
+
+export type OnboardingTask = {
+  id: string
+  title: string
+  description: string
+  done: boolean
+  href?: string
+}
+
 export type NotificationSettings = {
   product: boolean
   security: boolean
@@ -51,6 +66,58 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   sms: false,
   email: true,
 }
+
+export const DEFAULT_DIGEST_SETTINGS: DigestSettings = {
+  enabled: false,
+  day: "MONDAY",
+  time: "08:00",
+  email: "",
+}
+
+export const DEFAULT_ONBOARDING_TASKS: OnboardingTask[] = [
+  {
+    id: "connect-email",
+    title: "Connect your email service",
+    description: "Enable SMTP so Civis can send digests and alerts.",
+    done: false,
+    href: "/dashboard/settings",
+  },
+  {
+    id: "add-contact",
+    title: "Add your first CRM contact",
+    description: "Create a contact and start tracking pipeline momentum.",
+    done: false,
+    href: "/dashboard/crm",
+  },
+  {
+    id: "create-invoice",
+    title: "Send your first invoice",
+    description: "Draft an invoice so your finance dashboard has live data.",
+    done: false,
+    href: "/dashboard/accounting",
+  },
+  {
+    id: "launch-playbook",
+    title: "Launch a playbook",
+    description: "Kick off a structured workflow for CRM or HR.",
+    done: false,
+    href: "/dashboard/playbooks",
+  },
+  {
+    id: "create-workflow",
+    title: "Create an automation workflow",
+    description: "Set up an if-this-then-that rule in Operations Hub.",
+    done: false,
+    href: "/dashboard/operations",
+  },
+  {
+    id: "share-portal",
+    title: "Share a client portal",
+    description: "Give a client a live portal link with updates and docs.",
+    done: false,
+    href: "/dashboard/portal",
+  },
+]
 
 export const userUpdatedEventName = "civis-user-updated"
 export const themeUpdatedEventName = "civis-theme-updated"

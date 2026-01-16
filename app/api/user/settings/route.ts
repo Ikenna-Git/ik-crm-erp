@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getUserFromRequest } from "@/lib/request-user"
 import { createAuditLog } from "@/lib/audit"
 import { getDefaultKpis } from "@/lib/kpis"
+import { DEFAULT_ONBOARDING_TASKS } from "@/lib/user-settings"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable user settings." }, { status: 503 })
@@ -20,6 +21,11 @@ const DEFAULT_SETTINGS = {
   reminderNotifications: true,
   marketingNotifications: false,
   smsNotifications: false,
+  digestEnabled: false,
+  digestDay: "MONDAY",
+  digestTime: "08:00",
+  digestEmail: "",
+  onboarding: DEFAULT_ONBOARDING_TASKS,
 }
 
 const toProfile = (user: {
@@ -55,13 +61,24 @@ const toNotifications = (settings: typeof DEFAULT_SETTINGS) => ({
   sms: settings.smsNotifications,
 })
 
-const ensureSettings = async (userId: string, role: string) =>
+const toDigest = (settings: typeof DEFAULT_SETTINGS, email?: string | null) => ({
+  enabled: settings.digestEnabled,
+  day: settings.digestDay,
+  time: settings.digestTime,
+  email: settings.digestEmail || email || "",
+})
+
+const toOnboarding = (settings: typeof DEFAULT_SETTINGS) =>
+  Array.isArray(settings.onboarding) && settings.onboarding.length ? settings.onboarding : DEFAULT_ONBOARDING_TASKS
+
+const ensureSettings = async (userId: string, role: string, email?: string | null) =>
   prisma.userSettings.upsert({
     where: { userId },
     update: {},
     create: {
       userId,
       ...DEFAULT_SETTINGS,
+      digestEmail: email || DEFAULT_SETTINGS.digestEmail,
       kpiLayout: getDefaultKpis(role),
     },
   })
@@ -70,12 +87,14 @@ export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { user } = await getUserFromRequest(request)
-    const settings = await ensureSettings(user.id, user.role)
+    const settings = await ensureSettings(user.id, user.role, user.email)
     return NextResponse.json({
       profile: toProfile(user),
       preferences: toPreferences(settings),
       notifications: toNotifications(settings),
       kpis: settings.kpiLayout || getDefaultKpis(user.role),
+      digest: toDigest(settings as typeof DEFAULT_SETTINGS, user.email),
+      onboarding: toOnboarding(settings as typeof DEFAULT_SETTINGS),
     })
   } catch (error) {
     console.error("User settings fetch failed", error)
@@ -88,7 +107,7 @@ export async function PATCH(request: Request) {
   try {
     const { org, user } = await getUserFromRequest(request)
     const body = await request.json()
-    const { profile = {}, preferences = {}, notifications = {}, kpis } = body || {}
+    const { profile = {}, preferences = {}, notifications = {}, kpis, digest = {}, onboarding } = body || {}
 
     const userUpdates: Record<string, string | null> = {}
     if (profile.name !== undefined) userUpdates.name = profile.name
@@ -116,6 +135,11 @@ export async function PATCH(request: Request) {
     if (notifications.reminders !== undefined) settingsUpdates.reminderNotifications = notifications.reminders
     if (notifications.marketing !== undefined) settingsUpdates.marketingNotifications = notifications.marketing
     if (notifications.sms !== undefined) settingsUpdates.smsNotifications = notifications.sms
+    if (digest.enabled !== undefined) settingsUpdates.digestEnabled = digest.enabled
+    if (digest.day !== undefined) settingsUpdates.digestDay = digest.day
+    if (digest.time !== undefined) settingsUpdates.digestTime = digest.time
+    if (digest.email !== undefined) settingsUpdates.digestEmail = digest.email
+    if (onboarding !== undefined && Array.isArray(onboarding)) settingsUpdates.onboarding = onboarding
 
     const updatedSettings = Object.keys(settingsUpdates).length
       ? await prisma.userSettings.upsert({
@@ -127,7 +151,7 @@ export async function PATCH(request: Request) {
             ...settingsUpdates,
           },
         })
-      : await ensureSettings(user.id, user.role)
+      : await ensureSettings(user.id, user.role, user.email)
 
     await createAuditLog({
       orgId: org.id,
@@ -142,6 +166,8 @@ export async function PATCH(request: Request) {
         ),
         kpis: Array.isArray(kpis) ? kpis.length : undefined,
         notifications: Object.keys(settingsUpdates).filter((key) => key.includes("Notifications")),
+        digest: Object.keys(settingsUpdates).filter((key) => key.includes("digest")),
+        onboarding: Array.isArray(onboarding) ? onboarding.length : undefined,
       },
     })
 
@@ -150,6 +176,8 @@ export async function PATCH(request: Request) {
       preferences: toPreferences(updatedSettings as typeof DEFAULT_SETTINGS),
       notifications: toNotifications(updatedSettings as typeof DEFAULT_SETTINGS),
       kpis: (updatedSettings as typeof DEFAULT_SETTINGS).kpiLayout || getDefaultKpis(user.role),
+      digest: toDigest(updatedSettings as typeof DEFAULT_SETTINGS, user.email),
+      onboarding: toOnboarding(updatedSettings as typeof DEFAULT_SETTINGS),
     })
   } catch (error) {
     console.error("User settings update failed", error)

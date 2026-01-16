@@ -15,6 +15,10 @@ export async function GET(request: Request) {
     const portals = await prisma.clientPortal.findMany({
       where: { orgId: org.id },
       orderBy: { updatedAt: "desc" },
+      include: {
+        updates: { orderBy: { createdAt: "desc" }, take: 3 },
+        documents: { orderBy: { createdAt: "desc" }, take: 3 },
+      },
     })
     return NextResponse.json({ portals })
   } catch (error) {
@@ -40,6 +44,17 @@ export async function POST(request: Request) {
         summary: summary || null,
         accessCode: generateAccessCode(),
         status: "ACTIVE",
+      },
+    })
+
+    await prisma.clientPortalUpdate.create({
+      data: {
+        orgId: org.id,
+        portalId: portal.id,
+        userId: user.id,
+        title: "Portal created",
+        message: summary || "Client portal created and ready for updates.",
+        status: portal.status,
       },
     })
 

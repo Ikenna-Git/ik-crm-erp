@@ -25,6 +25,11 @@ const ensureSettings = async (userId: string) =>
       reminderNotifications: true,
       marketingNotifications: false,
       smsNotifications: false,
+      digestEnabled: false,
+      digestDay: "MONDAY",
+      digestTime: "08:00",
+      digestEmail: "",
+      onboarding: [],
     },
   })
 

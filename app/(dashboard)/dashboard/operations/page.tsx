@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
-import { Plus, CheckSquare, Lock, Globe, FileText, DownloadCloud, AlertTriangle } from "lucide-react"
+import { Plus, CheckSquare, Lock, Globe, FileText, DownloadCloud, AlertTriangle, Link2, Copy } from "lucide-react"
 import { ApprovalRequest, approvalsStorageKey, getApprovals } from "@/lib/approvals"
 import { getSessionHeaders } from "@/lib/user-settings"
 import { useSession } from "next-auth/react"
@@ -69,6 +69,27 @@ const integrationsSeed = [
   { id: "i8", name: "ChatGPT (OpenAI)", category: "AI", connected: false },
   { id: "i9", name: "Google Gemini", category: "AI", connected: false },
   { id: "i10", name: "Anthropic Claude", category: "AI", connected: false },
+]
+
+const webhookSeed = [
+  {
+    id: "wh-1",
+    name: "Accounting events",
+    url: "https://hooks.civis.io/accounting",
+    events: ["invoice.paid", "expense.approved"],
+    active: true,
+    secret: "whsec_01",
+    createdAt: "2025-01-08T09:15:00Z",
+  },
+  {
+    id: "wh-2",
+    name: "CRM pipeline alerts",
+    url: "https://hooks.civis.io/crm",
+    events: ["deal.stage.changed", "contact.created"],
+    active: false,
+    secret: "whsec_02",
+    createdAt: "2025-01-05T12:40:00Z",
+  },
 ]
 
 const insightsSeed = [
@@ -212,6 +233,7 @@ const STORAGE = {
   integrations: "civis_ops_integrations",
   reports: "civis_ops_reports",
   approvals: approvalsStorageKey,
+  webhooks: "civis_ops_webhooks",
 }
 
 const approvalStatusStyles: Record<string, string> = {
@@ -237,6 +259,8 @@ export default function OperationsPage() {
   const [rollbackBusy, setRollbackBusy] = useState("")
   const [compliance, setCompliance] = useState(complianceSeed)
   const [reports, setReports] = useState(reportsSeed)
+  const [webhooks, setWebhooks] = useState(webhookSeed)
+  const [webhookError, setWebhookError] = useState("")
 
   const commandState = useCachedFetch(
     "civis_ops_command",
@@ -275,6 +299,12 @@ export default function OperationsPage() {
     notes: "",
   })
 
+  const [webhookForm, setWebhookForm] = useState({
+    name: "",
+    url: "",
+    events: "",
+  })
+
   useEffect(() => {
     if (typeof window === "undefined") return
     const load = <T,>(key: string, fallback: T, setter: (value: T) => void) => {
@@ -291,6 +321,7 @@ export default function OperationsPage() {
     }
     load(STORAGE.workflows, workflowSeed, setWorkflows)
     load(STORAGE.reports, reportsSeed, setReports)
+    load(STORAGE.webhooks, webhookSeed, setWebhooks)
     setApprovals(getApprovals(approvalsSeed))
 
     try {
@@ -311,6 +342,48 @@ export default function OperationsPage() {
     } catch {
       setIntegrations(integrationsSeed)
     }
+  }, [])
+
+  useEffect(() => {
+    const loadWorkflows = async () => {
+      try {
+        const res = await fetch("/api/ops/workflows", { headers: { ...getSessionHeaders() } })
+        if (res.status === 503) {
+          setWorkflows(workflowSeed)
+          return
+        }
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data?.error || "Failed to load workflows")
+        const loaded = Array.isArray(data.workflows) ? data.workflows : []
+        setWorkflows(loaded.length ? loaded : workflowSeed)
+      } catch (err) {
+        console.warn("Workflow load failed", err)
+        setWorkflows(workflowSeed)
+      }
+    }
+    loadWorkflows()
+  }, [])
+
+  useEffect(() => {
+    const loadWebhooks = async () => {
+      try {
+        setWebhookError("")
+        const res = await fetch("/api/webhooks", { headers: { ...getSessionHeaders() } })
+        if (res.status === 503) {
+          setWebhooks(webhookSeed)
+          return
+        }
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data?.error || "Failed to load webhooks")
+        const loaded = Array.isArray(data.webhooks) ? data.webhooks : []
+        setWebhooks(loaded.length ? loaded : webhookSeed)
+      } catch (err: any) {
+        console.warn("Webhook load failed", err)
+        setWebhookError(err?.message || "Failed to load webhooks")
+        setWebhooks(webhookSeed)
+      }
+    }
+    loadWebhooks()
   }, [])
 
   useEffect(() => {
@@ -359,7 +432,7 @@ export default function OperationsPage() {
         })
         if (res.status === 503) {
           setDecisionError("Database not configured — showing demo decisions.")
-          setDecisionTrails([])
+          setDecisionTrails(decisionTrailSeed)
           return
         }
         const data = await res.json().catch(() => ({}))
@@ -373,6 +446,7 @@ export default function OperationsPage() {
         setDecisionTrails(trails)
       } catch (err: any) {
         setDecisionError(err?.message || "Failed to load decision trails")
+        setDecisionTrails(decisionTrailSeed)
       } finally {
         setDecisionLoading(false)
       }
@@ -400,22 +474,53 @@ export default function OperationsPage() {
     localStorage.setItem(STORAGE.approvals, JSON.stringify(approvals))
   }, [approvals])
 
-  const addWorkflow = () => {
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    localStorage.setItem(STORAGE.webhooks, JSON.stringify(webhooks))
+  }, [webhooks])
+
+  const addWorkflow = async () => {
     if (!canManage) return
     const name = workflowForm.name.trim()
     const trigger = workflowForm.trigger.trim()
     const action = workflowForm.action.trim()
     if (!name || !trigger || !action) return
-    setWorkflows((prev) => [
-      { id: `w-${Date.now()}`, name, trigger, action, active: true },
-      ...prev,
-    ])
-    setWorkflowForm({ name: "", trigger: "", action: "" })
+    try {
+      const res = await fetch("/api/ops/workflows", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({ name, trigger, action }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to create workflow")
+      setWorkflows((prev) => [data.workflow, ...prev])
+      setWorkflowForm({ name: "", trigger: "", action: "" })
+    } catch (err) {
+      console.warn("Workflow create failed", err)
+      setWorkflows((prev) => [{ id: `w-${Date.now()}`, name, trigger, action, active: true }, ...prev])
+      setWorkflowForm({ name: "", trigger: "", action: "" })
+    }
   }
 
-  const toggleWorkflow = (id: string) => {
+  const toggleWorkflow = async (id: string) => {
     if (!canManage) return
-    setWorkflows((prev) => prev.map((wf) => (wf.id === id ? { ...wf, active: !wf.active } : wf)))
+    const current = workflows.find((wf) => wf.id === id)
+    if (!current) return
+    const nextActive = !current.active
+    setWorkflows((prev) => prev.map((wf) => (wf.id === id ? { ...wf, active: nextActive } : wf)))
+    try {
+      const res = await fetch("/api/ops/workflows", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({ id, active: nextActive }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to update workflow")
+      setWorkflows((prev) => prev.map((wf) => (wf.id === id ? data.workflow : wf)))
+    } catch (err) {
+      console.warn("Workflow update failed", err)
+      setWorkflows((prev) => prev.map((wf) => (wf.id === id ? { ...wf, active: current.active } : wf)))
+    }
   }
 
   const updateApproval = (id: string, status: "approved" | "rejected") => {
@@ -426,6 +531,73 @@ export default function OperationsPage() {
   const toggleIntegration = (id: string) => {
     if (!canManage) return
     setIntegrations((prev) => prev.map((intg) => (intg.id === id ? { ...intg, connected: !intg.connected } : intg)))
+  }
+
+  const addWebhook = async () => {
+    if (!canManage) return
+    const name = webhookForm.name.trim()
+    const url = webhookForm.url.trim()
+    const events = webhookForm.events
+      .split(",")
+      .map((event) => event.trim())
+      .filter(Boolean)
+    if (!name || !url || !events.length) return
+
+    try {
+      const res = await fetch("/api/webhooks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({ name, url, events }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to create webhook")
+      setWebhooks((prev) => [data.webhook, ...prev])
+      setWebhookForm({ name: "", url: "", events: "" })
+    } catch (err: any) {
+      setWebhookError(err?.message || "Failed to create webhook")
+      setWebhooks((prev) => [
+        {
+          id: `wh-${Date.now()}`,
+          name,
+          url,
+          events,
+          active: true,
+          secret: "whsec_demo",
+          createdAt: new Date().toISOString(),
+        },
+        ...prev,
+      ])
+      setWebhookForm({ name: "", url: "", events: "" })
+    }
+  }
+
+  const toggleWebhook = async (id: string) => {
+    if (!canManage) return
+    const current = webhooks.find((hook) => hook.id === id)
+    if (!current) return
+    const nextActive = !current.active
+    setWebhooks((prev) => prev.map((hook) => (hook.id === id ? { ...hook, active: nextActive } : hook)))
+    try {
+      const res = await fetch("/api/webhooks", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({ id, active: nextActive }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to update webhook")
+      setWebhooks((prev) => prev.map((hook) => (hook.id === id ? data.webhook : hook)))
+    } catch (err) {
+      console.warn("Webhook update failed", err)
+      setWebhooks((prev) => prev.map((hook) => (hook.id === id ? { ...hook, active: current.active } : hook)))
+    }
+  }
+
+  const copyWebhookSecret = async (secret: string) => {
+    try {
+      await navigator.clipboard.writeText(secret)
+    } catch {
+      window.prompt("Copy webhook secret:", secret)
+    }
   }
 
   const applyInsight = (id: string) => {
@@ -564,11 +736,12 @@ export default function OperationsPage() {
       </Card>
 
       <Tabs defaultValue="timeline" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-9">
+        <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-10">
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
           <TabsTrigger value="workflows">Workflows</TabsTrigger>
           <TabsTrigger value="approvals">Approvals</TabsTrigger>
           <TabsTrigger value="integrations">Integrations</TabsTrigger>
+          <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
           <TabsTrigger value="insights">AI Insights</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
           <TabsTrigger value="audit">Audit Log</TabsTrigger>
@@ -717,6 +890,97 @@ export default function OperationsPage() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="webhooks" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Link2 className="w-5 h-5 text-primary" />
+                Webhook Endpoints
+              </CardTitle>
+              <CardDescription>Send Civis events to external systems in real time.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid md:grid-cols-3 gap-4">
+              <Input
+                placeholder="Webhook name"
+                value={webhookForm.name}
+                onChange={(e) => setWebhookForm({ ...webhookForm, name: e.target.value })}
+              />
+              <Input
+                placeholder="https://example.com/webhook"
+                value={webhookForm.url}
+                onChange={(e) => setWebhookForm({ ...webhookForm, url: e.target.value })}
+              />
+              <Input
+                placeholder="Events (comma separated)"
+                value={webhookForm.events}
+                onChange={(e) => setWebhookForm({ ...webhookForm, events: e.target.value })}
+              />
+              <Button className="w-fit" onClick={addWebhook} disabled={!canManage}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Webhook
+              </Button>
+              {webhookError ? <p className="text-xs text-destructive md:col-span-3">{webhookError}</p> : null}
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {webhooks.map((hook) => {
+              const events = Array.isArray(hook.events) ? hook.events : []
+              return (
+                <Card key={hook.id}>
+                  <CardContent className="pt-6 space-y-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-medium">{hook.name}</p>
+                        <p className="text-sm text-muted-foreground break-all">{hook.url}</p>
+                      </div>
+                      <Badge variant="outline" className={hook.active ? "text-green-600" : "text-muted-foreground"}>
+                        {hook.active ? "Active" : "Paused"}
+                      </Badge>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {events.length ? (
+                        events.map((event) => (
+                          <Badge key={event} variant="outline" className="bg-transparent">
+                            {event}
+                          </Badge>
+                        ))
+                      ) : (
+                        <Badge variant="outline" className="bg-transparent text-muted-foreground">
+                          No events listed
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-transparent"
+                        onClick={() => copyWebhookSecret(hook.secret)}
+                      >
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copy secret
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-transparent"
+                        onClick={() => toggleWebhook(hook.id)}
+                        disabled={!canManage}
+                      >
+                        {hook.active ? "Disable" : "Enable"}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Created {new Date(hook.createdAt).toLocaleDateString()}
+                    </p>
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         </TabsContent>
 

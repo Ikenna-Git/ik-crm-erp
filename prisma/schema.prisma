@@ -88,6 +88,10 @@ model Org {
   decisionTrails DecisionTrail[]
   playbookRuns PlaybookRun[]
   clientPortals ClientPortal[]
+  portalUpdates ClientPortalUpdate[]
+  portalDocuments ClientPortalDocument[]
+  automationWorkflows AutomationWorkflow[]
+  webhookEndpoints WebhookEndpoint[]
 }
 
 model User {
@@ -116,6 +120,8 @@ model User {
   auditLogs AuditLog[]
   decisionTrails DecisionTrail[]
   playbookRuns PlaybookRun[]
+  automationWorkflows AutomationWorkflow[]
+  portalUpdates ClientPortalUpdate[]
   accounts Account[]
   sessions Session[]
   @@index([orgId])
@@ -175,6 +181,11 @@ model UserSettings {
   reminderNotifications Boolean  @default(true)
   marketingNotifications Boolean @default(false)
   smsNotifications      Boolean  @default(false)
+  digestEnabled         Boolean  @default(false)
+  digestDay             String   @default("MONDAY")
+  digestTime            String   @default("08:00")
+  digestEmail           String?
+  onboarding            Json?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }
@@ -421,6 +432,74 @@ model ClientPortal {
   summary      String?
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
+
+  updates      ClientPortalUpdate[]
+  documents    ClientPortalDocument[]
+
+  @@index([orgId])
+}
+
+model ClientPortalUpdate {
+  id        String   @id @default(uuid())
+  org       Org      @relation(fields: [orgId], references: [id])
+  orgId     String
+  portal    ClientPortal @relation(fields: [portalId], references: [id], onDelete: Cascade)
+  portalId  String
+  user      User?    @relation(fields: [userId], references: [id])
+  userId    String?
+  title     String
+  message   String?
+  status    String?
+  createdAt DateTime @default(now())
+
+  @@index([orgId])
+  @@index([portalId])
+}
+
+model ClientPortalDocument {
+  id        String   @id @default(uuid())
+  org       Org      @relation(fields: [orgId], references: [id])
+  orgId     String
+  portal    ClientPortal @relation(fields: [portalId], references: [id], onDelete: Cascade)
+  portalId  String
+  title     String
+  url       String
+  fileType  String?
+  bytes     Int?
+  createdAt DateTime @default(now())
+
+  @@index([orgId])
+  @@index([portalId])
+}
+
+model AutomationWorkflow {
+  id        String   @id @default(uuid())
+  org       Org      @relation(fields: [orgId], references: [id])
+  orgId     String
+  user      User?    @relation(fields: [userId], references: [id])
+  userId    String?
+  name      String
+  trigger   String
+  action    String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId])
+  @@index([userId])
+}
+
+model WebhookEndpoint {
+  id        String   @id @default(uuid())
+  org       Org      @relation(fields: [orgId], references: [id])
+  orgId     String
+  name      String
+  url       String
+  events    Json?
+  secret    String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([orgId])
 }
