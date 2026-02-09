@@ -11,7 +11,6 @@ const missingCloudinary = () =>
 
 export async function POST(request: Request) {
   const missing = required.filter((key) => !process.env[key])
-  if (missing.length) return missingCloudinary()
 
   const formData = await request.formData()
   const file = formData.get("file")
@@ -19,6 +18,22 @@ export async function POST(request: Request) {
 
   if (!file || typeof file === "string") {
     return NextResponse.json({ error: "File is required" }, { status: 400 })
+  }
+
+  if (missing.length) {
+    if (process.env.NODE_ENV !== "production") {
+      const buffer = Buffer.from(await file.arrayBuffer())
+      const mime = file.type || "application/octet-stream"
+      const dataUrl = `data:${mime};base64,${buffer.toString("base64")}`
+      return NextResponse.json({
+        url: dataUrl,
+        bytes: buffer.length,
+        resourceType: mime.startsWith("image/") ? "image" : mime.startsWith("video/") ? "video" : "raw",
+        originalFilename: file.name,
+        mocked: true,
+      })
+    }
+    return missingCloudinary()
   }
 
   const timestamp = Math.floor(Date.now() / 1000)

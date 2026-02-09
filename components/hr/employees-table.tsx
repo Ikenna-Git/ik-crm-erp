@@ -105,6 +105,7 @@ export function EmployeesTable({
 }: EmployeesTableProps) {
   const [employees, setEmployees] = useState<Employee[]>(providedEmployees || mockEmployees)
   const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isUnlocked, setIsUnlocked] = useState(false)
@@ -132,7 +133,7 @@ export function EmployeesTable({
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery])
+  }, [searchQuery, pageSize])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -159,9 +160,8 @@ export function EmployeesTable({
 
   const displaySalary = isUnlocked && showSalaries
 
-  const PAGE_SIZE = 10
-  const totalPages = Math.max(1, Math.ceil(sortedEmployees.length / PAGE_SIZE))
-  const pagedEmployees = sortedEmployees.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const totalPages = Math.max(1, Math.ceil(sortedEmployees.length / pageSize))
+  const pagedEmployees = sortedEmployees.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages)
@@ -444,6 +444,8 @@ export function EmployeesTable({
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={setCurrentPage}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
             />
           </div>
         </CardContent>

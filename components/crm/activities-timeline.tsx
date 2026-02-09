@@ -49,9 +49,13 @@ const mockActivities: Activity[] = buildMockActivities(70)
 
 export function ActivitiesTimeline() {
   const [currentPage, setCurrentPage] = useState(1)
-  const PAGE_SIZE = 10
-  const totalPages = Math.max(1, Math.ceil(mockActivities.length / PAGE_SIZE))
-  const pagedActivities = mockActivities.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const [pageSize, setPageSize] = useState(10)
+  const totalPages = Math.max(1, Math.ceil(mockActivities.length / pageSize))
+  const pagedActivities = mockActivities.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [pageSize])
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages)
@@ -97,7 +101,13 @@ export function ActivitiesTimeline() {
           })}
         </div>
         <div className="pt-6">
-          <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
+          />
         </div>
       </CardContent>
     </Card>

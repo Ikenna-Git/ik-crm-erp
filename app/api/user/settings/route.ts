@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getUserFromRequest } from "@/lib/request-user"
 import { createAuditLog } from "@/lib/audit"
 import { getDefaultKpis } from "@/lib/kpis"
-import { DEFAULT_ONBOARDING_TASKS } from "@/lib/user-settings"
+import { DEFAULT_CRM_VIEWS, DEFAULT_ONBOARDING_TASKS } from "@/lib/user-settings"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable user settings." }, { status: 503 })
@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS = {
   currency: "NGN",
   landing: "dashboard",
   dateFormat: "DD/MM/YYYY",
+  aiProvider: "auto",
   kpiLayout: [],
   emailNotifications: true,
   productNotifications: true,
@@ -25,8 +26,64 @@ const DEFAULT_SETTINGS = {
   digestDay: "MONDAY",
   digestTime: "08:00",
   digestEmail: "",
+  crmContactView: DEFAULT_CRM_VIEWS.contacts,
+  crmCompanyView: DEFAULT_CRM_VIEWS.companies,
+  crmDealView: DEFAULT_CRM_VIEWS.deals,
   onboarding: DEFAULT_ONBOARDING_TASKS,
 }
+
+const BASE_SETTINGS = {
+  theme: DEFAULT_SETTINGS.theme,
+  density: DEFAULT_SETTINGS.density,
+  currency: DEFAULT_SETTINGS.currency,
+  landing: DEFAULT_SETTINGS.landing,
+  dateFormat: DEFAULT_SETTINGS.dateFormat,
+  emailNotifications: DEFAULT_SETTINGS.emailNotifications,
+  productNotifications: DEFAULT_SETTINGS.productNotifications,
+  securityNotifications: DEFAULT_SETTINGS.securityNotifications,
+  reminderNotifications: DEFAULT_SETTINGS.reminderNotifications,
+  marketingNotifications: DEFAULT_SETTINGS.marketingNotifications,
+  smsNotifications: DEFAULT_SETTINGS.smsNotifications,
+  digestEnabled: DEFAULT_SETTINGS.digestEnabled,
+  digestDay: DEFAULT_SETTINGS.digestDay,
+  digestTime: DEFAULT_SETTINGS.digestTime,
+  digestEmail: DEFAULT_SETTINGS.digestEmail,
+}
+
+const EXTENDED_SETTINGS_KEYS = new Set([
+  "kpiLayout",
+  "crmContactView",
+  "crmCompanyView",
+  "crmDealView",
+  "onboarding",
+  "aiProvider",
+])
+
+const stripExtendedSettings = (updates: Record<string, unknown>) => {
+  const safeUpdates: Record<string, unknown> = {}
+  Object.entries(updates).forEach(([key, value]) => {
+    if (!EXTENDED_SETTINGS_KEYS.has(key)) {
+      safeUpdates[key] = value
+    }
+  })
+  return safeUpdates
+}
+
+const isUnknownArgumentError = (error: unknown) =>
+  error instanceof Error && error.message.includes("Unknown argument")
+
+const buildFullCreate = (userId: string, role: string, email?: string | null) => ({
+  userId,
+  ...DEFAULT_SETTINGS,
+  digestEmail: email || DEFAULT_SETTINGS.digestEmail,
+  kpiLayout: getDefaultKpis(role),
+})
+
+const buildSafeCreate = (userId: string, email?: string | null) => ({
+  userId,
+  ...BASE_SETTINGS,
+  digestEmail: email || BASE_SETTINGS.digestEmail,
+})
 
 const toProfile = (user: {
   name: string
@@ -50,6 +107,7 @@ const toPreferences = (settings: typeof DEFAULT_SETTINGS) => ({
   currency: settings.currency,
   landing: settings.landing,
   dateFormat: settings.dateFormat,
+  aiProvider: settings.aiProvider || DEFAULT_SETTINGS.aiProvider,
 })
 
 const toNotifications = (settings: typeof DEFAULT_SETTINGS) => ({
@@ -71,17 +129,29 @@ const toDigest = (settings: typeof DEFAULT_SETTINGS, email?: string | null) => (
 const toOnboarding = (settings: typeof DEFAULT_SETTINGS) =>
   Array.isArray(settings.onboarding) && settings.onboarding.length ? settings.onboarding : DEFAULT_ONBOARDING_TASKS
 
-const ensureSettings = async (userId: string, role: string, email?: string | null) =>
-  prisma.userSettings.upsert({
-    where: { userId },
-    update: {},
-    create: {
-      userId,
-      ...DEFAULT_SETTINGS,
-      digestEmail: email || DEFAULT_SETTINGS.digestEmail,
-      kpiLayout: getDefaultKpis(role),
-    },
-  })
+const toCrmViews = (settings: typeof DEFAULT_SETTINGS) => ({
+  contacts: settings.crmContactView || DEFAULT_CRM_VIEWS.contacts,
+  companies: settings.crmCompanyView || DEFAULT_CRM_VIEWS.companies,
+  deals: settings.crmDealView || DEFAULT_CRM_VIEWS.deals,
+})
+
+const ensureSettings = async (userId: string, role: string, email?: string | null) => {
+  try {
+    return await prisma.userSettings.upsert({
+      where: { userId },
+      update: {},
+      create: buildFullCreate(userId, role, email),
+    })
+  } catch (error) {
+    if (!isUnknownArgumentError(error)) throw error
+    console.warn("UserSettings schema mismatch. Falling back to base settings.", error)
+    return prisma.userSettings.upsert({
+      where: { userId },
+      update: {},
+      create: buildSafeCreate(userId, email),
+    })
+  }
+}
 
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
@@ -95,6 +165,7 @@ export async function GET(request: Request) {
       kpis: settings.kpiLayout || getDefaultKpis(user.role),
       digest: toDigest(settings as typeof DEFAULT_SETTINGS, user.email),
       onboarding: toOnboarding(settings as typeof DEFAULT_SETTINGS),
+      crmViews: toCrmViews(settings as typeof DEFAULT_SETTINGS),
     })
   } catch (error) {
     console.error("User settings fetch failed", error)
@@ -107,7 +178,7 @@ export async function PATCH(request: Request) {
   try {
     const { org, user } = await getUserFromRequest(request)
     const body = await request.json()
-    const { profile = {}, preferences = {}, notifications = {}, kpis, digest = {}, onboarding } = body || {}
+    const { profile = {}, preferences = {}, notifications = {}, kpis, digest = {}, onboarding, crmViews } = body || {}
 
     const userUpdates: Record<string, string | null> = {}
     if (profile.name !== undefined) userUpdates.name = profile.name
@@ -127,6 +198,7 @@ export async function PATCH(request: Request) {
     if (preferences.currency !== undefined) settingsUpdates.currency = preferences.currency
     if (preferences.landing !== undefined) settingsUpdates.landing = preferences.landing
     if (preferences.dateFormat !== undefined) settingsUpdates.dateFormat = preferences.dateFormat
+    if (preferences.aiProvider !== undefined) settingsUpdates.aiProvider = preferences.aiProvider
     if (kpis !== undefined) settingsUpdates.kpiLayout = kpis
 
     if (notifications.email !== undefined) settingsUpdates.emailNotifications = notifications.email
@@ -139,19 +211,40 @@ export async function PATCH(request: Request) {
     if (digest.day !== undefined) settingsUpdates.digestDay = digest.day
     if (digest.time !== undefined) settingsUpdates.digestTime = digest.time
     if (digest.email !== undefined) settingsUpdates.digestEmail = digest.email
+    if (crmViews?.contacts) settingsUpdates.crmContactView = crmViews.contacts
+    if (crmViews?.companies) settingsUpdates.crmCompanyView = crmViews.companies
+    if (crmViews?.deals) settingsUpdates.crmDealView = crmViews.deals
     if (onboarding !== undefined && Array.isArray(onboarding)) settingsUpdates.onboarding = onboarding
 
-    const updatedSettings = Object.keys(settingsUpdates).length
-      ? await prisma.userSettings.upsert({
+    let updatedSettings
+    if (Object.keys(settingsUpdates).length) {
+      const createPayload = {
+        ...buildFullCreate(user.id, user.role, user.email),
+        ...settingsUpdates,
+      }
+
+      try {
+        updatedSettings = await prisma.userSettings.upsert({
           where: { userId: user.id },
           update: settingsUpdates,
+          create: createPayload,
+        })
+      } catch (error) {
+        if (!isUnknownArgumentError(error)) throw error
+        console.warn("UserSettings schema mismatch on update. Falling back to base settings.", error)
+        const safeUpdates = stripExtendedSettings(settingsUpdates)
+        updatedSettings = await prisma.userSettings.upsert({
+          where: { userId: user.id },
+          update: safeUpdates,
           create: {
-            userId: user.id,
-            ...DEFAULT_SETTINGS,
-            ...settingsUpdates,
+            ...buildSafeCreate(user.id, user.email),
+            ...safeUpdates,
           },
         })
-      : await ensureSettings(user.id, user.role, user.email)
+      }
+    } else {
+      updatedSettings = await ensureSettings(user.id, user.role, user.email)
+    }
 
     await createAuditLog({
       orgId: org.id,
@@ -178,6 +271,7 @@ export async function PATCH(request: Request) {
       kpis: (updatedSettings as typeof DEFAULT_SETTINGS).kpiLayout || getDefaultKpis(user.role),
       digest: toDigest(updatedSettings as typeof DEFAULT_SETTINGS, user.email),
       onboarding: toOnboarding(updatedSettings as typeof DEFAULT_SETTINGS),
+      crmViews: toCrmViews(updatedSettings as typeof DEFAULT_SETTINGS),
     })
   } catch (error) {
     console.error("User settings update failed", error)

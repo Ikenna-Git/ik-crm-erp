@@ -55,6 +55,7 @@ const statusConfig = {
 export function StockLevels({ searchQuery }: { searchQuery: string }) {
   const [items, setItems] = useState<StockItem[]>(mockStockLevels)
   const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({
@@ -116,13 +117,12 @@ export function StockLevels({ searchQuery }: { searchQuery: string }) {
       item.sku.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
-  const PAGE_SIZE = 10
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE))
-  const pagedItems = filteredItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize))
+  const pagedItems = filteredItems.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery])
+  }, [searchQuery, pageSize])
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages)
@@ -292,6 +292,8 @@ export function StockLevels({ searchQuery }: { searchQuery: string }) {
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={setCurrentPage}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
             />
           </div>
         </CardContent>

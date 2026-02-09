@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   try {
     const { org } = await getUserFromRequest(request)
     const body = await request.json()
-    const { title, value, stage, company, companyId, contactId, ownerId, expectedClose } = body || {}
+    const { title, value, stage, company, companyId, contactId, ownerId, expectedClose, customFields } = body || {}
     if (!title || typeof value !== "number") {
       return NextResponse.json({ error: "Title and numeric value required" }, { status: 400 })
     }
@@ -54,6 +54,7 @@ export async function POST(request: Request) {
         contactId,
         ownerId,
         expectedClose: expectedClose ? new Date(expectedClose) : null,
+        customFields: customFields && typeof customFields === "object" ? customFields : undefined,
         orgId: org.id,
       },
       include: { company: true },
@@ -79,7 +80,7 @@ export async function PATCH(request: Request) {
   try {
     const { org, user } = await getUserFromRequest(request)
     const body = await request.json()
-    const { id, title, value, stage, company, companyId, contactId, ownerId, expectedClose } = body || {}
+    const { id, title, value, stage, company, companyId, contactId, ownerId, expectedClose, customFields } = body || {}
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 })
     }
@@ -108,6 +109,7 @@ export async function PATCH(request: Request) {
         contactId,
         ownerId,
         expectedClose: expectedClose ? new Date(expectedClose) : undefined,
+        customFields: customFields && typeof customFields === "object" ? customFields : undefined,
       },
       include: { company: true },
     })

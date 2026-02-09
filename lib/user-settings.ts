@@ -15,6 +15,7 @@ export type UserPreferences = {
   currency: string
   landing: string
   dateFormat: string
+  aiProvider: "auto" | "openai" | "anthropic" | "gemini"
 }
 
 export type DigestSettings = {
@@ -22,6 +23,17 @@ export type DigestSettings = {
   day: string
   time: string
   email: string
+}
+
+export type CrmViewSettings = {
+  order: string[]
+  hidden: string[]
+}
+
+export type CrmViews = {
+  contacts: CrmViewSettings
+  companies: CrmViewSettings
+  deals: CrmViewSettings
 }
 
 export type OnboardingTask = {
@@ -56,6 +68,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   currency: "NGN",
   landing: "dashboard",
   dateFormat: "DD/MM/YYYY",
+  aiProvider: "auto",
 }
 
 export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
@@ -72,6 +85,21 @@ export const DEFAULT_DIGEST_SETTINGS: DigestSettings = {
   day: "MONDAY",
   time: "08:00",
   email: "",
+}
+
+export const DEFAULT_CRM_VIEWS: CrmViews = {
+  contacts: {
+    order: ["name", "company", "status", "revenue", "lastContact"],
+    hidden: [],
+  },
+  companies: {
+    order: ["name", "industry", "size", "owner", "updatedAt"],
+    hidden: [],
+  },
+  deals: {
+    order: ["title", "company", "stage", "value", "expectedClose"],
+    hidden: [],
+  },
 }
 
 export const DEFAULT_ONBOARDING_TASKS: OnboardingTask[] = [

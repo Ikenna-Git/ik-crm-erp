@@ -26,12 +26,19 @@ export async function POST(request: Request) {
   try {
     const { org } = await getUserFromRequest(request)
     const body = await request.json()
-    const { name, industry, size, ownerId } = body || {}
+    const { name, industry, size, ownerId, customFields } = body || {}
     if (!name) {
       return NextResponse.json({ error: "Name required" }, { status: 400 })
     }
     const company = await prisma.company.create({
-      data: { name, industry, size, ownerId, orgId: org.id },
+      data: {
+        name,
+        industry,
+        size,
+        ownerId,
+        customFields: customFields && typeof customFields === "object" ? customFields : undefined,
+        orgId: org.id,
+      },
     })
     await createAuditLog({
       orgId: org.id,
@@ -54,13 +61,19 @@ export async function PATCH(request: Request) {
   try {
     const { org, user } = await getUserFromRequest(request)
     const body = await request.json()
-    const { id, name, industry, size, ownerId } = body || {}
+    const { id, name, industry, size, ownerId, customFields } = body || {}
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 })
     }
     const company = await prisma.company.update({
       where: { id },
-      data: { name, industry, size, ownerId },
+      data: {
+        name,
+        industry,
+        size,
+        ownerId,
+        customFields: customFields && typeof customFields === "object" ? customFields : undefined,
+      },
     })
     await createAuditLog({
       orgId: org.id,

@@ -18,11 +18,13 @@ import {
   Play,
   ClipboardList,
   LayoutGrid,
+  Sparkles,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const navigation = [
   { name: "Overview", href: "/dashboard", icon: BarChart3 },
+  { name: "Civis AI", href: "/dashboard/ai", icon: Sparkles },
   { name: "CRM", href: "/dashboard/crm", icon: Users },
   { name: "Client Portal", href: "/dashboard/portal", icon: LayoutGrid },
   { name: "Accounting", href: "/dashboard/accounting", icon: DollarSign },

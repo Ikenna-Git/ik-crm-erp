@@ -82,7 +82,6 @@ const buildMockGallery = (count: number): GalleryItem[] =>
   }))
 
 const mockImages: GalleryItem[] = buildMockGallery(70)
-const PAGE_SIZE = 10
 
 const formatFileSize = (bytes?: number | null) => {
   if (bytes === null || bytes === undefined) return "—"
@@ -99,6 +98,7 @@ const toMediaType = (value?: string) => {
 export default function GalleryPage() {
   const [images, setImages] = useState<GalleryItem[]>(mockImages)
   const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [sharedImage, setSharedImage] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -177,14 +177,18 @@ export default function GalleryPage() {
     loadGallery()
   }, [])
 
-  const totalPages = Math.max(1, Math.ceil(images.length / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(images.length / pageSize))
   const pagedImages = useMemo(() => {
-    return images.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
-  }, [images, currentPage])
+    return images.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  }, [images, currentPage, pageSize])
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages)
   }, [currentPage, totalPages])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [pageSize])
 
   const handleDelete = async (id: string) => {
     try {
@@ -574,6 +578,8 @@ export default function GalleryPage() {
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={setCurrentPage}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
             />
           </div>
         ) : null}

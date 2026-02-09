@@ -40,6 +40,7 @@ export function CrmReports() {
   const [topDeals, setTopDeals] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [info, setInfo] = useState("")
 
   useEffect(() => {
     const loadSummary = async () => {
@@ -52,19 +53,28 @@ export function CrmReports() {
         if (res.status === 503) return
         const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data?.error || "Failed to load CRM reports")
-        if (Array.isArray(data.summary?.pipeline)) {
+        const pipelineData = Array.isArray(data.summary?.pipeline) ? data.summary.pipeline : []
+        const hasPipeline = pipelineData.some(
+          (entry: any) => Number(entry.count || 0) > 0 || Number(entry.value || 0) > 0,
+        )
+        if (pipelineData.length && hasPipeline) {
           setPipeline(
-            data.summary.pipeline.map((entry: any, idx: number) => ({
+            pipelineData.map((entry: any, idx: number) => ({
               stage: entry.stage,
               count: entry.count,
               value: entry.value,
               fill: stageColors[idx % stageColors.length],
             })),
           )
+          setInfo("")
+        } else {
+          setInfo("No CRM activity yet. Showing demo insights for now.")
         }
-        if (Array.isArray(data.summary?.contactStatus)) {
+        const contactData = Array.isArray(data.summary?.contactStatus) ? data.summary.contactStatus : []
+        const hasContacts = contactData.some((entry: any) => Number(entry.count || 0) > 0)
+        if (contactData.length && hasContacts) {
           setContactStatus(
-            data.summary.contactStatus.map((entry: any, idx: number) => ({
+            contactData.map((entry: any, idx: number) => ({
               status: entry.status,
               count: entry.count,
               fill: stageColors[idx % stageColors.length],
@@ -113,6 +123,7 @@ export function CrmReports() {
 
       {loading && <p className="text-xs text-muted-foreground">Updating CRM insights...</p>}
       {error && <p className="text-xs text-destructive">{error}</p>}
+      {!error && info && <p className="text-xs text-muted-foreground">{info}</p>}
 
       <div className="grid lg:grid-cols-2 gap-6">
         <Card>

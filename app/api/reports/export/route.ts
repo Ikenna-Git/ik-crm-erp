@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server"
 import nodemailer from "nodemailer"
 import { generateCsv } from "@/lib/reports"
-import { buildAccountingRows, buildCrmRows } from "@/lib/report-builders"
+import { buildAccountingRows, buildCrmRows, buildVatRows, buildAuditRows } from "@/lib/report-builders"
 import { getDefaultOrg } from "@/lib/defaultOrg"
+import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
 
 const REQUIRED_ENVS = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM"] as const
 
 type ExportBody = {
-  type?: "analytics" | "accounting" | "crm"
+  type?: "analytics" | "accounting" | "crm" | "vat" | "audit"
   target?: "desktop" | "email"
   email?: string
 }
@@ -19,10 +20,18 @@ export async function POST(request: Request) {
       { status: 503 },
     )
   }
+
+  const limit = rateLimit(getRateLimitKey(request, "report-export"), { limit: 12, windowMs: 60_000 })
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Too many export requests. Please wait a minute and try again." },
+      { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
+    )
+  }
   const body = (await request.json()) as ExportBody
   const { type, target, email } = body
 
-  if (!type || !["analytics", "accounting", "crm"].includes(type)) {
+  if (!type || !["analytics", "accounting", "crm", "vat", "audit"].includes(type)) {
     return NextResponse.json({ error: "Invalid report type" }, { status: 400 })
   }
   if (!target || !["desktop", "email"].includes(target)) {
@@ -31,7 +40,15 @@ export async function POST(request: Request) {
 
   const org = await getDefaultOrg()
   const rows =
-    type === "accounting" ? await buildAccountingRows(org.id) : type === "crm" ? await buildCrmRows(org.id) : undefined
+    type === "accounting"
+      ? await buildAccountingRows(org.id)
+      : type === "crm"
+        ? await buildCrmRows(org.id)
+        : type === "vat"
+          ? await buildVatRows(org.id)
+          : type === "audit"
+            ? await buildAuditRows(org.id)
+            : undefined
   const csv = generateCsv(type, rows)
   const filename = `${org.name || "report"}-${type}.csv`
 

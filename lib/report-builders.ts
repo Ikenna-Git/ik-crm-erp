@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import type { ReportRow } from "@/lib/reports"
 
 const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+const VAT_RATE = 0.075
 
 const getMonthKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
 
@@ -77,6 +78,46 @@ export const buildCrmRows = async (orgId: string): Promise<ReportRow[]> => {
   }))
 
   return [...dealRows, ...contactRows]
+}
+
+export const buildVatRows = async (orgId: string): Promise<ReportRow[]> => {
+  const vatRate = 0.075
+  const invoices = await prisma.invoice.findMany({
+    where: { orgId, status: { in: ["PAID", "SENT", "OVERDUE"] } },
+    orderBy: { createdAt: "desc" },
+  })
+
+  return invoices.map((invoice) => {
+    const amount = invoice.amount || 0
+    const vatDue = Math.round(amount * vatRate)
+    return {
+      invoice: invoice.invoiceNumber,
+      client: invoice.clientName,
+      amount,
+      vatRate: "7.5%",
+      vatDue,
+      issueDate: (invoice.issueDate || invoice.createdAt).toISOString().slice(0, 10),
+      status: invoice.status,
+    }
+  })
+}
+
+export const buildAuditRows = async (orgId: string): Promise<ReportRow[]> => {
+  const logs = await prisma.auditLog.findMany({
+    where: { orgId },
+    include: { user: true },
+    orderBy: { createdAt: "desc" },
+    take: 500,
+  })
+
+  return logs.map((log) => ({
+    timestamp: log.createdAt.toISOString(),
+    user: log.user?.email || log.user?.name || "System",
+    action: log.action,
+    entity: log.entity || "",
+    entityId: log.entityId || "",
+    metadata: log.metadata ? JSON.stringify(log.metadata) : "",
+  }))
 }
 
 export const buildAccountingSummary = async (orgId: string) => {
@@ -174,5 +215,37 @@ export const buildCrmSummary = async (orgId: string) => {
     pipeline,
     contactStatus,
     topDeals,
+  }
+}
+
+export const buildVatSummary = async (orgId: string) => {
+  const months = buildMonthRange(6)
+  const invoices = await prisma.invoice.findMany({ where: { orgId } })
+
+  const monthMap = new Map(
+    months.map((month) => [
+      month.key,
+      { month: month.label, taxable: 0, vatDue: 0 },
+    ]),
+  )
+
+  invoices.forEach((invoice) => {
+    if (!["PAID", "SENT", "OVERDUE"].includes(invoice.status)) return
+    const date = safeDate(invoice.issueDate) || invoice.createdAt
+    const key = getMonthKey(date)
+    const entry = monthMap.get(key)
+    if (!entry) return
+    entry.taxable += invoice.amount
+    entry.vatDue += Math.round(invoice.amount * VAT_RATE)
+  })
+
+  const totalTaxable = Array.from(monthMap.values()).reduce((sum, entry) => sum + entry.taxable, 0)
+  const totalVat = Array.from(monthMap.values()).reduce((sum, entry) => sum + entry.vatDue, 0)
+
+  return {
+    vatRate: VAT_RATE,
+    totalTaxable,
+    totalVat,
+    months: Array.from(monthMap.values()),
   }
 }

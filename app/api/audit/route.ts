@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getUserFromRequest } from "@/lib/request-user"
+import { isAdmin } from "@/lib/authz"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable audit logs." }, { status: 503 })
@@ -8,7 +9,10 @@ const dbUnavailable = () =>
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org, user } = await getUserFromRequest(request)
+    if (!isAdmin(user.role)) {
+      return NextResponse.json({ error: "Admin access required" }, { status: 403 })
+    }
     const logs = await prisma.auditLog.findMany({
       where: { orgId: org.id },
       orderBy: { createdAt: "desc" },

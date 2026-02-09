@@ -116,7 +116,7 @@ export default function ClientPortalPage() {
   const [updateForm, setUpdateForm] = useState({
     title: "",
     message: "",
-    status: "ACTIVE",
+    status: "PENDING",
   })
   const [documentForm, setDocumentForm] = useState({
     title: "",
@@ -128,12 +128,24 @@ export default function ClientPortalPage() {
   const [uploading, setUploading] = useState(false)
 
   const MAX_FILE_SIZE = 5 * 1024 * 1024
+  const createLocalId = () => `local-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`
+  const fileToDataUrl = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "")
+      reader.onerror = () => reject(new Error("Failed to read file"))
+      reader.readAsDataURL(file)
+    })
 
   const loadPortals = async () => {
     try {
       setLoading(true)
       setError("")
       const res = await fetch("/api/portal", { headers: { ...getSessionHeaders() } })
+      if (res.status === 503) {
+        setPortals(portalSeed)
+        return
+      }
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || "Failed to load portals")
       const loaded = Array.isArray(data.portals) ? data.portals : []
@@ -152,7 +164,7 @@ export default function ClientPortalPage() {
 
   useEffect(() => {
     if (!updateDialogOpen) {
-      setUpdateForm({ title: "", message: "", status: "ACTIVE" })
+      setUpdateForm({ title: "", message: "", status: "PENDING" })
     }
     if (!documentDialogOpen) {
       setDocumentForm({ title: "", url: "", fileType: "document" })
@@ -163,7 +175,7 @@ export default function ClientPortalPage() {
 
   const openUpdateDialogFor = (portal: PortalItem) => {
     setActivePortal(portal)
-    setUpdateForm({ title: "", message: "", status: portal.status })
+    setUpdateForm({ title: "", message: "", status: "PENDING" })
     setUpdateDialogOpen(true)
   }
 
@@ -202,6 +214,28 @@ export default function ClientPortalPage() {
           status: updateForm.status,
         }),
       })
+      if (res.status === 503) {
+        const localUpdate: PortalUpdate = {
+          id: createLocalId(),
+          title: updateForm.title,
+          message: updateForm.message,
+          status: updateForm.status,
+          createdAt: new Date().toISOString(),
+        }
+        setPortals((prev) =>
+          prev.map((portal) =>
+            portal.id === activePortal.id
+              ? {
+                  ...portal,
+                  updates: [localUpdate, ...(portal.updates || [])],
+                  updatedAt: new Date().toISOString(),
+                }
+              : portal,
+          ),
+        )
+        setUpdateDialogOpen(false)
+        return
+      }
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || "Failed to add update")
       setPortals((prev) =>
@@ -210,7 +244,6 @@ export default function ClientPortalPage() {
             ? {
                 ...portal,
                 updates: [data.update, ...(portal.updates || [])],
-                status: updateForm.status as PortalItem["status"],
                 updatedAt: new Date().toISOString(),
               }
             : portal,
@@ -236,10 +269,21 @@ export default function ClientPortalPage() {
           setUploadError("File too large. Please upload a file under 5 MB.")
           return
         }
-        const uploaded = await uploadToCloudinary(selectedFile, "civis/portal")
-        url = uploaded.url
-        bytes = uploaded.bytes || 0
-        fileType = uploaded.resourceType || documentForm.fileType
+        try {
+          const uploaded = await uploadToCloudinary(selectedFile, "civis/portal")
+          url = uploaded.url
+          bytes = uploaded.bytes || 0
+          fileType = uploaded.resourceType || documentForm.fileType
+        } catch (uploadErr: any) {
+          if (uploadErr?.message?.includes("Missing Cloudinary configuration")) {
+            url = await fileToDataUrl(selectedFile)
+            bytes = selectedFile.size
+            fileType = selectedFile.type || documentForm.fileType
+            setUploadError("Cloudinary not configured. Saved as a local demo file.")
+          } else {
+            throw uploadErr
+          }
+        }
       }
 
       if (!url) {
@@ -258,6 +302,29 @@ export default function ClientPortalPage() {
           bytes,
         }),
       })
+      if (res.status === 503) {
+        const localDoc: PortalDocument = {
+          id: createLocalId(),
+          title: documentForm.title || "Shared document",
+          url,
+          fileType,
+          bytes,
+          createdAt: new Date().toISOString(),
+        }
+        setPortals((prev) =>
+          prev.map((portal) =>
+            portal.id === activePortal.id
+              ? {
+                  ...portal,
+                  documents: [localDoc, ...(portal.documents || [])],
+                  updatedAt: new Date().toISOString(),
+                }
+              : portal,
+          ),
+        )
+        setDocumentDialogOpen(false)
+        return
+      }
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || "Failed to add document")
       setPortals((prev) =>
@@ -286,6 +353,24 @@ export default function ClientPortalPage() {
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
         body: JSON.stringify(form),
       })
+      if (res.status === 503) {
+        const localPortal: PortalItem = {
+          id: createLocalId(),
+          name: form.name,
+          contactName: form.contactName,
+          contactEmail: form.contactEmail,
+          status: "ACTIVE",
+          accessCode: form.name.toLowerCase().replace(/\s+/g, "-") || "portal",
+          summary: form.summary,
+          updatedAt: new Date().toISOString(),
+          updates: [],
+          documents: [],
+        }
+        setPortals((prev) => [localPortal, ...prev])
+        setForm({ name: "", contactName: "", contactEmail: "", summary: "" })
+        setOpenDialog(false)
+        return
+      }
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || "Failed to create portal")
       setPortals((prev) => [data.portal, ...prev])
@@ -297,19 +382,41 @@ export default function ClientPortalPage() {
   }
 
   const handleStatusUpdate = async (id: string, status: PortalItem["status"]) => {
+    const previous = portals.find((portal) => portal.id === id)
+    if (previous?.status === status) return
+    setPortals((prev) =>
+      prev.map((portal) =>
+        portal.id === id ? { ...portal, status, updatedAt: new Date().toISOString() } : portal,
+      ),
+    )
     try {
       const res = await fetch("/api/portal", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
         body: JSON.stringify({ id, status }),
       })
+      if (res.status === 503) {
+        setError("Portal status updates are running in demo mode until the database is configured.")
+        return
+      }
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || "Failed to update portal")
       setPortals((prev) => prev.map((item) => (item.id === id ? data.portal : item)))
     } catch (err: any) {
       setError(err?.message || "Failed to update portal")
+      if (previous) {
+        setPortals((prev) =>
+          prev.map((portal) =>
+            portal.id === id ? { ...portal, status: previous.status, updatedAt: previous.updatedAt } : portal,
+          ),
+        )
+      }
     }
   }
+
+  const activeCount = portals.filter((portal) => portal.status === "ACTIVE").length
+  const updatesCount = portals.reduce((sum, portal) => sum + (portal.updates?.length || 0), 0)
+  const documentsCount = portals.reduce((sum, portal) => sum + (portal.documents?.length || 0), 0)
 
   const copyLink = async (code: string) => {
     const base = typeof window === "undefined" ? "" : window.location.origin
@@ -388,6 +495,30 @@ export default function ClientPortalPage() {
             </div>
           </DialogContent>
         </Dialog>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Active portals</p>
+            <p className="text-3xl font-bold">{activeCount}</p>
+            <p className="text-xs text-muted-foreground mt-2">Live client access</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Updates shared</p>
+            <p className="text-3xl font-bold">{updatesCount}</p>
+            <p className="text-xs text-muted-foreground mt-2">Across all portals</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">Documents shared</p>
+            <p className="text-3xl font-bold">{documentsCount}</p>
+            <p className="text-xs text-muted-foreground mt-2">Files + links</p>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -498,7 +629,7 @@ export default function ClientPortalPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Status</Label>
+              <Label>Approval status</Label>
               <Select
                 value={updateForm.status}
                 onValueChange={(value) => setUpdateForm({ ...updateForm, status: value })}
@@ -507,11 +638,14 @@ export default function ClientPortalPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ACTIVE">Active</SelectItem>
-                  <SelectItem value="PAUSED">Paused</SelectItem>
-                  <SelectItem value="ARCHIVED">Archived</SelectItem>
+                  <SelectItem value="PENDING">Pending approval</SelectItem>
+                  <SelectItem value="APPROVED">Approved</SelectItem>
+                  <SelectItem value="REJECTED">Rejected</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Pending updates can be approved or rejected from the client portal link.
+              </p>
             </div>
             <Button onClick={handleAddUpdate} disabled={!updateForm.title.trim()}>
               Publish update

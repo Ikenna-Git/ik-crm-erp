@@ -14,7 +14,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from "recharts"
 import { TrendingUp, Users, DollarSign, ShoppingCart } from "lucide-react"
@@ -159,13 +158,22 @@ export default function AnalyticsPage() {
             <CardDescription>Monthly comparison</CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-[#0891b2]" />
+                Revenue
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-[#f43f5e]" />
+                Expenses
+              </div>
+            </div>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={revenueData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
                 <Tooltip />
-                <Legend />
                 <Line type="monotone" dataKey="revenue" stroke="#0891b2" strokeWidth={2} />
                 <Line type="monotone" dataKey="expenses" stroke="#f43f5e" strokeWidth={2} />
               </LineChart>

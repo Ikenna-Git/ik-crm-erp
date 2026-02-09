@@ -27,6 +27,12 @@ const currencies = ["NGN", "USD", "EUR", "GBP"]
 const industries = ["Technology", "Finance", "Retail", "Manufacturing", "Healthcare"]
 const roles = ["user", "admin", "super_admin"]
 const digestDays = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
+const aiProviders = [
+  { value: "auto", label: "Auto (use AI_PROVIDER env)" },
+  { value: "openai", label: "OpenAI" },
+  { value: "anthropic", label: "Anthropic" },
+  { value: "gemini", label: "Gemini" },
+]
 
 export default function SettingsPage() {
   const { data: session } = useSession()
@@ -552,6 +558,27 @@ export default function SettingsPage() {
                     value={preferences.dateFormat}
                     onChange={(e) => setPreferences({ ...preferences, dateFormat: e.target.value })}
                   />
+                </div>
+                <div>
+                  <Label>AI provider</Label>
+                  <Select
+                    value={preferences.aiProvider}
+                    onValueChange={(value) => setPreferences({ ...preferences, aiProvider: value as any })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {aiProviders.map((provider) => (
+                        <SelectItem key={provider.value} value={provider.value}>
+                          {provider.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Requires matching API keys in <code>.env.local</code>. Restart dev server after changes.
+                  </p>
                 </div>
               </div>
               <Button className="w-fit" onClick={handlePreferencesSave}>

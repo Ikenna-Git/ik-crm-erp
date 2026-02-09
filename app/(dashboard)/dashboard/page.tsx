@@ -8,7 +8,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -401,13 +400,22 @@ export default function DashboardPage() {
             <CardDescription>Monthly performance</CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-[#0f766e]" />
+                Revenue
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-[#d1d5db]" />
+                Expenses
+              </div>
+            </div>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={revenueData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="month" stroke="#9ca3af" />
                 <YAxis stroke="#9ca3af" />
                 <Tooltip />
-                <Legend />
                 <Line type="monotone" dataKey="revenue" stroke="#0f766e" strokeWidth={2} />
                 <Line type="monotone" dataKey="expenses" stroke="#d1d5db" strokeWidth={2} />
               </LineChart>

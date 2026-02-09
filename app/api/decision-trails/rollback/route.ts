@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getUserFromRequest } from "@/lib/request-user"
 import { createAuditLog } from "@/lib/audit"
 import { restoreDateField } from "@/lib/decision-trails"
+import { isAdmin } from "@/lib/authz"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable decision trails." }, { status: 503 })
@@ -13,6 +14,9 @@ export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org, user } = await getUserFromRequest(request)
+    if (!isAdmin(user.role)) {
+      return NextResponse.json({ error: "Admin access required for rollback" }, { status: 403 })
+    }
     const body = await request.json()
     const { id } = body || {}
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })

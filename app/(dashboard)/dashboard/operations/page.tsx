@@ -28,6 +28,12 @@ const workflowSeed = [
   { id: "w3", name: "New hire onboarding", trigger: "Employee created", action: "Assign onboarding tasks", active: false },
 ]
 
+const workflowRunsSeed = [
+  { id: "run-1", name: "Overdue invoice reminder", status: "Success", owner: "Finance Bot", time: "Today 09:15" },
+  { id: "run-2", name: "Low stock reorder", status: "Queued", owner: "Inventory Bot", time: "Yesterday 18:02" },
+  { id: "run-3", name: "New hire onboarding", status: "Paused", owner: "HR Ops", time: "Yesterday 09:40" },
+]
+
 const approvalsSeed: ApprovalRequest[] = [
   {
     id: "a1",
@@ -90,6 +96,12 @@ const webhookSeed = [
     secret: "whsec_02",
     createdAt: "2025-01-05T12:40:00Z",
   },
+]
+
+const webhookDeliveriesSeed = [
+  { id: "wd-1", name: "invoice.paid", status: "Delivered", target: "Accounting events", time: "2 hours ago" },
+  { id: "wd-2", name: "expense.approved", status: "Delivered", target: "Accounting events", time: "Yesterday" },
+  { id: "wd-3", name: "deal.stage.changed", status: "Failed", target: "CRM pipeline alerts", time: "2 days ago" },
 ]
 
 const insightsSeed = [
@@ -396,6 +408,11 @@ export default function OperationsPage() {
         })
         if (res.status === 503) {
           setAuditError("Database not configured — showing demo audit logs.")
+          setAuditLogs(auditSeed)
+          return
+        }
+        if (res.status === 403) {
+          setAuditError("Admin access required to view audit logs.")
           setAuditLogs(auditSeed)
           return
         }
@@ -820,6 +837,27 @@ export default function OperationsPage() {
               </Card>
             ))}
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Workflow Runs</CardTitle>
+              <CardDescription>Latest automation activity across modules.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {workflowRunsSeed.map((run) => (
+                <div key={run.id} className="flex items-center justify-between border-b border-border pb-3 last:border-0">
+                  <div>
+                    <p className="font-medium">{run.name}</p>
+                    <p className="text-sm text-muted-foreground">{run.owner}</p>
+                  </div>
+                  <div className="text-right text-sm">
+                    <p className="font-semibold">{run.status}</p>
+                    <p className="text-xs text-muted-foreground">{run.time}</p>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="approvals" className="space-y-4">
@@ -982,6 +1020,29 @@ export default function OperationsPage() {
               )
             })}
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Webhook Deliveries</CardTitle>
+              <CardDescription>Recent webhook attempts and their status.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {webhookDeliveriesSeed.map((delivery) => (
+                <div key={delivery.id} className="flex items-center justify-between border-b border-border pb-3 last:border-0">
+                  <div>
+                    <p className="font-medium">{delivery.name}</p>
+                    <p className="text-sm text-muted-foreground">{delivery.target}</p>
+                  </div>
+                  <div className="text-right text-sm">
+                    <p className={`font-semibold ${delivery.status === "Failed" ? "text-destructive" : ""}`}>
+                      {delivery.status}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{delivery.time}</p>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="insights" className="space-y-4">

@@ -96,6 +96,7 @@ export function PayrollTable({
 }: PayrollTableProps) {
   const [payroll, setPayroll] = useState<PayrollRecord[]>(providedPayroll || mockPayroll)
   const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [showAmounts, setShowAmounts] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -135,9 +136,8 @@ export function PayrollTable({
 
   const displayAmounts = isUnlocked && showAmounts
 
-  const PAGE_SIZE = 10
-  const totalPages = Math.max(1, Math.ceil(sortedPayroll.length / PAGE_SIZE))
-  const pagedPayroll = sortedPayroll.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const totalPages = Math.max(1, Math.ceil(sortedPayroll.length / pageSize))
+  const pagedPayroll = sortedPayroll.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -152,7 +152,7 @@ export function PayrollTable({
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery])
+  }, [searchQuery, pageSize])
 
   useEffect(() => {
     if (providedPayroll) setPayroll(providedPayroll)
@@ -479,6 +479,8 @@ export function PayrollTable({
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={setCurrentPage}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
             />
           </div>
         </CardContent>

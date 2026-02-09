@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getDefaultOrg } from "@/lib/defaultOrg"
+import { getUserFromRequest } from "@/lib/request-user"
+import { isAdmin } from "@/lib/authz"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable settings." }, { status: 503 })
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
+    const { user } = await getUserFromRequest(request)
+    if (!isAdmin(user.role)) {
+      return NextResponse.json({ error: "Admin access required" }, { status: 403 })
+    }
     const org = await getDefaultOrg()
     const users = await prisma.user.findMany({ where: { orgId: org.id } })
     return NextResponse.json({ org, users })
@@ -20,6 +26,10 @@ export async function GET() {
 export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
+    const { user } = await getUserFromRequest(request)
+    if (!isAdmin(user.role)) {
+      return NextResponse.json({ error: "Admin access required" }, { status: 403 })
+    }
     const body = await request.json()
     const { name, theme, notifyEmail } = body || {}
     const org = await getDefaultOrg()
@@ -37,6 +47,10 @@ export async function PATCH(request: Request) {
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
+    const { user } = await getUserFromRequest(request)
+    if (!isAdmin(user.role)) {
+      return NextResponse.json({ error: "Admin access required" }, { status: 403 })
+    }
     const body = await request.json()
     const { name, email, role } = body || {}
     if (!name || !email || !role) return NextResponse.json({ error: "name, email, role required" }, { status: 400 })

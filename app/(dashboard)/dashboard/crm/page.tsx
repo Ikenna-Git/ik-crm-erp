@@ -4,12 +4,16 @@ import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Sparkles, Download } from "lucide-react"
+import { Sparkles, Download } from "lucide-react"
 import { ContactsTable } from "@/components/crm/contacts-table"
 import { DealsBoard } from "@/components/crm/deals-board"
 import { ActivitiesTimeline } from "@/components/crm/activities-timeline"
 import { CrmReports } from "@/components/crm/crm-reports"
+import { CompaniesTable } from "@/components/crm/companies-table"
+import { CrmQualityScorecard } from "@/components/crm/data-quality-scorecard"
+import { FollowupSchedulerCard, type FollowupSummary } from "@/components/crm/followup-scheduler-card"
 import { getSessionHeaders } from "@/lib/user-settings"
+import { DEFAULT_CRM_VIEWS } from "@/lib/user-settings"
 import {
   Dialog,
   DialogContent,
@@ -19,7 +23,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const crmNames = ["Adaeze Okafor", "Emeka Umeh", "Sarah Johnson", "David Chen", "Ibrahim Musa", "Lena Martins", "Grace Williams", "Noah Brown"]
 const crmCompanies = ["Northwind", "Acme Corp", "Venture Labs", "Globex", "NovaWorks", "Blue Ridge", "Nimbus", "Zenith"]
@@ -39,6 +42,7 @@ const buildFallbackContacts = (count: number) =>
       status: statusOptions[idx % statusOptions.length],
       revenue: idx % 3 === 0 ? 90000 + (idx % 6) * 15000 : 0,
       lastContact: `${(idx % 7) + 1}d ago`,
+      lastContactAt: new Date(2025, (idx % 6) + 1, (idx % 27) + 1).toISOString(),
     }
   })
 
@@ -57,26 +61,41 @@ const buildFallbackDeals = (count: number) =>
       stage,
       owner,
       expectedClose,
+      updatedAt: new Date(2025, idx % 6, (idx % 27) + 1).toISOString(),
+    }
+  })
+
+const buildFallbackCompanies = (count: number) =>
+  Array.from({ length: count }, (_, idx) => {
+    const name = crmCompanies[idx % crmCompanies.length]
+    const industries = ["Fintech", "Retail", "Logistics", "Healthcare", "Manufacturing", "Education"]
+    const sizes = ["1-10", "11-50", "51-200", "201-500", "500+"]
+    return {
+      id: `CO-${(idx + 1).toString().padStart(3, "0")}`,
+      name,
+      industry: industries[idx % industries.length],
+      size: sizes[idx % sizes.length],
+      owner: crmNames[idx % crmNames.length],
+      updatedAt: new Date(2025, idx % 12, (idx % 27) + 1).toISOString(),
     }
   })
 
 const fallbackContacts = buildFallbackContacts(70)
 const fallbackDeals = buildFallbackDeals(70)
+const fallbackCompanies = buildFallbackCompanies(50)
 
 export default function CRMPage() {
   const searchQuery = ""
   const [loading, setLoading] = useState(false)
   const [contacts, setContacts] = useState<any[]>([])
+  const [companies, setCompanies] = useState<any[]>([])
   const [deals, setDeals] = useState<any[]>([])
-  const [openAddDialog, setOpenAddDialog] = useState(false)
+  const [crmViews, setCrmViews] = useState(DEFAULT_CRM_VIEWS)
   const [exportEmail, setExportEmail] = useState("ikchils@gmail.com")
   const [openExportDialog, setOpenExportDialog] = useState(false)
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    status: "lead",
-  })
+  const [followupSummary, setFollowupSummary] = useState<FollowupSummary | null>(null)
+  const [followupLoading, setFollowupLoading] = useState(false)
+  const [followupNotice, setFollowupNotice] = useState("")
 
   const parseJsonSafe = async (res: Response) => {
     const text = await res.text()
@@ -84,6 +103,77 @@ export default function CRMPage() {
       return JSON.parse(text)
     } catch {
       throw new Error(`Invalid JSON response: ${text.slice(0, 120)}`)
+    }
+  }
+
+  const buildLocalFollowups = () => {
+    const inactiveContacts = contacts
+      .filter((contact) => !contact.lastContactAt)
+      .slice(0, 6)
+      .map((contact: any) => ({
+        id: contact.id,
+        label: contact.name,
+        meta: "No recent touchpoint",
+      }))
+
+    const stalledDeals = deals
+      .filter((deal) => ["proposal", "negotiation"].includes(deal.stage))
+      .slice(0, 6)
+      .map((deal: any) => ({
+        id: deal.id,
+        label: deal.title,
+        meta: `${deal.stage} stage`,
+      }))
+
+    return {
+      inactiveContacts: { count: inactiveContacts.length, items: inactiveContacts },
+      stalledDeals: { count: stalledDeals.length, items: stalledDeals },
+      generatedAt: new Date().toISOString(),
+    }
+  }
+
+  const loadFollowups = async () => {
+    try {
+      setFollowupLoading(true)
+      setFollowupNotice("")
+      const res = await fetch("/api/crm/followups", { headers: { ...getSessionHeaders() } })
+      if (res.status === 503) {
+        setFollowupSummary(buildLocalFollowups())
+        return
+      }
+      const data = await parseJsonSafe(res)
+      if (!res.ok) throw new Error(data?.error || "Failed to load follow-ups")
+      setFollowupSummary(data.summary)
+    } catch (err: any) {
+      console.warn("Failed to load follow-ups", err)
+      setFollowupSummary(buildLocalFollowups())
+    } finally {
+      setFollowupLoading(false)
+    }
+  }
+
+  const handleGenerateFollowups = async () => {
+    try {
+      setFollowupLoading(true)
+      setFollowupNotice("")
+      const res = await fetch("/api/crm/followups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({}),
+      })
+      if (res.status === 503) {
+        setFollowupNotice("Connect your database to generate real follow-up tasks.")
+        return
+      }
+      const data = await parseJsonSafe(res)
+      if (!res.ok) throw new Error(data?.error || "Failed to generate follow-ups")
+      const created = data.created?.contacts + data.created?.deals
+      setFollowupNotice(`Generated ${created || 0} follow-up tasks.`)
+      setFollowupSummary(data.summary)
+    } catch (err: any) {
+      setFollowupNotice(err?.message || "Failed to generate follow-ups.")
+    } finally {
+      setFollowupLoading(false)
     }
   }
 
@@ -103,39 +193,64 @@ export default function CRMPage() {
     status: String(contact.status || "prospect").toLowerCase(),
     revenue: contact.revenue || 0,
     lastContact: formatLastContact(contact.lastContact),
+    lastContactAt: contact.lastContact ? new Date(contact.lastContact).toISOString() : contact.updatedAt || null,
+    updatedAt: contact.updatedAt ? new Date(contact.updatedAt).toISOString() : null,
+    customFields: contact.customFields || {},
   })
 
   const mapDeal = (deal: any) => ({
     id: deal.id,
     title: deal.title,
     company: deal.company?.name || deal.companyName || deal.companyId || "",
+    companyId: deal.companyId || null,
     value: deal.value,
     stage: String(deal.stage || "prospect").toLowerCase(),
     owner: deal.owner?.name || deal.ownerName || deal.ownerId || "",
+    ownerId: deal.ownerId || null,
+    contactId: deal.contactId || null,
     expectedClose: deal.expectedClose ? new Date(deal.expectedClose).toISOString().slice(0, 10) : undefined,
+    updatedAt: deal.updatedAt ? new Date(deal.updatedAt).toISOString() : null,
+    customFields: deal.customFields || {},
+  })
+
+  const mapCompany = (company: any) => ({
+    id: company.id,
+    name: company.name,
+    industry: company.industry || "",
+    size: company.size || "",
+    owner: company.owner?.name || company.ownerName || "",
+    ownerId: company.ownerId || null,
+    updatedAt: company.updatedAt ? new Date(company.updatedAt).toISOString().slice(0, 10) : "",
+    customFields: company.customFields || {},
   })
 
   const loadData = async () => {
     try {
       setLoading(true)
-      const [contactsRes, dealsRes] = await Promise.all([
+      const [contactsRes, dealsRes, companiesRes] = await Promise.all([
         fetch("/api/crm/contacts", { headers: { ...getSessionHeaders() } }),
         fetch("/api/crm/deals", { headers: { ...getSessionHeaders() } }),
+        fetch("/api/crm/companies", { headers: { ...getSessionHeaders() } }),
       ])
       const contactsJson = contactsRes.ok ? await parseJsonSafe(contactsRes) : null
       const dealsJson = dealsRes.ok ? await parseJsonSafe(dealsRes) : null
+      const companiesJson = companiesRes.ok ? await parseJsonSafe(companiesRes) : null
 
       const loadedContacts =
         contactsJson?.contacts?.length > 0 ? contactsJson.contacts.map(mapContact) : fallbackContacts
 
       const loadedDeals = dealsJson?.deals?.length ? dealsJson.deals.map(mapDeal) : fallbackDeals
+      const loadedCompanies =
+        companiesJson?.companies?.length > 0 ? companiesJson.companies.map(mapCompany) : fallbackCompanies
 
       setContacts(loadedContacts)
       setDeals(loadedDeals)
+      setCompanies(loadedCompanies)
     } catch (err) {
       console.error("Failed to load CRM data", err)
       setContacts(fallbackContacts)
       setDeals(fallbackDeals)
+      setCompanies(fallbackCompanies)
     } finally {
       setLoading(false)
     }
@@ -147,6 +262,7 @@ export default function CRMPage() {
     phone?: string
     company?: string
     status: string
+    customFields?: Record<string, any>
   }) => {
     try {
       const res = await fetch("/api/crm/contacts", {
@@ -159,6 +275,7 @@ export default function CRMPage() {
           company: payload.company,
           status: payload.status,
           lastContact: new Date().toISOString(),
+          customFields: payload.customFields || {},
         }),
       })
       const data = await parseJsonSafe(res)
@@ -173,6 +290,7 @@ export default function CRMPage() {
         ...payload,
         revenue: 0,
         lastContact: "Just now",
+        customFields: payload.customFields || {},
       }
       setContacts((prev) => [...prev, fallback])
       return fallback
@@ -200,11 +318,42 @@ export default function CRMPage() {
     loadData()
   }, [])
 
-  const handleAddContact = async () => {
-    if (formData.name && formData.email) {
-      await handleAddContactAPI(formData)
-      setFormData({ name: "", email: "", phone: "", status: "lead" })
-      setOpenAddDialog(false)
+  useEffect(() => {
+    if (contacts.length || deals.length) {
+      loadFollowups()
+    }
+  }, [contacts.length, deals.length])
+
+  useEffect(() => {
+    const loadViews = async () => {
+      try {
+        const res = await fetch("/api/user/settings", { headers: { ...getSessionHeaders() } })
+        if (res.status === 503) return
+        const data = await parseJsonSafe(res)
+        if (data?.crmViews) {
+          setCrmViews({
+            contacts: data.crmViews.contacts || DEFAULT_CRM_VIEWS.contacts,
+            companies: data.crmViews.companies || DEFAULT_CRM_VIEWS.companies,
+            deals: data.crmViews.deals || DEFAULT_CRM_VIEWS.deals,
+          })
+        }
+      } catch (err) {
+        console.warn("Failed to load CRM views", err)
+      }
+    }
+    loadViews()
+  }, [])
+
+  const handleViewChange = async (entity: "contacts" | "companies" | "deals", view: any) => {
+    setCrmViews((prev) => ({ ...prev, [entity]: view }))
+    try {
+      await fetch("/api/user/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({ crmViews: { [entity]: view } }),
+      })
+    } catch (err) {
+      console.warn("Failed to save CRM view", err)
     }
   }
 
@@ -224,6 +373,130 @@ export default function CRMPage() {
       setContacts((prev) =>
         prev.map((c) => (c.id === id ? { ...c, ...data, lastContact: "Updated just now" } : c)),
       )
+    }
+  }
+
+  const handleAddCompanyAPI = async (payload: {
+    name: string
+    industry?: string
+    size?: string
+    customFields?: Record<string, any>
+  }) => {
+    try {
+      const res = await fetch("/api/crm/companies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({
+          name: payload.name,
+          industry: payload.industry,
+          size: payload.size,
+          customFields: payload.customFields || {},
+        }),
+      })
+      const data = await parseJsonSafe(res)
+      if (!res.ok) throw new Error(data?.error || "Failed to add company")
+      const company = mapCompany(data.company)
+      setCompanies((prev) => [...prev, company])
+      return company
+    } catch (err) {
+      console.warn("Failed to add company via API, falling back to local data", err)
+      const fallback = {
+        id: `CO-${Date.now()}`,
+        ...payload,
+        owner: "—",
+        updatedAt: new Date().toISOString().slice(0, 10),
+      }
+      setCompanies((prev) => [...prev, fallback])
+      return fallback
+    }
+  }
+
+  const handleUpdateCompany = async (id: string, data: any) => {
+    try {
+      const res = await fetch("/api/crm/companies", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({ id, ...data }),
+      })
+      const payload = await parseJsonSafe(res)
+      if (!res.ok) throw new Error(payload?.error || "Failed to update company")
+      const updated = mapCompany(payload.company)
+      setCompanies((prev) => prev.map((c) => (c.id === id ? updated : c)))
+    } catch (err) {
+      console.warn("Failed to update company", err)
+      setCompanies((prev) => prev.map((c) => (c.id === id ? { ...c, ...data } : c)))
+    }
+  }
+
+  const handleDeleteCompany = async (id: string) => {
+    try {
+      const res = await fetch(`/api/crm/companies?id=${id}`, {
+        method: "DELETE",
+        headers: { ...getSessionHeaders() },
+      })
+      if (!res.ok) {
+        const data = await parseJsonSafe(res)
+        throw new Error(data?.error || "Failed to delete company")
+      }
+    } catch (err) {
+      console.warn("Failed to delete company", err)
+    } finally {
+      setCompanies((prev) => prev.filter((c) => c.id !== id))
+    }
+  }
+
+  const handleAddDealAPI = async (payload: {
+    title: string
+    value: number
+    stage: string
+    company?: string
+    expectedClose?: string
+    customFields?: Record<string, any>
+  }) => {
+    try {
+      const res = await fetch("/api/crm/deals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({
+          title: payload.title,
+          value: payload.value,
+          stage: payload.stage,
+          company: payload.company,
+          expectedClose: payload.expectedClose,
+          customFields: payload.customFields || {},
+        }),
+      })
+      const data = await parseJsonSafe(res)
+      if (!res.ok) throw new Error(data?.error || "Failed to add deal")
+      const deal = mapDeal(data.deal)
+      setDeals((prev) => [...prev, deal])
+      return deal
+    } catch (err) {
+      console.warn("Failed to add deal via API, falling back to local data", err)
+      const fallback = {
+        id: `D-${Date.now()}`,
+        ...payload,
+        owner: "—",
+      }
+      setDeals((prev) => [...prev, fallback])
+      return fallback
+    }
+  }
+
+  const handleUpdateDeal = async (id: string, data: any) => {
+    try {
+      const res = await fetch("/api/crm/deals", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({ id, ...data }),
+      })
+      const payload = await parseJsonSafe(res)
+      if (!res.ok) throw new Error(payload?.error || "Failed to update deal")
+      const updated = mapDeal(payload.deal)
+      setDeals((prev) => prev.map((d) => (d.id === id ? updated : d)))
+    } catch (err) {
+      console.warn("Failed to update deal", err)
+      setDeals((prev) => prev.map((d) => (d.id === id ? { ...d, ...data } : d)))
     }
   }
 
@@ -304,66 +577,6 @@ export default function CRMPage() {
               </div>
             </DialogContent>
           </Dialog>
-          <Dialog open={openAddDialog} onOpenChange={setOpenAddDialog}>
-            <DialogTrigger asChild>
-              <Button className="flex items-center gap-2">
-                <Plus className="w-4 h-4" />
-                New Contact
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Contact</DialogTitle>
-                <DialogDescription>Create a new contact in your CRM system</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Contact Name</Label>
-                  <Input
-                    id="name"
-                    placeholder="Company or contact name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="email@example.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input
-                    id="phone"
-                    placeholder="+234 800 123 4567"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="lead">Lead</SelectItem>
-                      <SelectItem value="prospect">Prospect</SelectItem>
-                      <SelectItem value="customer">Customer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button onClick={handleAddContact} className="w-full">
-                  Add Contact
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
         </div>
       </div>
 
@@ -383,6 +596,9 @@ export default function CRMPage() {
             Contacts: {contacts.length}
           </span>
           <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
+            Companies: {companies.length}
+          </span>
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
             Deals: {deals.length}
           </span>
           <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
@@ -391,10 +607,19 @@ export default function CRMPage() {
         </div>
       </div>
 
+      <CrmQualityScorecard contacts={contacts} deals={deals} />
+      <FollowupSchedulerCard
+        summary={followupSummary}
+        loading={followupLoading}
+        notice={followupNotice}
+        onGenerate={handleGenerateFollowups}
+      />
+
       {/* Tabs */}
       <Tabs defaultValue="contacts" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="contacts">Contacts</TabsTrigger>
+          <TabsTrigger value="companies">Companies</TabsTrigger>
           <TabsTrigger value="deals">Sales Pipeline</TabsTrigger>
           <TabsTrigger value="activities">Activities</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
@@ -408,12 +633,25 @@ export default function CRMPage() {
             onAddContact={handleAddContactAPI}
             onDeleteContact={handleDeleteContact}
             onUpdateContact={handleUpdateContact}
+            crmView={crmViews.contacts}
+            onViewChange={(view) => handleViewChange("contacts", view)}
+          />
+        </TabsContent>
+
+        <TabsContent value="companies" className="space-y-4">
+          <CompaniesTable
+            companies={companies}
+            onAddCompany={handleAddCompanyAPI}
+            onDeleteCompany={handleDeleteCompany}
+            onUpdateCompany={handleUpdateCompany}
+            crmView={crmViews.companies}
+            onViewChange={(view) => handleViewChange("companies", view)}
           />
         </TabsContent>
 
         {/* Deals Tab */}
         <TabsContent value="deals" className="space-y-4">
-          <DealsBoard deals={deals} />
+          <DealsBoard deals={deals} onAddDeal={handleAddDealAPI} onUpdateDeal={handleUpdateDeal} />
         </TabsContent>
 
         {/* Activities Tab */}

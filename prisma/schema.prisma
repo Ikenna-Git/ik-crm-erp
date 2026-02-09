@@ -53,6 +53,22 @@ enum NotificationType {
   ERROR
 }
 
+enum CrmEntity {
+  CONTACT
+  COMPANY
+  DEAL
+}
+
+enum CrmFieldType {
+  TEXT
+  NUMBER
+  CURRENCY
+  DATE
+  SELECT
+  MULTISELECT
+  CHECKBOX
+}
+
 enum PlaybookStatus {
   ACTIVE
   PAUSED
@@ -92,6 +108,7 @@ model Org {
   portalDocuments ClientPortalDocument[]
   automationWorkflows AutomationWorkflow[]
   webhookEndpoints WebhookEndpoint[]
+  crmFields    CrmField[]
 }
 
 model User {
@@ -174,7 +191,11 @@ model UserSettings {
   currency              String   @default("NGN")
   landing               String   @default("dashboard")
   dateFormat            String   @default("DD/MM/YYYY")
+  aiProvider            String   @default("auto")
   kpiLayout             Json?
+  crmContactView        Json?
+  crmCompanyView        Json?
+  crmDealView           Json?
   emailNotifications    Boolean  @default(true)
   productNotifications  Boolean  @default(true)
   securityNotifications Boolean  @default(true)
@@ -202,6 +223,7 @@ model Contact {
   lastContact DateTime?
   notes     String?
   tags      String?
+  customFields Json?
   company   Company? @relation(fields: [companyId], references: [id])
   companyId String?
   owner     User?    @relation(fields: [ownerId], references: [id])
@@ -220,6 +242,7 @@ model Company {
   name      String
   industry  String?
   size      String?
+  customFields Json?
   owner     User?     @relation(fields: [ownerId], references: [id])
   ownerId   String?
   createdAt DateTime  @default(now())
@@ -238,6 +261,7 @@ model Deal {
   value         Int
   stage         DealStage  @default(PROSPECT)
   expectedClose DateTime?
+  customFields  Json?
   company       Company?   @relation(fields: [companyId], references: [id])
   companyId     String?
   contact       Contact?   @relation(fields: [contactId], references: [id])
@@ -250,6 +274,25 @@ model Deal {
   tasks Task[]
   @@index([orgId])
   @@index([stage])
+}
+
+model CrmField {
+  id        String        @id @default(uuid())
+  org       Org           @relation(fields: [orgId], references: [id])
+  orgId     String
+  entity    CrmEntity
+  name      String
+  key       String
+  type      CrmFieldType
+  options   Json?
+  required  Boolean       @default(false)
+  archived  Boolean       @default(false)
+  order     Int           @default(0)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([orgId, entity])
+  @@unique([orgId, entity, key])
 }
 
 model Task {

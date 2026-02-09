@@ -79,6 +79,7 @@ const priorityColors = {
 export function TasksKanban({ searchQuery }: { searchQuery: string }) {
   const [tasks, setTasks] = useState<Task[]>(mockTasks)
   const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [stageFilter, setStageFilter] = useState<"all" | Task["stage"]>("all")
@@ -105,9 +106,8 @@ export function TasksKanban({ searchQuery }: { searchQuery: string }) {
 
   const sortedTasks = [...filteredTasks].sort((a, b) => b.startDate.localeCompare(a.startDate))
 
-  const PAGE_SIZE = 10
-  const totalPages = Math.max(1, Math.ceil(sortedTasks.length / PAGE_SIZE))
-  const pagedTasks = sortedTasks.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const totalPages = Math.max(1, Math.ceil(sortedTasks.length / pageSize))
+  const pagedTasks = sortedTasks.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   const monthOptions = Array.from(new Set(tasks.map((task) => task.startDate.slice(0, 7)))).sort()
   const visibleStages =
@@ -115,7 +115,7 @@ export function TasksKanban({ searchQuery }: { searchQuery: string }) {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery, stageFilter, monthFilter, priorityFilter])
+  }, [searchQuery, stageFilter, monthFilter, priorityFilter, pageSize])
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages)
@@ -327,7 +327,13 @@ export function TasksKanban({ searchQuery }: { searchQuery: string }) {
         })}
       </div>
 
-      <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+      <PaginationControls
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
+      />
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

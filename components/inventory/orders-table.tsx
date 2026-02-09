@@ -70,6 +70,7 @@ const formatNaira = (amount: number) => {
 export function OrdersTable({ searchQuery }: { searchQuery: string }) {
   const [orders, setOrders] = useState<PurchaseOrder[]>(mockOrders)
   const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({
@@ -130,13 +131,12 @@ export function OrdersTable({ searchQuery }: { searchQuery: string }) {
       order.supplier.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
-  const PAGE_SIZE = 10
-  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE))
-  const pagedOrders = filteredOrders.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize))
+  const pagedOrders = filteredOrders.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery])
+  }, [searchQuery, pageSize])
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages)
@@ -302,6 +302,8 @@ export function OrdersTable({ searchQuery }: { searchQuery: string }) {
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={setCurrentPage}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
             />
           </div>
         </CardContent>

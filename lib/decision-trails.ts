@@ -36,6 +36,7 @@ export const contactSnapshot = (contact: Contact) => ({
   lastContact: contact.lastContact ? contact.lastContact.toISOString() : null,
   notes: contact.notes,
   tags: contact.tags,
+  customFields: contact.customFields ?? null,
   companyId: contact.companyId,
   ownerId: contact.ownerId,
 })
@@ -45,6 +46,7 @@ export const dealSnapshot = (deal: Deal) => ({
   value: deal.value,
   stage: deal.stage,
   expectedClose: deal.expectedClose ? deal.expectedClose.toISOString() : null,
+  customFields: deal.customFields ?? null,
   companyId: deal.companyId,
   contactId: deal.contactId,
   ownerId: deal.ownerId,

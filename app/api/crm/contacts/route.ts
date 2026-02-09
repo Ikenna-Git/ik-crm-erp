@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   try {
     const { org } = await getUserFromRequest(request)
     const body = await request.json()
-    const { name, email, phone, company, status, revenue, lastContact, tags, ownerId, notes } = body || {}
+    const { name, email, phone, company, status, revenue, lastContact, tags, ownerId, notes, customFields } = body || {}
     if (!name || !email) {
       return NextResponse.json({ error: "Name and email required" }, { status: 400 })
     }
@@ -55,6 +55,7 @@ export async function POST(request: Request) {
         status: safeStatus,
         revenue: typeof revenue === "number" ? revenue : undefined,
         lastContact: lastContact ? new Date(lastContact) : undefined,
+        customFields: customFields && typeof customFields === "object" ? customFields : undefined,
         orgId: org.id,
       },
       include: { company: true },
@@ -80,7 +81,7 @@ export async function PATCH(request: Request) {
   try {
     const { org, user } = await getUserFromRequest(request)
     const body = await request.json()
-    const { id, name, email, phone, company, status, revenue, lastContact, tags, ownerId, notes } = body || {}
+    const { id, name, email, phone, company, status, revenue, lastContact, tags, ownerId, notes, customFields } = body || {}
 
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 })
@@ -112,6 +113,7 @@ export async function PATCH(request: Request) {
         status: safeStatus,
         revenue: typeof revenue === "number" ? revenue : undefined,
         lastContact: lastContact ? new Date(lastContact) : undefined,
+        customFields: customFields && typeof customFields === "object" ? customFields : undefined,
         ...(companyId !== undefined ? { companyId } : {}),
       },
       include: { company: true },

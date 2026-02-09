@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getUserFromRequest } from "@/lib/request-user"
-import { buildAccountingSummary, buildCrmSummary } from "@/lib/report-builders"
+import { buildAccountingSummary, buildCrmSummary, buildVatSummary } from "@/lib/report-builders"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable reports." }, { status: 503 })
@@ -19,6 +19,11 @@ export async function GET(request: Request) {
 
     if (type === "crm") {
       const summary = await buildCrmSummary(org.id)
+      return NextResponse.json({ summary })
+    }
+
+    if (type === "vat") {
+      const summary = await buildVatSummary(org.id)
       return NextResponse.json({ summary })
     }
 

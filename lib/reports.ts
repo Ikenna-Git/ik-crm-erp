@@ -1,4 +1,4 @@
-export type ReportType = "analytics" | "accounting" | "crm"
+export type ReportType = "analytics" | "accounting" | "crm" | "vat" | "audit"
 
 export type ReportRow = Record<string, string | number | null | undefined>
 
@@ -22,6 +22,14 @@ const sampleData: Record<ReportType, ReportRow[]> = {
     { type: "deal", title: "ERP License - Globex", stage: "negotiation", value: 640000 },
     { type: "contact", name: "Adaeze Okafor", status: "lead", company: "Acme Corp" },
     { type: "contact", name: "Ibrahim Musa", status: "customer", company: "Nimbus" },
+  ],
+  vat: [
+    { invoice: "INV-2025-001", client: "Acme Corp", amount: 450000, vatRate: "7.5%", vatDue: 33750, status: "paid" },
+    { invoice: "INV-2025-014", client: "Globex", amount: 320000, vatRate: "7.5%", vatDue: 24000, status: "sent" },
+  ],
+  audit: [
+    { timestamp: "2025-02-10T10:21:00Z", user: "ikchils@gmail.com", action: "Updated invoice", entity: "Invoice", entityId: "INV-2025-014" },
+    { timestamp: "2025-02-11T08:32:00Z", user: "System", action: "Generated follow-up tasks", entity: "Task", entityId: "-" },
   ],
 }
 

@@ -77,10 +77,27 @@ const buildDemoVideos = (count: number): DemoVideo[] =>
   }))
 
 const demoVideos: DemoVideo[] = buildDemoVideos(70)
+const normalizeKey = (video: DemoVideo) =>
+  `${video.title.toLowerCase().trim()}::${video.category.toLowerCase().trim()}`
+const dedupeVideos = (items: DemoVideo[]) => {
+  const byId = new Map<string, DemoVideo>()
+  items.forEach((item) => {
+    if (!byId.has(item.id)) byId.set(item.id, item)
+  })
+  const bySignature = new Map<string, DemoVideo>()
+  Array.from(byId.values()).forEach((item) => {
+    const signature = normalizeKey(item)
+    if (!bySignature.has(signature)) {
+      bySignature.set(signature, item)
+    }
+  })
+  return Array.from(bySignature.values())
+}
 
 export default function DemoPage() {
   const [videos, setVideos] = useState<DemoVideo[]>(demoVideos)
   const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [selectedVideo, setSelectedVideo] = useState<DemoVideo | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -134,16 +151,13 @@ export default function DemoPage() {
       if (stored) {
         const parsed = JSON.parse(stored)
         if (Array.isArray(parsed)) {
-          const merged = [
-            ...parsed,
-            ...demoVideos.filter((seed) => !parsed.some((item: DemoVideo) => item.id === seed.id)),
-          ]
+          const merged = dedupeVideos([...parsed, ...demoVideos])
           setVideos(merged)
           localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
           return
         }
       }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(demoVideos))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(dedupeVideos(demoVideos)))
     } catch (err) {
       console.warn("Failed to load demo videos", err)
     }
@@ -160,15 +174,22 @@ export default function DemoPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [videos.length])
+  }, [videos.length, pageSize])
 
-  const PAGE_SIZE = 10
-  const totalPages = Math.max(1, Math.ceil(videos.length / PAGE_SIZE))
-  const pagedVideos = videos.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const totalPages = Math.max(1, Math.ceil(videos.length / pageSize))
+  const pagedVideos = videos.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages)
   }, [currentPage, totalPages])
+  const categoryCounts = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const video of videos) {
+      map.set(video.category, (map.get(video.category) || 0) + 1)
+    }
+    return map
+  }, [videos])
+
   const grouped = useMemo(() => {
     const map = new Map<string, DemoVideo[]>()
     for (const video of pagedVideos) {
@@ -226,9 +247,9 @@ export default function DemoPage() {
       videoUrl: form.videoUrl?.trim() || "",
     }
     if (editingId) {
-      setVideos((prev) => prev.map((video) => (video.id === editingId ? payload : video)))
+      setVideos((prev) => dedupeVideos(prev.map((video) => (video.id === editingId ? payload : video))))
     } else {
-      setVideos((prev) => [payload, ...prev])
+      setVideos((prev) => dedupeVideos([payload, ...prev]))
     }
     setDialogOpen(false)
     setEditingId(null)
@@ -357,7 +378,7 @@ export default function DemoPage() {
                   <p className="text-sm text-muted-foreground">Demos focused on {category.toLowerCase()}.</p>
                 </div>
                 <Button variant="outline" size="sm">
-                  {videos.length} videos
+                  {categoryCounts.get(category) || videos.length} videos
                 </Button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -439,6 +460,8 @@ export default function DemoPage() {
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={setCurrentPage}
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
           />
         </div>
       </div>

@@ -18,6 +18,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { EmployeesTable, type Employee, mockEmployees } from "@/components/hr/employees-table"
 import { PayrollTable, type PayrollRecord, mockPayroll } from "@/components/hr/payroll-table"
 import { AttendanceTracker } from "@/components/hr/attendance-tracker"
+import { PositionsTable } from "@/components/hr/positions-table"
+import { HrQualityScorecard } from "@/components/hr/hr-quality-scorecard"
+import { CompliancePack } from "@/components/hr/compliance-pack"
 
 export default function HRPage() {
   const searchQuery = ""
@@ -242,6 +245,9 @@ export default function HRPage() {
         </div>
       </div>
 
+      <HrQualityScorecard employees={employees} />
+      <CompliancePack employeesCount={employees.length} payrollRuns={payroll.length} />
+
       {/* People Pulse */}
       <div className="rounded-xl border border-border bg-card/70 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-start gap-3">
@@ -268,9 +274,10 @@ export default function HRPage() {
 
       {/* Tabs */}
       <Tabs defaultValue="employees" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="employees">Employees</TabsTrigger>
           <TabsTrigger value="payroll">Payroll</TabsTrigger>
+          <TabsTrigger value="positions">Positions</TabsTrigger>
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
         </TabsList>
 
@@ -294,6 +301,10 @@ export default function HRPage() {
             onUpdatePayroll={handleUpdatePayroll}
             onDeletePayroll={handleDeletePayroll}
           />
+        </TabsContent>
+
+        <TabsContent value="positions" className="space-y-4">
+          <PositionsTable />
         </TabsContent>
 
         {/* Attendance Tab */}

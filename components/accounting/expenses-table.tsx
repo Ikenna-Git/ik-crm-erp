@@ -80,6 +80,7 @@ export function ExpensesTable({
 }: Props) {
   const [expenses, setExpenses] = useState<Expense[]>(providedExpenses || mockExpenses)
   const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
@@ -96,7 +97,7 @@ export function ExpensesTable({
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery])
+  }, [searchQuery, pageSize])
 
   const filteredExpenses = expenses.filter(
     (expense) =>
@@ -108,9 +109,8 @@ export function ExpensesTable({
     (b.date || "").localeCompare(a.date || ""),
   )
 
-  const PAGE_SIZE = 10
-  const totalPages = Math.max(1, Math.ceil(sortedExpenses.length / PAGE_SIZE))
-  const pagedExpenses = sortedExpenses.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const totalPages = Math.max(1, Math.ceil(sortedExpenses.length / pageSize))
+  const pagedExpenses = sortedExpenses.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages)
@@ -313,6 +313,8 @@ export function ExpensesTable({
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={setCurrentPage}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
             />
           </div>
         </CardContent>

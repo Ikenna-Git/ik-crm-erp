@@ -11,7 +11,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
   PieChart,
   Pie,
@@ -41,6 +40,7 @@ export function FinancialReports() {
   const [expenseBreakdown, setExpenseBreakdown] = useState(fallbackExpenseBreakdown)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [info, setInfo] = useState("")
 
   useEffect(() => {
     const loadSummary = async () => {
@@ -53,19 +53,28 @@ export function FinancialReports() {
         if (res.status === 503) return
         const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data?.error || "Failed to load reports")
-        if (data.summary?.months) {
+        const months = Array.isArray(data.summary?.months) ? data.summary.months : []
+        const hasSignal = months.some(
+          (entry: any) => Number(entry.revenue || 0) > 0 || Number(entry.expenses || 0) > 0 || Number(entry.profit || 0) > 0,
+        )
+        if (months.length && hasSignal) {
           setMonthlyData(
-            data.summary.months.map((entry: any) => ({
+            months.map((entry: any) => ({
               month: entry.month,
               revenue: entry.revenue,
               expenses: entry.expenses,
               profit: entry.profit,
             })),
           )
+          setInfo("")
+        } else {
+          setInfo("No accounting data yet. Showing demo insights for now.")
         }
-        if (data.summary?.expenseBreakdown) {
+        const breakdown = Array.isArray(data.summary?.expenseBreakdown) ? data.summary.expenseBreakdown : []
+        const hasBreakdown = breakdown.some((entry: any) => Number(entry.value || 0) > 0)
+        if (breakdown.length && hasBreakdown) {
           setExpenseBreakdown(
-            data.summary.expenseBreakdown.map((entry: any, idx: number) => ({
+            breakdown.map((entry: any, idx: number) => ({
               name: entry.name,
               value: entry.value,
               fill: fallbackExpenseBreakdown[idx % fallbackExpenseBreakdown.length].fill,
@@ -113,6 +122,7 @@ export function FinancialReports() {
       </div>
       {loading && <p className="text-xs text-muted-foreground">Updating report data...</p>}
       {error && <p className="text-xs text-destructive">{error}</p>}
+      {!error && info && <p className="text-xs text-muted-foreground">{info}</p>}
 
       {/* Revenue vs Expenses Chart */}
       <Card>
@@ -121,13 +131,26 @@ export function FinancialReports() {
           <CardDescription>Monthly comparison over the last 6 months</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-[#0f766e]" />
+              Revenue
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-[#f87171]" />
+              Expenses
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-[#22c55e]" />
+              Profit
+            </div>
+          </div>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={monthlyData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis dataKey="month" stroke="#9ca3af" />
               <YAxis stroke="#9ca3af" />
               <Tooltip />
-              <Legend />
               <Line type="monotone" dataKey="revenue" stroke="#0f766e" strokeWidth={2} />
               <Line type="monotone" dataKey="expenses" stroke="#f87171" strokeWidth={2} />
               <Line type="monotone" dataKey="profit" stroke="#22c55e" strokeWidth={2} />
@@ -143,13 +166,16 @@ export function FinancialReports() {
           <CardDescription>Monthly profit margins</CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="h-2 w-2 rounded-full bg-[#0f766e]" />
+            Profit
+          </div>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={monthlyData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis dataKey="month" stroke="#9ca3af" />
               <YAxis stroke="#9ca3af" />
               <Tooltip />
-              <Legend />
               <Bar dataKey="profit" fill="#0f766e" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>

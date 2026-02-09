@@ -20,6 +20,7 @@ import { InvoicesTable, type Invoice } from "@/components/accounting/invoices-ta
 import { ExpensesTable, type Expense } from "@/components/accounting/expenses-table"
 import { FinancialReports } from "@/components/accounting/financial-reports"
 import { getSessionHeaders } from "@/lib/user-settings"
+import { formatNaira } from "@/lib/currency"
 
 const invoiceClients = ["Acme Corp", "Northwind", "Globex", "Venture Labs", "Nimbus", "Zenith"]
 const expenseCategories = ["utilities", "travel", "equipment", "software", "office", "meals"]
@@ -52,6 +53,27 @@ const buildFallbackExpenses = (count: number): Expense[] =>
 
 const fallbackInvoices = buildFallbackInvoices(70)
 const fallbackExpenses = buildFallbackExpenses(70)
+
+const reportPacks = [
+  {
+    id: "close-pack",
+    title: "Month-end close pack",
+    detail: "GL summary, AR/AP aging, expense ledger",
+    cadence: "Monthly",
+  },
+  {
+    id: "cashflow-pack",
+    title: "Cash flow pulse",
+    detail: "Revenue vs expenses, profit margin, burn rate",
+    cadence: "Weekly",
+  },
+  {
+    id: "compliance-pack",
+    title: "Compliance bundle",
+    detail: "VAT summary, PAYE schedule, statutory remittances",
+    cadence: "Quarterly",
+  },
+]
 
 export default function AccountingPage() {
   const searchQuery = ""
@@ -486,6 +508,47 @@ export default function AccountingPage() {
     }
   }
 
+  const handleExportCompliance = async (type: "vat" | "audit", target: "desktop" | "email") => {
+    try {
+      if (target === "desktop") {
+        const res = await fetch("/api/reports/export", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+          body: JSON.stringify({ type, target: "desktop" }),
+        })
+        if (!res.ok) throw new Error("Failed to export")
+        const blob = await res.blob()
+        const url = window.URL.createObjectURL(blob)
+        const link = document.createElement("a")
+        link.href = url
+        link.download = `${type}-report.csv`
+        link.click()
+        window.URL.revokeObjectURL(url)
+        return
+      }
+
+      const res = await fetch("/api/reports/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({ type, target: "email", email: exportEmail }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(data.error || "Failed to send email")
+        return
+      }
+      alert(data.message || "Report sent")
+    } catch (err) {
+      alert("Export failed. Please try again.")
+    }
+  }
+
+  const vatRate = 0.075
+  const vatTaxable = invoices
+    .filter((inv) => ["paid", "sent", "overdue"].includes(inv.status))
+    .reduce((sum, inv) => sum + (inv.amount || 0), 0)
+  const vatDue = Math.round(vatTaxable * vatRate)
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -770,6 +833,72 @@ export default function AccountingPage() {
         {/* Reports Tab */}
         <TabsContent value="reports" className="space-y-4">
           <FinancialReports />
+          <Card>
+            <CardHeader>
+              <CardTitle>Report Packs</CardTitle>
+              <CardDescription>Curated bundles for finance, leadership, and compliance.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {reportPacks.map((pack) => (
+                <div key={pack.id} className="flex flex-col gap-3 rounded-lg border border-border p-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="font-medium">{pack.title}</p>
+                    <p className="text-sm text-muted-foreground">{pack.detail}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{pack.cadence} cadence</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={() => handleExportReports("desktop")}>
+                      Export CSV
+                    </Button>
+                    <Button size="sm" variant="outline" className="bg-transparent" onClick={() => handleExportReports("email")}>
+                      Send Email
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Regional Compliance Pack (NGN)</CardTitle>
+              <CardDescription>VAT presets and audit-ready exports for regulators.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-lg border border-border p-4 space-y-2">
+                  <p className="font-medium">VAT Snapshot</p>
+                  <p className="text-sm text-muted-foreground">7.5% VAT on taxable revenue.</p>
+                  <div className="text-sm">
+                    <p>Taxable revenue: {financeUnlocked ? formatNaira(vatTaxable) : "Locked"}</p>
+                    <p>VAT due: {financeUnlocked ? formatNaira(vatDue) : "Locked"}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <Button size="sm" onClick={() => handleExportCompliance("vat", "desktop")}>
+                      Export VAT CSV
+                    </Button>
+                    <Button size="sm" variant="outline" className="bg-transparent" onClick={() => handleExportCompliance("vat", "email")}>
+                      Email VAT CSV
+                    </Button>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-border p-4 space-y-2">
+                  <p className="font-medium">Audit-ready exports</p>
+                  <p className="text-sm text-muted-foreground">
+                    Pull action logs, approval trails, and edits for compliance review.
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <Button size="sm" onClick={() => handleExportCompliance("audit", "desktop")}>
+                      Export audit log
+                    </Button>
+                    <Button size="sm" variant="outline" className="bg-transparent" onClick={() => handleExportCompliance("audit", "email")}>
+                      Email audit log
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="import" className="space-y-4">

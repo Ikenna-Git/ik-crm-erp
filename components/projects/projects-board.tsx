@@ -111,6 +111,7 @@ export function ProjectsBoard({
 }: ProjectsBoardProps) {
   const [projects, setProjects] = useState<Project[]>(providedProjects || mockProjects)
   const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({
@@ -138,13 +139,12 @@ export function ProjectsBoard({
     return matchesQuery && matchesStatus
   })
 
-  const PAGE_SIZE = 10
-  const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PAGE_SIZE))
-  const pagedProjects = filteredProjects.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const totalPages = Math.max(1, Math.ceil(filteredProjects.length / pageSize))
+  const pagedProjects = filteredProjects.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery, statusFilter])
+  }, [searchQuery, statusFilter, pageSize])
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages)
@@ -358,7 +358,13 @@ export function ProjectsBoard({
         })}
       </div>
 
-      <PaginationControls currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+      <PaginationControls
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        pageSize={pageSize}
+        onPageSizeChange={setPageSize}
+      />
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
