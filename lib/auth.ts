@@ -2,8 +2,11 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import type { AuthOptions } from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import CredentialsProvider from "next-auth/providers/credentials"
-import { prisma } from "@/lib/prisma"
+import { prisma, withPrismaRetry } from "@/lib/prisma"
 import { getDefaultOrg } from "@/lib/defaultOrg"
+
+const useAdapter = process.env.NODE_ENV === "production" || process.env.NEXTAUTH_USE_ADAPTER === "true"
+const allowCredentialsFallback = process.env.NODE_ENV !== "production" || process.env.NEXTAUTH_ALLOW_FALLBACK === "true"
 
 const buildProviders = () => {
   const providers = []
@@ -29,29 +32,54 @@ const buildProviders = () => {
       authorize: async (credentials) => {
         const email = credentials?.email?.toLowerCase().trim()
         if (!email) return null
-
         const name = credentials?.name || email.split("@")[0]
-        const org = await getDefaultOrg()
         const defaultAdmin = (process.env.DEFAULT_SUPER_ADMIN_EMAIL || "ikchils@gmail.com").toLowerCase()
         const role = email === defaultAdmin ? "SUPER_ADMIN" : "USER"
 
-        const user = await prisma.user.upsert({
-          where: { email },
-          update: { name },
-          create: {
-            email,
+        if (!useAdapter) {
+          return {
+            id: `local-${Buffer.from(email).toString("hex").slice(0, 20)}`,
             name,
+            email,
             role,
-            orgId: org.id,
-          },
-        })
+          } as any
+        }
 
-        return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        } as any
+        try {
+          const org = await getDefaultOrg()
+
+          const user = await withPrismaRetry("auth.authorize.upsertUser", () =>
+            prisma.user.upsert({
+              where: { email },
+              update: { name },
+              create: {
+                email,
+                name,
+                role,
+                orgId: org.id,
+              },
+            }),
+          )
+
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+          } as any
+        } catch (error) {
+          console.error("Credentials authorize failed", error)
+          if (allowCredentialsFallback) {
+            console.warn("Using local credentials fallback user (DB unavailable).")
+            return {
+              id: `local-${Buffer.from(email).toString("hex").slice(0, 20)}`,
+              name,
+              email,
+              role,
+            } as any
+          }
+          return null
+        }
       },
     }),
   )
@@ -60,9 +88,10 @@ const buildProviders = () => {
 }
 
 export const authOptions: AuthOptions = {
-  adapter: PrismaAdapter(prisma),
+  adapter: useAdapter ? PrismaAdapter(prisma) : undefined,
   providers: buildProviders(),
   session: { strategy: "jwt" },
+  debug: process.env.NODE_ENV !== "production",
   pages: {
     signIn: "/login",
   },

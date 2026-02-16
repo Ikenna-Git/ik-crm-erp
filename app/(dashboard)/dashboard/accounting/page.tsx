@@ -272,6 +272,7 @@ export default function AccountingPage() {
     } else {
       localStorage.setItem("civis_finance_access_code", "2468")
     }
+    localStorage.setItem("civis_finance_unlocked", "false")
   }, [])
 
   const unlockFinance = () => {
@@ -281,6 +282,9 @@ export default function AccountingPage() {
       return
     }
     setFinanceUnlocked(true)
+    if (typeof window !== "undefined") {
+      localStorage.setItem("civis_finance_unlocked", "true")
+    }
     setFinanceInput("")
     setFinanceError("")
     setFinanceNotice("Finance view unlocked.")
@@ -288,6 +292,9 @@ export default function AccountingPage() {
 
   const lockFinance = () => {
     setFinanceUnlocked(false)
+    if (typeof window !== "undefined") {
+      localStorage.setItem("civis_finance_unlocked", "false")
+    }
     setFinanceError("")
     setFinanceNotice("Finance view locked.")
   }
@@ -554,7 +561,9 @@ export default function AccountingPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Accounting</h1>
+          <h1 className="text-3xl font-bold" data-ai-anchor="accounting-header">
+            Accounting
+          </h1>
           <p className="text-muted-foreground mt-1">Manage invoices, expenses, and financial reports</p>
           {loading && <p className="text-xs text-muted-foreground">Loading...</p>}
         </div>

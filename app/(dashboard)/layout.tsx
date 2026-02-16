@@ -8,6 +8,7 @@ import { useSession } from "next-auth/react"
 import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { OfflineBanner } from "@/components/offline-banner"
+import { AiAssistPopover } from "@/components/ai-assist-popover"
 
 export default function DashboardLayout({
   children,
@@ -57,6 +58,7 @@ export default function DashboardLayout({
         <OfflineBanner />
         <DashboardHeader />
         <main className="flex-1 overflow-auto">{children}</main>
+        <AiAssistPopover />
       </div>
     </div>
   )

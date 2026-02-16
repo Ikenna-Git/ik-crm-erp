@@ -106,24 +106,79 @@ export default function CRMPage() {
     }
   }
 
-  const buildLocalFollowups = () => {
-    const inactiveContacts = contacts
-      .filter((contact) => !contact.lastContactAt)
-      .slice(0, 6)
-      .map((contact: any) => ({
-        id: contact.id,
-        label: contact.name,
-        meta: "No recent touchpoint",
-      }))
+  const toDate = (value?: string | null) => {
+    if (!value) return null
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? null : date
+  }
 
-    const stalledDeals = deals
-      .filter((deal) => ["proposal", "negotiation"].includes(deal.stage))
-      .slice(0, 6)
-      .map((deal: any) => ({
-        id: deal.id,
-        label: deal.title,
-        meta: `${deal.stage} stage`,
-      }))
+  const daysIdleFrom = (value?: string | null) => {
+    const date = toDate(value)
+    if (!date) return null
+    return Math.max(0, Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24)))
+  }
+
+  const getPriority = (type: "contact" | "deal", daysIdle: number) => {
+    if (type === "contact") {
+      if (daysIdle >= 45) return "critical" as const
+      if (daysIdle >= 30) return "high" as const
+      return "normal" as const
+    }
+    if (daysIdle >= 20) return "critical" as const
+    if (daysIdle >= 14) return "high" as const
+    return "normal" as const
+  }
+
+  const priorityWeight = {
+    critical: 3,
+    high: 2,
+    normal: 1,
+  } as const
+
+  const sortByPriorityAndAge = <T extends { priority: "critical" | "high" | "normal"; daysIdle: number; label: string }>(
+    items: T[],
+  ) =>
+    [...items].sort((a, b) => {
+      const priorityDelta = priorityWeight[b.priority] - priorityWeight[a.priority]
+      if (priorityDelta !== 0) return priorityDelta
+      const idleDelta = b.daysIdle - a.daysIdle
+      if (idleDelta !== 0) return idleDelta
+      return a.label.localeCompare(b.label)
+    })
+
+  const buildLocalFollowups = () => {
+    const inactiveContacts = sortByPriorityAndAge(
+      contacts
+        .map((contact) => {
+          const daysIdle = daysIdleFrom(contact.lastContactAt || contact.updatedAt)
+          if (daysIdle === null || daysIdle < 21) return null
+          return {
+            id: contact.id,
+            label: contact.name,
+            meta: `${daysIdle} days idle`,
+            daysIdle,
+            priority: getPriority("contact", daysIdle),
+          }
+        })
+        .filter(Boolean) as Array<{ id: string; label: string; meta: string; daysIdle: number; priority: "critical" | "high" | "normal" }>,
+    ).slice(0, 10)
+
+    const stalledDeals = sortByPriorityAndAge(
+      deals
+        .map((deal) => {
+          if (!["proposal", "negotiation", "qualified"].includes(String(deal.stage).toLowerCase())) return null
+          const daysIdle = daysIdleFrom(deal.updatedAt)
+          if (daysIdle === null || daysIdle < 10) return null
+          return {
+            id: deal.id,
+            label: deal.title,
+            meta: `${String(deal.stage).toLowerCase()} • ${daysIdle} days`,
+            daysIdle,
+            priority: getPriority("deal", daysIdle),
+          }
+        })
+        .filter(Boolean) as Array<{ id: string; label: string; meta: string; daysIdle: number; priority: "critical" | "high" | "normal" }>,
+    ).slice(0, 10)
 
     return {
       inactiveContacts: { count: inactiveContacts.length, items: inactiveContacts },
@@ -144,6 +199,9 @@ export default function CRMPage() {
       const data = await parseJsonSafe(res)
       if (!res.ok) throw new Error(data?.error || "Failed to load follow-ups")
       setFollowupSummary(data.summary)
+      if (data?.simulated) {
+        setFollowupNotice("Showing simulated follow-ups while database is offline.")
+      }
     } catch (err: any) {
       console.warn("Failed to load follow-ups", err)
       setFollowupSummary(buildLocalFollowups())
@@ -168,7 +226,17 @@ export default function CRMPage() {
       const data = await parseJsonSafe(res)
       if (!res.ok) throw new Error(data?.error || "Failed to generate follow-ups")
       const created = data.created?.contacts + data.created?.deals
-      setFollowupNotice(`Generated ${created || 0} follow-up tasks.`)
+      if (data?.simulated) {
+        setFollowupNotice(`Simulated mode: generated ${created || 0} follow-up tasks while DB is offline.`)
+        setFollowupSummary(data.summary)
+        return
+      }
+      const skipped = Number(data.skipped || 0)
+      setFollowupNotice(
+        skipped > 0
+          ? `Generated ${created || 0} follow-up tasks. ${skipped} item(s) were skipped safely.`
+          : `Generated ${created || 0} follow-up tasks.`,
+      )
       setFollowupSummary(data.summary)
     } catch (err: any) {
       setFollowupNotice(err?.message || "Failed to generate follow-ups.")
@@ -540,7 +608,9 @@ export default function CRMPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">CRM Dashboard</h1>
+          <h1 className="text-3xl font-bold" data-ai-anchor="crm-header">
+            CRM Dashboard
+          </h1>
           <p className="text-muted-foreground mt-1">Manage contacts, deals, and sales activities</p>
           {loading && <p className="text-xs text-muted-foreground">Loading...</p>}
         </div>

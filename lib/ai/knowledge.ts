@@ -4,6 +4,12 @@ export type KnowledgeEntry = {
   content: string
 }
 
+export type BestPracticeEntry = {
+  title: string
+  keywords: string[]
+  guidance: string
+}
+
 export const CIVIS_KB: KnowledgeEntry[] = [
   {
     title: "CRM custom fields",
@@ -43,6 +49,45 @@ export const CIVIS_KB: KnowledgeEntry[] = [
   },
 ]
 
+export const CIVIS_BEST_PRACTICES: BestPracticeEntry[] = [
+  {
+    title: "CRM data hygiene",
+    keywords: ["crm", "lead", "contact", "pipeline", "quality", "duplicate"],
+    guidance:
+      "Keep one owner and one next action per deal. Require source, stage, expected close date, and last activity date to prevent silent pipeline decay.",
+  },
+  {
+    title: "Sales follow-up cadence",
+    keywords: ["follow-up", "sales", "deal", "stalled", "inactivity"],
+    guidance:
+      "Set inactivity triggers by stage (e.g. 3 days in discovery, 5 days in proposal). Auto-create reminders before opportunities go cold.",
+  },
+  {
+    title: "Collections and cashflow",
+    keywords: ["invoice", "accounting", "cashflow", "receivable", "overdue"],
+    guidance:
+      "Use a fixed invoice reminder ladder: pre-due reminder, due-date notice, and escalation at 7+ days overdue with assigned owner.",
+  },
+  {
+    title: "HR attendance discipline",
+    keywords: ["hr", "attendance", "leave", "payroll", "employee"],
+    guidance:
+      "Track attendance status daily and enforce leave windows with return-date alerts so payroll closes with fewer manual corrections.",
+  },
+  {
+    title: "Operations reliability",
+    keywords: ["ops", "workflow", "playbook", "webhook", "automation"],
+    guidance:
+      "Every automation should have owner, fallback step, and success metric. Review failed runs weekly and keep audit evidence for each critical flow.",
+  },
+  {
+    title: "Security baseline",
+    keywords: ["security", "admin", "access", "role", "audit"],
+    guidance:
+      "Apply least-privilege roles, rotate secrets quarterly, enforce MFA for admins, and review audit logs for unusual behavior every week.",
+  },
+]
+
 export const findKnowledge = (query: string) => {
   const input = query.toLowerCase()
   let best: { entry: KnowledgeEntry; score: number } | null = null
@@ -53,4 +98,20 @@ export const findKnowledge = (query: string) => {
     }
   }
   return best?.entry || null
+}
+
+export const getBestPracticeNuggets = (query: string, max = 3) => {
+  const input = query.toLowerCase()
+  const scored = CIVIS_BEST_PRACTICES.map((entry) => ({
+    entry,
+    score: entry.keywords.reduce((sum, keyword) => (input.includes(keyword) ? sum + 1 : sum), 0),
+  }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+
+  if (!scored.length) {
+    return CIVIS_BEST_PRACTICES.slice(0, max).map((item) => item.guidance)
+  }
+
+  return scored.slice(0, max).map((item) => item.entry.guidance)
 }

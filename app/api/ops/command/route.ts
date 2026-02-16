@@ -117,6 +117,15 @@ export async function GET(request: Request) {
     })
   } catch (error) {
     console.error("Ops command center fetch failed", error)
-    return NextResponse.json({ error: "Failed to load ops command center" }, { status: 500 })
+    const detail = error instanceof Error ? error.message : "Unknown error"
+    return NextResponse.json(
+      {
+        error:
+          process.env.NODE_ENV === "development"
+            ? `Failed to load ops command center: ${detail}`
+            : "Failed to load ops command center",
+      },
+      { status: 503 },
+    )
   }
 }

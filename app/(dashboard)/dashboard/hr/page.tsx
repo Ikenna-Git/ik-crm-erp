@@ -105,7 +105,9 @@ export default function HRPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">HR & Employees</h1>
+          <h1 className="text-3xl font-bold" data-ai-anchor="hr-header">
+            HR & Employees
+          </h1>
           <p className="text-muted-foreground mt-1">Manage employees, payroll, and attendance</p>
         </div>
         <div className="flex gap-2">

@@ -692,7 +692,9 @@ export default function OperationsPage() {
   return (
     <div className="p-6 space-y-6">
       <div className="space-y-1">
-        <h1 className="text-3xl font-bold">Operations Hub</h1>
+        <h1 className="text-3xl font-bold" data-ai-anchor="operations-header">
+          Operations Hub
+        </h1>
         <p className="text-muted-foreground">
           Workflows, approvals, integrations, AI insights, audit trails, and compliance in one place.
         </p>

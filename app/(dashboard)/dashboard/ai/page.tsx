@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Sparkles, Send, Wand2, ListChecks, Mail, Activity } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -8,14 +9,19 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { getSessionHeaders } from "@/lib/user-settings"
+import { writeAiAssistInstruction, type AiAssistInstruction } from "@/lib/ai-assist"
 
 type ChatMessage = {
   role: "user" | "assistant"
   content: string
 }
 
+type ChatAction = AiAssistInstruction
+
 const STORAGE_KEY = "civis_ai_chat"
 const quickPrompts = [
+  "Guide me through Civis as a new team lead.",
+  "Guide me on step 2 (CRM deep dive).",
   "Summarize my CRM pipeline this week.",
   "How do I add a custom field in CRM?",
   "Draft a follow-up email to a lead.",
@@ -32,6 +38,7 @@ const tourSteps = [
 ]
 
 export default function CivisAIPage() {
+  const router = useRouter()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [sending, setSending] = useState(false)
@@ -81,16 +88,32 @@ export default function CivisAIPage() {
     setInput("")
     setSending(true)
     setError("")
+
+    const headers: Record<string, string> = { "Content-Type": "application/json", ...getSessionHeaders() }
+    if (typeof window !== "undefined") {
+      headers["x-current-path"] = window.location.pathname
+      headers["x-hr-sensitive-unlocked"] = localStorage.getItem("civis_payroll_unlocked") === "true" ? "true" : "false"
+      headers["x-finance-sensitive-unlocked"] =
+        localStorage.getItem("civis_finance_unlocked") === "true" ? "true" : "false"
+    }
+
     try {
       const res = await fetch("/api/ai/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        headers,
         body: JSON.stringify({ messages: nextMessages, mode, context }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || "Failed to get response")
       const reply = data?.message || "I’m ready when you are."
       setMessages([...nextMessages, { role: "assistant", content: reply }])
+
+      const actions = Array.isArray(data?.actions) ? (data.actions as ChatAction[]) : []
+      const navigateAction = actions.find((item) => item?.type === "navigate" && item.route)
+      if (navigateAction && data?.provider === "civis-nav-engine") {
+        writeAiAssistInstruction(navigateAction)
+        router.push(navigateAction.route)
+      }
     } catch (err: any) {
       setError(err?.message || "Civis AI is unavailable right now.")
       setMessages([...nextMessages, { role: "assistant", content: "I ran into an error. Try again in a moment." }])
@@ -139,8 +162,17 @@ export default function CivisAIPage() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || "Failed to generate follow-ups")
       const created = data?.created
+      const skipped = Number(data?.skipped || 0)
+      if (data?.simulated) {
+        setTaskStatus(
+          `Simulated mode: created ${created?.contacts || 0} contact follow-ups and ${created?.deals || 0} stalled deal tasks while DB is offline.`,
+        )
+        return
+      }
       setTaskStatus(
-        `Created ${created?.contacts || 0} contact follow-ups and ${created?.deals || 0} stalled deal tasks.`,
+        skipped > 0
+          ? `Created ${created?.contacts || 0} contact follow-ups and ${created?.deals || 0} stalled deal tasks. ${skipped} item(s) were skipped safely.`
+          : `Created ${created?.contacts || 0} contact follow-ups and ${created?.deals || 0} stalled deal tasks.`,
       )
     } catch (err: any) {
       setTaskStatus(err?.message || "Could not generate follow-up tasks.")

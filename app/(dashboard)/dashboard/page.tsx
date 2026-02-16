@@ -294,7 +294,9 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold">Welcome Back</h1>
+          <h1 className="text-3xl font-bold" data-ai-anchor="overview-header">
+            Welcome Back
+          </h1>
           <p className="text-muted-foreground mt-1">Here's your business overview for today</p>
           {commandState.stale && <p className="text-xs text-muted-foreground">Showing cached insights.</p>}
           {commandState.error && <p className="text-xs text-destructive">{commandState.error}</p>}

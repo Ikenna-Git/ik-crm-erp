@@ -432,7 +432,9 @@ export default function ClientPortalPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold">Client Portal</h1>
+          <h1 className="text-3xl font-bold" data-ai-anchor="portal-header">
+            Client Portal
+          </h1>
           <p className="text-muted-foreground mt-1">Give clients a secure view of deliverables and updates.</p>
           {loading && <p className="text-xs text-muted-foreground">Loading portals...</p>}
           {error && <p className="text-xs text-destructive">{error}</p>}

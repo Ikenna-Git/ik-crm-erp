@@ -147,6 +147,7 @@ export function PayrollTable({
     } else {
       localStorage.setItem("civis_payroll_access_code", "1234")
     }
+    localStorage.setItem("civis_payroll_unlocked", "false")
     setShowAmounts(false)
   }, [])
 
@@ -249,6 +250,9 @@ export function PayrollTable({
     }
     setIsUnlocked(true)
     setShowAmounts(true)
+    if (typeof window !== "undefined") {
+      localStorage.setItem("civis_payroll_unlocked", "true")
+    }
     setAccessInput("")
     setAccessError("")
     setAccessNotice("")
@@ -257,6 +261,9 @@ export function PayrollTable({
   const lockPayroll = () => {
     setIsUnlocked(false)
     setShowAmounts(false)
+    if (typeof window !== "undefined") {
+      localStorage.setItem("civis_payroll_unlocked", "false")
+    }
     setAccessInput("")
     setAccessError("")
     setAccessNotice("")
