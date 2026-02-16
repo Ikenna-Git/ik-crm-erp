@@ -55,10 +55,10 @@ export async function POST(request: Request) {
     const { name, email, role } = body || {}
     if (!name || !email || !role) return NextResponse.json({ error: "name, email, role required" }, { status: 400 })
     const org = await getDefaultOrg()
-    const user = await prisma.user.create({
+    const createdUser = await prisma.user.create({
       data: { name, email, role, orgId: org.id },
     })
-    return NextResponse.json({ user })
+    return NextResponse.json({ user: createdUser })
   } catch (error: any) {
     if (error.code === "P2002") {
       return NextResponse.json({ error: "Email already exists" }, { status: 400 })
