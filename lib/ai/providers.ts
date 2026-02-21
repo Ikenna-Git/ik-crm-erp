@@ -19,13 +19,22 @@ export const resolveProvider = (override?: string | null): ProviderConfig | null
   const preferred =
     normalizedOverride && normalizedOverride !== "auto" ? normalizedOverride : (process.env.AI_PROVIDER || "").toLowerCase()
   const temperature = parseTemperature(process.env.AI_TEMPERATURE)
+  const modelFor = (provider: AiProvider, fallback: string) => {
+    const perProviderModel =
+      provider === "openai"
+        ? process.env.AI_MODEL_OPENAI
+        : provider === "anthropic"
+          ? process.env.AI_MODEL_ANTHROPIC
+          : process.env.AI_MODEL_GEMINI
+    return perProviderModel || process.env.AI_MODEL || fallback
+  }
 
   const configs: Record<AiProvider, ProviderConfig | null> = {
     openai: process.env.OPENAI_API_KEY
       ? {
           provider: "openai",
           apiKey: process.env.OPENAI_API_KEY,
-          model: process.env.AI_MODEL || "gpt-4o-mini",
+          model: modelFor("openai", "gpt-4o-mini"),
           temperature,
         }
       : null,
@@ -33,7 +42,7 @@ export const resolveProvider = (override?: string | null): ProviderConfig | null
       ? {
           provider: "anthropic",
           apiKey: process.env.ANTHROPIC_API_KEY,
-          model: process.env.AI_MODEL || "claude-3-5-sonnet-20240620",
+          model: modelFor("anthropic", "claude-3-5-sonnet-20240620"),
           temperature,
         }
       : null,
@@ -41,7 +50,7 @@ export const resolveProvider = (override?: string | null): ProviderConfig | null
       ? {
           provider: "gemini",
           apiKey: process.env.GEMINI_API_KEY,
-          model: process.env.AI_MODEL || "gemini-1.5-flash",
+          model: modelFor("gemini", "gemini-1.5-flash"),
           temperature,
         }
       : null,

@@ -195,16 +195,23 @@ export const buildFallbackResponse = (mode: FallbackMode, prompt: string, contex
   }
 
   if (/^(yes|yeah|yep|ok|okay|sure|go ahead|continue)\b/i.test(prompt.trim())) {
-    return `Great. I’m ready. Tell me the exact action you want next:\n\n1. Show a live count (employees, contacts, deals, invoices, expenses)\n2. Generate follow-up tasks\n3. Draft an update email\n4. Take you to a module and highlight it`
+    return `Great. Tell me the exact action and I’ll do it now. Example: "show employee count", "generate follow-up tasks", or "take me to CRM".`
   }
 
   if (/^(no|nope|nah|not now|later|skip)\b/i.test(prompt.trim())) {
-    return `No problem. Tell me what you want instead:\n\n1. Show live business counts\n2. Navigate to a module\n3. Generate follow-up tasks\n4. Draft an email`
+    return `No problem. Tell me what you want instead and I’ll adapt.`
+  }
+
+  if (/^(1|2|3|4)$/.test(prompt.trim())) {
+    if (prompt.trim() === "1") return "Sure. I can show your live snapshot now."
+    if (prompt.trim() === "2") return "Sure. I can generate follow-up tasks. Say: \"generate follow-up tasks now\"."
+    if (prompt.trim() === "3") return "Sure. Tell me the recipient and topic for the email."
+    return "Sure. Tell me which module to open: CRM, Accounting, HR, Operations, or Portal."
   }
 
   if (/(say|tell|give).*(something )?(unique|different|special|fresh)|something unique/i.test(prompt.trim())) {
     return `Civis is your quiet operator, ${userName}: while others chase dashboards, you run decisions. Ask me for one command and I’ll turn it into action, owner, and deadline.`
   }
 
-  return `Civis command desk ready, ${userName}. Pick one:\n1. Show live counts\n2. Generate follow-ups\n3. Draft a business email\n4. Take me to a module`
+  return `I can help right away. Ask naturally, for example: "How many employees do we have?", "Generate follow-up tasks", "Draft an email to our CFO", or "Take me to Accounting".`
 }

@@ -37,7 +37,8 @@ type DataResolution = {
 }
 
 const isDev = process.env.NODE_ENV !== "production"
-const fastLocalQna = process.env.AI_FAST_LOCAL_QNA !== "false"
+// In production, default to real model responses unless explicitly enabled.
+const fastLocalQna = process.env.AI_FAST_LOCAL_QNA === "true" || (isDev && process.env.AI_FAST_LOCAL_QNA !== "false")
 
 const demoSnapshot = {
   employees: 24,
@@ -59,7 +60,14 @@ const normalizeMessages = (messages: any[]): AiMessage[] =>
     }))
 
 const buildSystemPrompt = (mode: AiMode, userName: string, orgName: string, knowledge?: string) => {
-  const base = `You are Civis AI, the in-app assistant for a CRM/ERP platform. Be concise, helpful, and action-oriented. Use NGN for currency and keep responses under 180 words unless asked for more. Address the user as ${userName}.`
+  const base =
+    `You are Civis AI, a smart assistant for the Civis CRM/ERP platform. ` +
+    `Help users manage business operations: query live data, generate tasks/emails, navigate modules, and guide actions. ` +
+    `Be concise, conversational, and practical like a trusted colleague. Detect intent despite typos and shorthand. ` +
+    `Maintain context across turns. If input matches an option number or phrase, execute it directly. ` +
+    `For unclear inputs, ask one clarifying question instead of resetting to a full menu. ` +
+    `Respect sensitive data locks for HR/payroll and finance totals; if locked, explain what to unlock. ` +
+    `Use NGN for currency and keep responses under 180 words unless asked for more. Address the user as ${userName}.`
   const modePrompt = {
     qna: "Answer questions about Civis features and best practices. Offer next steps.",
     summary: "Summarize the provided business metrics and suggest 1-2 next actions.",
@@ -229,12 +237,26 @@ const resolveGreetingPrompt = (prompt: string, userName: string): DataResolution
   const value = prompt.trim().toLowerCase()
   if (!/^(hi|hello|hey|yo|good morning|good afternoon|good evening)\b/.test(value)) return null
   return {
-    message: `Hey ${userName}. I’m ready.\n\nTry one:\n1) "How many employees do we have?"\n2) "Show my business snapshot"\n3) "Generate follow-up tasks"\n4) "Take me to CRM"`,
+    message: `Hey ${userName}. I’m here. Ask me anything about HR, CRM, accounting, operations, or say "show snapshot".`,
   }
 }
 
 const resolveLowSignalOrOffTopic = (prompt: string): DataResolution | null => {
   const value = prompt.trim().toLowerCase()
+  if (/^(1|2|3|4)$/.test(value)) return null
+
+  if (/(must i pick a number|do i have to pick a number|without number|can i just type)/.test(value)) {
+    return {
+      message: "No. You can type naturally. Example: \"show employee count\", \"draft email to CFO\", or \"take me to HR\".",
+    }
+  }
+
+  if (/(are you smart|are you intelligent|can you really help)/.test(value)) {
+    return {
+      message:
+        "Yes. Ask naturally and I’ll handle it. I can pull live counts, guide modules, draft business emails, and generate follow-up actions.",
+    }
+  }
   if (!value) {
     return {
       message:
@@ -259,6 +281,51 @@ const resolveLowSignalOrOffTopic = (prompt: string): DataResolution | null => {
     return {
       message:
         "I can do light chat, but I’m optimized for your Civis work. Ask me for live counts, module guidance, reports, emails, or automation actions.",
+    }
+  }
+
+  return null
+}
+
+const resolveQuickChoice = (prompt: string): DataResolution | null => {
+  const value = prompt.trim().toLowerCase()
+  if (value === "1") {
+    return {
+      message: "Pulling your live business snapshot now.",
+      action: moduleActions.overview,
+    }
+  }
+  if (value === "2") {
+    return {
+      message:
+        "Sure. I can generate follow-up tasks from stalled deals and inactive contacts. Say: \"generate follow-up tasks now\".",
+      action: moduleActions.crm,
+    }
+  }
+  if (value === "3") {
+    return {
+      message: "Great. I can draft it. Tell me recipient + topic (example: \"email CFO about overdue invoices\").",
+    }
+  }
+  if (value === "4") {
+    return {
+      message: "Done. Tell me where to go: CRM, Accounting, HR, Operations, or Portal.",
+    }
+  }
+  return null
+}
+
+const resolveAddIntent = (prompt: string, previousAssistant: string): DataResolution | null => {
+  const value = prompt.trim().toLowerCase()
+  const employeeAddAsk =
+    /(add|create|register).*(employee|staff|team member)/.test(value) ||
+    (/(can you add|add for me|help me add)/.test(value) && /(employees|hr)/i.test(previousAssistant))
+
+  if (employeeAddAsk) {
+    return {
+      message:
+        "Yes. I can prepare that. Send details in one line:\nName, Email, Role, Department, Start date.\nExample: Ada Obi, ada@civis.com, HR Manager, HR, 2026-02-20.",
+      action: moduleActions.hr,
     }
   }
 
@@ -587,6 +654,41 @@ export async function POST(request: Request) {
           provider: "civis-greeter",
           mode: "qna",
           actions: [],
+        })
+      }
+
+      const quickChoice = resolveQuickChoice(lastUserMessage)
+      if (quickChoice) {
+        if (quickChoice.action && lastUserMessage.trim() === "1") {
+          const dataResolution = await resolveDataQuery(org.id, "show business snapshot", hasDbUser, {
+            hrUnlocked,
+            financeUnlocked,
+          })
+          if (dataResolution) {
+            return NextResponse.json({
+              message: dataResolution.message,
+              provider: "civis-data-engine",
+              mode: "qna",
+              actions: dataResolution.action ? [dataResolution.action] : [],
+            })
+          }
+        }
+
+        return NextResponse.json({
+          message: quickChoice.message,
+          provider: "civis-choice-engine",
+          mode: "qna",
+          actions: quickChoice.action ? [quickChoice.action] : [],
+        })
+      }
+
+      const addIntent = resolveAddIntent(lastUserMessage, previousAssistantMessage)
+      if (addIntent) {
+        return NextResponse.json({
+          message: addIntent.message,
+          provider: "civis-action-engine",
+          mode: "qna",
+          actions: addIntent.action ? [addIntent.action] : [],
         })
       }
 
