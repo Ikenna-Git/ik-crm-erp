@@ -39,6 +39,7 @@ type DataResolution = {
 const isDev = process.env.NODE_ENV !== "production"
 // Keep model-first behavior by default. Local rule-based QnA is opt-in only.
 const fastLocalQna = process.env.AI_FAST_LOCAL_QNA === "true"
+const aiRateLimitPerMinute = Number(process.env.AI_RATE_LIMIT_PER_MIN || "300")
 
 const demoSnapshot = {
   employees: 24,
@@ -64,7 +65,7 @@ const buildSystemPrompt = (mode: AiMode, userName: string, orgName: string, know
     `You are Civis AI, a smart assistant for the Civis CRM/ERP platform. ` +
     `Help users manage business operations: query live data, generate tasks/emails, navigate modules, and guide actions. ` +
     `Be concise, conversational, and practical like a trusted colleague. Detect intent despite typos and shorthand. ` +
-    `Maintain context across turns. If input matches an option number or phrase, execute it directly. ` +
+    `Maintain context across turns. Interpret shorthand and typos naturally. ` +
     `For unclear inputs, ask one clarifying question instead of resetting to a full menu. ` +
     `Respect sensitive data locks for HR/payroll and finance totals; if locked, explain what to unlock. ` +
     `You may use light, tasteful humor sometimes when the moment is low-stakes and conversational. ` +
@@ -283,34 +284,6 @@ const resolveLowSignalOrOffTopic = (prompt: string): DataResolution | null => {
     }
   }
 
-  return null
-}
-
-const resolveQuickChoice = (prompt: string): DataResolution | null => {
-  const value = prompt.trim().toLowerCase()
-  if (value === "1") {
-    return {
-      message: "Pulling your live business snapshot now.",
-      action: moduleActions.overview,
-    }
-  }
-  if (value === "2") {
-    return {
-      message:
-        "Sure. I can generate follow-up tasks from stalled deals and inactive contacts. Say: \"generate follow-up tasks now\".",
-      action: moduleActions.crm,
-    }
-  }
-  if (value === "3") {
-    return {
-      message: "Great. I can draft it. Tell me recipient + topic (example: \"email CFO about overdue invoices\").",
-    }
-  }
-  if (value === "4") {
-    return {
-      message: "Done. Tell me where to go: CRM, Accounting, HR, Operations, or Portal.",
-    }
-  }
   return null
 }
 
@@ -654,12 +627,14 @@ const resolveDataQuery = async (
 
 export async function POST(request: Request) {
   try {
-    const limit = rateLimit(getRateLimitKey(request, "ai"), { limit: 30, windowMs: 60_000 })
-    if (!limit.ok) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please wait a moment and try again." },
-        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
-      )
+    if (Number.isFinite(aiRateLimitPerMinute) && aiRateLimitPerMinute > 0) {
+      const limit = rateLimit(getRateLimitKey(request, "ai"), { limit: aiRateLimitPerMinute, windowMs: 60_000 })
+      if (!limit.ok) {
+        return NextResponse.json(
+          { error: "Rate limit exceeded. Please wait a moment and try again." },
+          { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
+        )
+      }
     }
     const fallbackEmail = request.headers.get("x-user-email")?.trim() || process.env.DEFAULT_USER_EMAIL || "ikchils@gmail.com"
     const fallbackName = request.headers.get("x-user-name")?.trim() || fallbackEmail.split("@")[0] || "there"
@@ -710,31 +685,6 @@ export async function POST(request: Request) {
           provider: "civis-greeter",
           mode: "qna",
           actions: [],
-        })
-      }
-
-      const quickChoice = resolveQuickChoice(lastUserMessage)
-      if (quickChoice) {
-        if (quickChoice.action && lastUserMessage.trim() === "1") {
-          const dataResolution = await resolveDataQuery(org.id, "show business snapshot", hasDbUser, {
-            hrUnlocked,
-            financeUnlocked,
-          })
-          if (dataResolution) {
-            return NextResponse.json({
-              message: dataResolution.message,
-              provider: "civis-data-engine",
-              mode: "qna",
-              actions: dataResolution.action ? [dataResolution.action] : [],
-            })
-          }
-        }
-
-        return NextResponse.json({
-          message: quickChoice.message,
-          provider: "civis-choice-engine",
-          mode: "qna",
-          actions: quickChoice.action ? [quickChoice.action] : [],
         })
       }
 
