@@ -226,5 +226,10 @@ export const buildFallbackResponse = (mode: FallbackMode, prompt: string, contex
     return `Civis is your quiet operator, ${userName}: while others chase dashboards, you run decisions. Ask me for one command and I’ll turn it into action, owner, and deadline.`
   }
 
-  return `I can help right away. Ask naturally, for example: "How many employees do we have?", "Generate follow-up tasks", "Draft an email to our CFO", or "Take me to Accounting".`
+  const trimmed = prompt.trim()
+  if (!trimmed) {
+    return "Tell me what you want to do, and I’ll help step by step."
+  }
+
+  return `I hear you. I can help with "${trimmed}". If you want a precise action, include the module or goal (for example: HR employee count, CRM follow-ups, or draft an email to a team).`
 }

@@ -37,8 +37,8 @@ type DataResolution = {
 }
 
 const isDev = process.env.NODE_ENV !== "production"
-// In production, default to real model responses unless explicitly enabled.
-const fastLocalQna = process.env.AI_FAST_LOCAL_QNA === "true" || (isDev && process.env.AI_FAST_LOCAL_QNA !== "false")
+// Keep model-first behavior by default. Local rule-based QnA is opt-in only.
+const fastLocalQna = process.env.AI_FAST_LOCAL_QNA === "true"
 
 const demoSnapshot = {
   employees: 24,
@@ -97,13 +97,10 @@ const shouldFallbackFromWeakProviderReply = (mode: AiMode, prompt: string, reply
 
   const lowerReply = text.toLowerCase()
   const lowerPrompt = prompt.toLowerCase()
-  const genericPitch =
-    lowerReply.includes("i can help with crm") ||
-    lowerReply.includes("ask me to explain a feature") ||
-    lowerReply.includes("draft an email")
-
-  if (genericPitch) return true
-  if (mode !== "tour") return false
+  if (mode !== "tour") {
+    // For QnA/email/summary, trust model output unless it's effectively empty.
+    return text.length < 8
+  }
 
   const hasNumberedSteps = /(^|\n)\s*\d+[.)]\s+/.test(text)
   const moduleMentions = ["overview", "crm", "accounting", "hr", "operations", "portal"].filter((module) =>
@@ -259,10 +256,7 @@ const resolveLowSignalOrOffTopic = (prompt: string): DataResolution | null => {
   }
 
   if (/(are you smart|are you intelligent|can you really help)/.test(value)) {
-    return {
-      message:
-        "Yes. Ask naturally and I’ll handle it. I can pull live counts, guide modules, draft business emails, and generate follow-up actions.",
-    }
+    return { message: "Yes. Ask naturally and I’ll handle it." }
   }
   if (!value) {
     return {
@@ -273,25 +267,12 @@ const resolveLowSignalOrOffTopic = (prompt: string): DataResolution | null => {
 
   const squashed = value.replace(/\s+/g, "")
   const lowSignal =
-    /^(m+|mm+|hmm+|uh+|um+|erm+|asdf+|qwerty+|zxcv+|xxx+|zzz+|kkk+|lol+|haha+)$/i.test(squashed) ||
-    (value.length <= 2 && !/^(hr|crm|ops|ai|ok)$/i.test(value))
+    /^(m+|mm+|hmm+|uh+|um+|erm+|asdf+|qwerty+|zxcv+|xxx+|zzz+|kkk+)$/i.test(squashed) ||
+    (value.length <= 1 && !/^(hr|crm|ops|ai|ok)$/i.test(value))
 
   if (lowSignal) {
     return {
-      message:
-        "I didn’t catch that clearly. Try: \"How many employees do we have?\", \"Generate follow-up tasks\", or \"Take me to Accounting\".",
-    }
-  }
-
-  if (/(joke|funny|make me laugh|be witty|banter)/.test(value)) {
-    const jokes = [
-      "Tiny Civis joke: We had 99 problems, then we fixed duplicate contacts and now it's 12.",
-      "CRM joke: The lead said 'follow up later'. We did. They said 'wow, you actually followed up'.",
-      "Ops joke: Automation is just future-you thanking present-you.",
-    ]
-    const joke = jokes[Math.floor(Math.random() * jokes.length)]
-    return {
-      message: `${joke}\n\nNow back to business, unless you want another one.`,
+      message: "I didn’t catch that clearly. Tell me in one sentence what you want me to do.",
     }
   }
 
@@ -299,14 +280,6 @@ const resolveLowSignalOrOffTopic = (prompt: string): DataResolution | null => {
     return {
       message:
         "Fair call. Let’s make this better: give me one goal and I’ll respond with a sharper, more human answer plus action steps.",
-    }
-  }
-
-  const offTopic = /(movie|music|football|soccer|relationship|dating|weather|gossip|celebrity|meme)/.test(value)
-  if (offTopic) {
-    return {
-      message:
-        "I can do light chat, but I’m optimized for your Civis work. Ask me for live counts, module guidance, reports, emails, or automation actions.",
     }
   }
 
