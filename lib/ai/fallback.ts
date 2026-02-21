@@ -160,9 +160,22 @@ const buildSmartTour = (prompt: string, context: unknown, userName: string) => {
 export const buildFallbackResponse = (mode: FallbackMode, prompt: string, context: unknown, userName = "there") => {
   if (mode === "email") {
     const details = (context || {}) as EmailContext
+    const promptValue = prompt.toLowerCase()
     const recipient = details.recipient || "the client"
     const tone = details.tone || "professional"
     const goal = details.goal || "follow up"
+    const hasRecipientHint =
+      Boolean(details.recipient?.trim()) || /(to\s+[a-z0-9@._-]+)|\b(cfo|ceo|hr|finance|ops|team|client|customer|vendor|manager)\b/.test(promptValue)
+    const hasGoalHint =
+      Boolean(details.goal?.trim()) ||
+      /(about|re:|regarding|subject|invoice|overdue|payroll|leave|follow[- ]?up|update|onboarding|meeting)/.test(
+        promptValue,
+      )
+
+    if (!hasRecipientHint || !hasGoalHint) {
+      return `I can draft that well. Share:\n1) recipient (person/team)\n2) topic\n3) tone (optional)\n\nExample: "Draft email to HR team about leave reminders, tone friendly."`
+    }
+
     const extra = details.context ? `Context: ${details.context}\n\n` : ""
     return `Subject: Quick update on ${goal}\n\nHi ${recipient},\n\n${extra}I wanted to ${goal.toLowerCase()}. Here is a quick update and the next step I recommend:\n\n- Status: In progress\n- Next action: Confirm timeline and dependencies\n\nLet me know if you'd like me to adjust anything.\n\nBest,\n${userName}\nTone: ${tone}`
   }

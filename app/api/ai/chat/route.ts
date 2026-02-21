@@ -67,6 +67,8 @@ const buildSystemPrompt = (mode: AiMode, userName: string, orgName: string, know
     `Maintain context across turns. If input matches an option number or phrase, execute it directly. ` +
     `For unclear inputs, ask one clarifying question instead of resetting to a full menu. ` +
     `Respect sensitive data locks for HR/payroll and finance totals; if locked, explain what to unlock. ` +
+    `You may use light, tasteful humor sometimes when the moment is low-stakes and conversational. ` +
+    `Avoid humor for security, payroll, legal, or incident scenarios. ` +
     `Use NGN for currency and keep responses under 180 words unless asked for more. Address the user as ${userName}.`
   const modePrompt = {
     qna: "Answer questions about Civis features and best practices. Offer next steps.",
@@ -236,8 +238,13 @@ const isNegativePrompt = (prompt: string) =>
 const resolveGreetingPrompt = (prompt: string, userName: string): DataResolution | null => {
   const value = prompt.trim().toLowerCase()
   if (!/^(hi|hello|hey|yo|good morning|good afternoon|good evening)\b/.test(value)) return null
+  const lines = [
+    `Hey ${userName}. I’m here. Ask me anything about HR, CRM, accounting, operations, or say "show snapshot".`,
+    `Hey ${userName}. Ready when you are. I answer faster than office gossip travels.`,
+    `Hi ${userName}. Let’s make the dashboard earn its salary today.`,
+  ]
   return {
-    message: `Hey ${userName}. I’m here. Ask me anything about HR, CRM, accounting, operations, or say "show snapshot".`,
+    message: lines[Math.floor(Math.random() * lines.length)],
   }
 }
 
@@ -276,7 +283,26 @@ const resolveLowSignalOrOffTopic = (prompt: string): DataResolution | null => {
     }
   }
 
-  const offTopic = /(joke|movie|music|football|soccer|relationship|dating|weather|gossip|celebrity|meme)/.test(value)
+  if (/(joke|funny|make me laugh|be witty|banter)/.test(value)) {
+    const jokes = [
+      "Tiny Civis joke: We had 99 problems, then we fixed duplicate contacts and now it's 12.",
+      "CRM joke: The lead said 'follow up later'. We did. They said 'wow, you actually followed up'.",
+      "Ops joke: Automation is just future-you thanking present-you.",
+    ]
+    const joke = jokes[Math.floor(Math.random() * jokes.length)]
+    return {
+      message: `${joke}\n\nNow back to business, unless you want another one.`,
+    }
+  }
+
+  if (/(you're boring|you are boring|so boring|you are dry|you sound robotic)/.test(value)) {
+    return {
+      message:
+        "Fair call. Let’s make this better: give me one goal and I’ll respond with a sharper, more human answer plus action steps.",
+    }
+  }
+
+  const offTopic = /(movie|music|football|soccer|relationship|dating|weather|gossip|celebrity|meme)/.test(value)
   if (offTopic) {
     return {
       message:
@@ -315,6 +341,15 @@ const resolveQuickChoice = (prompt: string): DataResolution | null => {
   return null
 }
 
+const resolveHighlightPreference = (prompt: string): DataResolution | null => {
+  const value = prompt.trim().toLowerCase()
+  if (!/(don'?t highlight|do not highlight|without highlight|no highlight|stop highlighting)/.test(value)) return null
+
+  return {
+    message: "Noted. I’ll navigate without highlight unless you ask for it.",
+  }
+}
+
 const resolveAddIntent = (prompt: string, previousAssistant: string): DataResolution | null => {
   const value = prompt.trim().toLowerCase()
   const employeeAddAsk =
@@ -332,6 +367,24 @@ const resolveAddIntent = (prompt: string, previousAssistant: string): DataResolu
   return null
 }
 
+const resolveEmailClarification = (prompt: string): DataResolution | null => {
+  const value = prompt.trim().toLowerCase()
+  const asksEmail = /(draft|write|compose).*(email|mail)|email/.test(value)
+  if (!asksEmail) return null
+
+  const hasRecipientHint =
+    /(to\s+[a-z0-9@._-]+)|\b(cfo|ceo|hr|finance|ops|team|client|customer|vendor|manager)\b/.test(value)
+  const hasTopicHint =
+    /(about|re:|regarding|subject|invoice|overdue|payroll|leave|follow[- ]?up|update|onboarding|meeting)/.test(value)
+
+  if (hasRecipientHint && hasTopicHint) return null
+
+  return {
+    message:
+      "Sure. I can draft it properly. Send:\n1) recipient (person/team)\n2) topic\n3) tone (optional)\n\nExample: \"Draft email to HR team about leave reminders, tone friendly.\"",
+  }
+}
+
 const resolveCreativePrompt = (prompt: string, userName: string): DataResolution | null => {
   const value = prompt.trim().toLowerCase()
   const asksUnique =
@@ -345,6 +398,36 @@ const resolveCreativePrompt = (prompt: string, userName: string): DataResolution
       `Civis is your quiet operator, ${userName}: while others chase dashboards, you run decisions. ` +
       `Ask me for one command and I’ll turn it into action, owner, and deadline.`,
   }
+}
+
+const humorRequested = (prompt: string) =>
+  /(joke|funny|humor|humorous|make me laugh|be witty|roast|banter)/i.test(prompt)
+
+const humorAllowedForPrompt = (prompt: string) => {
+  const value = prompt.toLowerCase()
+  if (/(payroll|salary|security|breach|incident|fraud|legal|compliance|paye|pension|tax|audit)/.test(value)) {
+    return false
+  }
+  return true
+}
+
+const addHumorLineIfSuitable = (reply: string, prompt: string, mode: AiMode) => {
+  if (mode !== "qna") return reply
+  if (!reply.trim()) return reply
+  if (!humorAllowedForPrompt(prompt)) return reply
+
+  const explicit = humorRequested(prompt)
+  const occasional = Math.random() < 0.2
+  if (!explicit && !occasional) return reply
+
+  const oneLiners = [
+    "Bonus tip: clean data closes deals; chaos only closes laptops.",
+    "Small daily updates beat heroic monthly cleanup every time.",
+    "If dashboards could clap, this one would.",
+    "Good ops is boring in the best possible way.",
+  ]
+  const line = oneLiners[Math.floor(Math.random() * oneLiners.length)]
+  return `${reply}\n\n${line}`
 }
 
 const resolveConversationFollowup = async (
@@ -682,6 +765,16 @@ export async function POST(request: Request) {
         })
       }
 
+      const highlightPreference = resolveHighlightPreference(lastUserMessage)
+      if (highlightPreference) {
+        return NextResponse.json({
+          message: highlightPreference.message,
+          provider: "civis-preference-engine",
+          mode: "qna",
+          actions: [],
+        })
+      }
+
       const addIntent = resolveAddIntent(lastUserMessage, previousAssistantMessage)
       if (addIntent) {
         return NextResponse.json({
@@ -689,6 +782,16 @@ export async function POST(request: Request) {
           provider: "civis-action-engine",
           mode: "qna",
           actions: addIntent.action ? [addIntent.action] : [],
+        })
+      }
+
+      const emailClarification = resolveEmailClarification(lastUserMessage)
+      if (emailClarification) {
+        return NextResponse.json({
+          message: emailClarification.message,
+          provider: "civis-email-clarifier",
+          mode: "qna",
+          actions: [],
         })
       }
 
@@ -816,8 +919,10 @@ export async function POST(request: Request) {
       console.warn("Failed to write AI audit log", auditError)
     }
 
+    const finalReply = addHumorLineIfSuitable(reply, lastUserMessage, mode)
+
     return NextResponse.json({
-      message: reply,
+      message: finalReply,
       provider: resolvedProvider,
       mode,
       actions: [] as AiAction[],
