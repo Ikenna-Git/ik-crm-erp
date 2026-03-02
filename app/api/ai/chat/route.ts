@@ -663,12 +663,17 @@ export async function POST(request: Request) {
     const financeUnlocked = request.headers.get("x-finance-sensitive-unlocked") === "true"
 
     if (requestedMode === "qna") {
-      const followupResolution = await resolveConversationFollowup(
-        org.id,
-        lastUserMessage,
-        previousAssistantMessage,
-        hasDbUser,
-      )
+      let followupResolution: DataResolution | null = null
+      try {
+        followupResolution = await resolveConversationFollowup(
+          org.id,
+          lastUserMessage,
+          previousAssistantMessage,
+          hasDbUser,
+        )
+      } catch (error) {
+        console.warn("Follow-up resolution failed, continuing with model response", error)
+      }
       if (followupResolution) {
         return NextResponse.json({
           message: followupResolution.message,
@@ -748,10 +753,15 @@ export async function POST(request: Request) {
         })
       }
 
-      const dataResolution = await resolveDataQuery(org.id, lastUserMessage, hasDbUser, {
-        hrUnlocked,
-        financeUnlocked,
-      })
+      let dataResolution: DataResolution | null = null
+      try {
+        dataResolution = await resolveDataQuery(org.id, lastUserMessage, hasDbUser, {
+          hrUnlocked,
+          financeUnlocked,
+        })
+      } catch (error) {
+        console.warn("Data resolution failed, continuing with model response", error)
+      }
       if (dataResolution) {
         return NextResponse.json({
           message: dataResolution.message,

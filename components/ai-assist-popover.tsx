@@ -27,6 +27,7 @@ type PageCoach = {
 
 const CHAT_STORAGE_KEY = "civis_ai_assist_chat_v1"
 const OPEN_STORAGE_KEY = "civis_ai_assist_open"
+const MAX_OUTBOUND_MESSAGES = 16
 
 const getPageCoach = (pathname: string): PageCoach => {
   if (pathname.startsWith("/dashboard/crm")) {
@@ -158,6 +159,7 @@ export function AiAssistPopover() {
     if (!trimmed || loading) return
 
     const nextMessages: ChatMessage[] = [...messages, { role: "user", content: trimmed }]
+    const outboundMessages = nextMessages.slice(-MAX_OUTBOUND_MESSAGES)
     setMessages(nextMessages)
     setInput("")
     setLoading(true)
@@ -177,7 +179,7 @@ export function AiAssistPopover() {
         headers,
         body: JSON.stringify({
           mode: "qna",
-          messages: nextMessages,
+          messages: outboundMessages,
           context: {
             currentPath: pathname,
             pageTitle: pageCoach.title,
@@ -186,7 +188,7 @@ export function AiAssistPopover() {
         }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data?.error || "Civis AI is unavailable right now.")
+      if (!res.ok) throw new Error(data?.error || "I hit a temporary issue. I can still guide you manually right now.")
 
       const reply = typeof data?.message === "string" && data.message.trim() ? data.message : "I’m ready."
       setMessages([...nextMessages, { role: "assistant", content: reply }])
