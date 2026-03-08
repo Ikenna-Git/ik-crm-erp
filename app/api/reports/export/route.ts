@@ -2,8 +2,10 @@ import { NextResponse } from "next/server"
 import nodemailer from "nodemailer"
 import { generateCsv } from "@/lib/reports"
 import { buildAccountingRows, buildCrmRows, buildVatRows, buildAuditRows } from "@/lib/report-builders"
-import { getDefaultOrg } from "@/lib/defaultOrg"
+import { getUserFromRequest, isRequestUserError } from "@/lib/request-user"
+import { isAdmin } from "@/lib/authz"
 import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
+import { createAuditLog } from "@/lib/audit"
 
 const REQUIRED_ENVS = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM"] as const
 
@@ -28,7 +30,7 @@ export async function POST(request: Request) {
       { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
     )
   }
-  const body = (await request.json()) as ExportBody
+  const body = (await request.json().catch(() => ({}))) as ExportBody
   const { type, target, email } = body
 
   if (!type || !["analytics", "accounting", "crm", "vat", "audit"].includes(type)) {
@@ -38,46 +40,56 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid export target" }, { status: 400 })
   }
 
-  const org = await getDefaultOrg()
-  const rows =
-    type === "accounting"
-      ? await buildAccountingRows(org.id)
-      : type === "crm"
-        ? await buildCrmRows(org.id)
-        : type === "vat"
-          ? await buildVatRows(org.id)
-          : type === "audit"
-            ? await buildAuditRows(org.id)
-            : undefined
-  const csv = generateCsv(type, rows)
-  const filename = `${org.name || "report"}-${type}.csv`
-
-  // Desktop download: return CSV as attachment
-  if (target === "desktop") {
-    return new NextResponse(csv, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/csv",
-        "Content-Disposition": `attachment; filename="${filename}"`,
-      },
-    })
-  }
-
-  // Email path
-  if (!email) {
-    return NextResponse.json({ error: "Email is required for email export" }, { status: 400 })
-  }
-
-  // Ensure SMTP config is present
-  const missing = REQUIRED_ENVS.filter((key) => !process.env[key])
-  if (missing.length) {
-    return NextResponse.json(
-      { error: `Missing SMTP configuration: ${missing.join(", ")}` },
-      { status: 500 },
-    )
-  }
-
   try {
+    const { org, user } = await getUserFromRequest(request)
+    if (!isAdmin(user.role)) {
+      return NextResponse.json({ error: "Admin access required for report exports" }, { status: 403 })
+    }
+
+    const rows =
+      type === "accounting"
+        ? await buildAccountingRows(org.id)
+        : type === "crm"
+          ? await buildCrmRows(org.id)
+          : type === "vat"
+            ? await buildVatRows(org.id)
+            : type === "audit"
+              ? await buildAuditRows(org.id)
+              : undefined
+    const csv = generateCsv(type, rows)
+    const filename = `${org.name || "report"}-${type}.csv`
+
+    if (target === "desktop") {
+      await createAuditLog({
+        orgId: org.id,
+        userId: user.id,
+        action: "Exported report to desktop",
+        entity: "ReportExport",
+        entityId: type,
+        metadata: { type, target },
+      })
+
+      return new NextResponse(csv, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/csv",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+        },
+      })
+    }
+
+    if (!email) {
+      return NextResponse.json({ error: "Email is required for email export" }, { status: 400 })
+    }
+
+    const missing = REQUIRED_ENVS.filter((key) => !process.env[key])
+    if (missing.length) {
+      return NextResponse.json(
+        { error: `Missing SMTP configuration: ${missing.join(", ")}` },
+        { status: 500 },
+      )
+    }
+
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: Number(process.env.SMTP_PORT || 587),
@@ -96,9 +108,21 @@ export async function POST(request: Request) {
       attachments: [{ filename, content: csv, contentType: "text/csv" }],
     })
 
+    await createAuditLog({
+      orgId: org.id,
+      userId: user.id,
+      action: "Exported report by email",
+      entity: "ReportExport",
+      entityId: type,
+      metadata: { type, target, email },
+    })
+
     return NextResponse.json({ ok: true, message: `Report sent to ${email}` })
   } catch (err) {
+    if (isRequestUserError(err)) {
+      return NextResponse.json({ error: err.message }, { status: err.status })
+    }
     console.error("Email send failed", err)
-    return NextResponse.json({ error: "Failed to send email" }, { status: 500 })
+    return NextResponse.json({ error: "Failed to export report" }, { status: 500 })
   }
 }

@@ -1,0 +1,1224 @@
+openapi: 3.0.3
+info:
+  title: Civis CRM/ERP API
+  version: 0.1.0
+  description: |
+    Generated from the current Next.js App Router endpoints under `app/api/**/route.ts`.
+    This spec is intended for Swagger/SwaggerHub documentation and VAPT planning.
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+  - url: https://ik-crm-erp.onrender.com
+    description: Production
+
+tags:
+  - name: Auth
+  - name: Health
+  - name: Bootstrap
+  - name: User Settings
+  - name: Admin
+  - name: Audit
+  - name: CRM
+  - name: Accounting
+  - name: Reports
+  - name: Tasks
+  - name: Ops
+  - name: Playbooks
+  - name: Decision Trails
+  - name: Notifications
+  - name: Media
+  - name: Client Portal
+  - name: Webhooks
+  - name: AI
+
+components:
+  securitySchemes:
+    nextAuthSession:
+      type: apiKey
+      in: cookie
+      name: next-auth.session-token
+      description: NextAuth session cookie (development/non-secure cookie name).
+    nextAuthSecureSession:
+      type: apiKey
+      in: cookie
+      name: __Secure-next-auth.session-token
+      description: NextAuth session cookie (secure cookie name).
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    MessageResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        message:
+          type: string
+    IdPayload:
+      type: object
+      properties:
+        id:
+          type: string
+      required: [id]
+    ContactInput:
+      type: object
+      properties:
+        name: { type: string }
+        email: { type: string, format: email }
+        phone: { type: string }
+        company: { type: string }
+        status: { type: string, enum: [LEAD, PROSPECT, CUSTOMER] }
+        revenue: { type: integer }
+        lastContact: { type: string, format: date-time }
+        tags: { type: string }
+        ownerId: { type: string }
+        notes: { type: string }
+        customFields:
+          type: object
+          additionalProperties: true
+      required: [name, email]
+    CompanyInput:
+      type: object
+      properties:
+        name: { type: string }
+        industry: { type: string }
+        size: { type: string }
+        ownerId: { type: string }
+        customFields:
+          type: object
+          additionalProperties: true
+      required: [name]
+    DealInput:
+      type: object
+      properties:
+        title: { type: string }
+        value: { type: integer }
+        stage: { type: string, enum: [PROSPECT, QUALIFIED, PROPOSAL, NEGOTIATION, WON, LOST] }
+        company: { type: string }
+        companyId: { type: string }
+        contactId: { type: string }
+        ownerId: { type: string }
+        expectedClose: { type: string, format: date-time }
+        customFields:
+          type: object
+          additionalProperties: true
+      required: [title, value]
+    InvoiceInput:
+      type: object
+      properties:
+        invoiceNumber: { type: string }
+        clientName: { type: string }
+        amount: { type: integer }
+        status: { type: string, enum: [DRAFT, SENT, PAID, OVERDUE] }
+        dueDate: { type: string, format: date-time }
+        issueDate: { type: string, format: date-time }
+      required: [invoiceNumber, clientName, amount]
+    ExpenseInput:
+      type: object
+      properties:
+        description: { type: string }
+        amount: { type: integer }
+        category: { type: string }
+        date: { type: string, format: date-time }
+        status: { type: string, enum: [PENDING, APPROVED, REJECTED] }
+        submittedBy: { type: string }
+      required: [description, amount]
+    TaskInput:
+      type: object
+      properties:
+        title: { type: string }
+        dueDate: { type: string, format: date-time }
+        ownerId: { type: string }
+        relatedType: { type: string }
+        relatedId: { type: string }
+      required: [title]
+    TaskUpdateInput:
+      type: object
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [OPEN, DONE] }
+      required: [id]
+    ReportExportInput:
+      type: object
+      properties:
+        type: { type: string, enum: [analytics, accounting, crm, vat, audit] }
+        target: { type: string, enum: [desktop, email] }
+        email: { type: string, format: email }
+      required: [type, target]
+    UserSettingsPatchInput:
+      type: object
+      properties:
+        profile:
+          type: object
+          properties:
+            name: { type: string }
+            email: { type: string, format: email }
+            title: { type: string }
+            phone: { type: string }
+            timezone: { type: string }
+            locale: { type: string }
+        preferences:
+          type: object
+          additionalProperties: true
+        notifications:
+          type: object
+          additionalProperties: true
+        kpis:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        digest:
+          type: object
+          additionalProperties: true
+        onboarding:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        crmViews:
+          type: object
+          additionalProperties: true
+    PortalCreateInput:
+      type: object
+      properties:
+        name: { type: string }
+        contactName: { type: string }
+        contactEmail: { type: string, format: email }
+        summary: { type: string }
+      required: [name]
+    PortalUpdateInput:
+      type: object
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [ACTIVE, PAUSED, ARCHIVED] }
+        summary: { type: string }
+      required: [id]
+    WebhookInput:
+      type: object
+      properties:
+        name: { type: string }
+        url: { type: string, format: uri }
+        events:
+          type: array
+          items: { type: string }
+      required: [name, url]
+    AIChatInput:
+      type: object
+      properties:
+        mode: { type: string, enum: [qna, summary, email, tour] }
+        provider: { type: string }
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              role: { type: string, enum: [system, user, assistant] }
+              content: { type: string }
+        context:
+          type: object
+          additionalProperties: true
+      required: [messages]
+
+security:
+  - nextAuthSession: []
+  - nextAuthSecureSession: []
+
+paths:
+  /api/health/db:
+    get:
+      tags: [Health]
+      summary: Check database connectivity
+      security: []
+      responses:
+        '200': { description: Health status }
+        '500': { description: Health check failed, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/auth/{nextauthPath}:
+    get:
+      tags: [Auth]
+      summary: NextAuth catch-all GET route
+      security: []
+      parameters:
+        - name: nextauthPath
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: NextAuth response }
+    post:
+      tags: [Auth]
+      summary: NextAuth catch-all POST route
+      security: []
+      parameters:
+        - name: nextauthPath
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: NextAuth response }
+
+  /api/app/bootstrap:
+    get:
+      tags: [Bootstrap]
+      summary: Load bootstrap dashboard datasets
+      responses:
+        '200': { description: Bootstrap data loaded }
+        '401': { description: Authentication required, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '503': { description: DB not configured, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+
+  /api/user/settings:
+    get:
+      tags: [User Settings]
+      summary: Get profile and preferences
+      responses:
+        '200': { description: Settings payload }
+        '401': { description: Authentication required }
+    patch:
+      tags: [User Settings]
+      summary: Update profile and preferences
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserSettingsPatchInput'
+      responses:
+        '200': { description: Settings updated }
+        '400': { description: Invalid payload }
+        '401': { description: Authentication required }
+
+  /api/settings:
+    get:
+      tags: [Admin]
+      summary: Get org settings and users
+      responses:
+        '200': { description: Org + users }
+        '403': { description: Admin required }
+    patch:
+      tags: [Admin]
+      summary: Update organization settings
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                theme: { type: string }
+                notifyEmail: { type: string, format: email }
+      responses:
+        '200': { description: Updated org }
+        '403': { description: Admin required }
+    post:
+      tags: [Admin]
+      summary: Invite/create user in org
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                email: { type: string, format: email }
+                role: { type: string, enum: [USER, ADMIN, SUPER_ADMIN] }
+              required: [name, email, role]
+      responses:
+        '200': { description: User created }
+        '400': { description: Validation or duplicate email }
+        '403': { description: Admin required }
+
+  /api/admin/users:
+    get:
+      tags: [Admin]
+      summary: List organization users
+      responses:
+        '200': { description: User list }
+        '403': { description: Admin required }
+    patch:
+      tags: [Admin]
+      summary: Update a user's role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id: { type: string }
+                role: { type: string, enum: [USER, ADMIN, SUPER_ADMIN] }
+              required: [id, role]
+      responses:
+        '200': { description: User updated }
+        '403': { description: Admin/Super-admin required }
+
+  /api/audit:
+    get:
+      tags: [Audit]
+      summary: List audit logs
+      responses:
+        '200': { description: Audit logs }
+        '403': { description: Admin required }
+    post:
+      tags: [Audit]
+      summary: Create an audit log entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action: { type: string }
+                entity: { type: string }
+                entityId: { type: string }
+                metadata:
+                  type: object
+                  additionalProperties: true
+              required: [action]
+      responses:
+        '200': { description: Audit log created }
+
+  /api/crm/contacts:
+    get:
+      tags: [CRM]
+      summary: List contacts
+      responses:
+        '200': { description: Contacts list }
+    post:
+      tags: [CRM]
+      summary: Create contact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContactInput' }
+      responses:
+        '200': { description: Contact created }
+        '400': { description: Validation error }
+    patch:
+      tags: [CRM]
+      summary: Update contact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ContactInput'
+                - type: object
+                  properties:
+                    id: { type: string }
+                  required: [id]
+      responses:
+        '200': { description: Contact updated }
+    delete:
+      tags: [CRM]
+      summary: Delete contact
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Contact deleted }
+
+  /api/crm/companies:
+    get:
+      tags: [CRM]
+      summary: List companies
+      responses:
+        '200': { description: Companies list }
+    post:
+      tags: [CRM]
+      summary: Create company
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompanyInput' }
+      responses:
+        '200': { description: Company created }
+    patch:
+      tags: [CRM]
+      summary: Update company
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/CompanyInput'
+                - type: object
+                  properties:
+                    id: { type: string }
+                  required: [id]
+      responses:
+        '200': { description: Company updated }
+    delete:
+      tags: [CRM]
+      summary: Delete company
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Company deleted }
+
+  /api/crm/deals:
+    get:
+      tags: [CRM]
+      summary: List deals
+      responses:
+        '200': { description: Deals list }
+    post:
+      tags: [CRM]
+      summary: Create deal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DealInput' }
+      responses:
+        '200': { description: Deal created }
+    patch:
+      tags: [CRM]
+      summary: Update deal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/DealInput'
+                - type: object
+                  properties:
+                    id: { type: string }
+                  required: [id]
+      responses:
+        '200': { description: Deal updated }
+    delete:
+      tags: [CRM]
+      summary: Delete deal
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Deal deleted }
+
+  /api/crm/fields:
+    get:
+      tags: [CRM]
+      summary: List custom CRM fields by entity
+      parameters:
+        - name: entity
+          in: query
+          required: true
+          schema: { type: string, enum: [CONTACT, COMPANY, DEAL] }
+      responses:
+        '200': { description: Field definitions }
+    post:
+      tags: [CRM]
+      summary: Create CRM custom field
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                entity: { type: string, enum: [CONTACT, COMPANY, DEAL] }
+                name: { type: string }
+                key: { type: string }
+                type: { type: string, enum: [TEXT, NUMBER, CURRENCY, DATE, SELECT, MULTISELECT, CHECKBOX] }
+                options:
+                  type: array
+                  items: { type: string }
+                required: { type: boolean }
+                order: { type: integer }
+              required: [entity, name, key, type]
+      responses:
+        '200': { description: Field created }
+    patch:
+      tags: [CRM]
+      summary: Update CRM custom field
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id: { type: string }
+                name: { type: string }
+                options:
+                  type: array
+                  items: { type: string }
+                required: { type: boolean }
+                archived: { type: boolean }
+                order: { type: integer }
+              required: [id]
+      responses:
+        '200': { description: Field updated }
+    delete:
+      tags: [CRM]
+      summary: Archive CRM custom field
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Field archived }
+
+  /api/crm/followups:
+    get:
+      tags: [CRM]
+      summary: Preview follow-up recommendations
+      responses:
+        '200': { description: Recommended follow-ups }
+    post:
+      tags: [CRM]
+      summary: Generate and persist follow-up tasks
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200': { description: Follow-up tasks created }
+        '500': { description: Follow-up generation failed }
+
+  /api/accounting/invoices:
+    get:
+      tags: [Accounting]
+      summary: List invoices
+      responses:
+        '200': { description: Invoices list }
+    post:
+      tags: [Accounting]
+      summary: Create invoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InvoiceInput' }
+      responses:
+        '200': { description: Invoice created }
+    patch:
+      tags: [Accounting]
+      summary: Update invoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/InvoiceInput'
+                - type: object
+                  properties:
+                    id: { type: string }
+                  required: [id]
+      responses:
+        '200': { description: Invoice updated }
+    delete:
+      tags: [Accounting]
+      summary: Delete invoice
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Invoice deleted }
+
+  /api/accounting/expenses:
+    get:
+      tags: [Accounting]
+      summary: List expenses
+      responses:
+        '200': { description: Expenses list }
+    post:
+      tags: [Accounting]
+      summary: Create expense
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExpenseInput' }
+      responses:
+        '200': { description: Expense created }
+    patch:
+      tags: [Accounting]
+      summary: Update expense
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ExpenseInput'
+                - type: object
+                  properties:
+                    id: { type: string }
+                  required: [id]
+      responses:
+        '200': { description: Expense updated }
+    delete:
+      tags: [Accounting]
+      summary: Delete expense
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Expense deleted }
+
+  /api/reports/summary:
+    get:
+      tags: [Reports]
+      summary: Get report summary dataset
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema: { type: string, enum: [accounting, crm, vat] }
+      responses:
+        '200': { description: Report summary }
+        '400': { description: Invalid report type }
+
+  /api/reports/export:
+    post:
+      tags: [Reports]
+      summary: Export reports as CSV download or email
+      description: Admin-only operation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReportExportInput' }
+      responses:
+        '200': { description: CSV stream or send result }
+        '400': { description: Validation error }
+        '403': { description: Admin access required }
+        '429': { description: Rate limited }
+
+  /api/reports/digest:
+    post:
+      tags: [Reports]
+      summary: Send digest email
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string, format: email }
+                sendNow: { type: boolean }
+      responses:
+        '200': { description: Digest result }
+
+  /api/tasks:
+    get:
+      tags: [Tasks]
+      summary: List tasks
+      responses:
+        '200': { description: Tasks list }
+        '401': { description: Authentication required }
+    post:
+      tags: [Tasks]
+      summary: Create task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskInput' }
+      responses:
+        '200': { description: Task created }
+        '400': { description: Validation error }
+        '401': { description: Authentication required }
+    patch:
+      tags: [Tasks]
+      summary: Update task status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskUpdateInput' }
+      responses:
+        '200': { description: Task updated }
+        '404': { description: Task not found }
+
+  /api/ops/command:
+    get:
+      tags: [Ops]
+      summary: Ops command center snapshot
+      responses:
+        '200': { description: Ops KPIs and actions }
+
+  /api/ops/workflows:
+    get:
+      tags: [Ops]
+      summary: List automation workflows
+      responses:
+        '200': { description: Workflows list }
+    post:
+      tags: [Ops]
+      summary: Create automation workflow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                trigger: { type: string }
+                action: { type: string }
+              required: [name, trigger, action]
+      responses:
+        '200': { description: Workflow created }
+    patch:
+      tags: [Ops]
+      summary: Update automation workflow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id: { type: string }
+                active: { type: boolean }
+                name: { type: string }
+                trigger: { type: string }
+                action: { type: string }
+              required: [id]
+      responses:
+        '200': { description: Workflow updated }
+
+  /api/playbooks:
+    get:
+      tags: [Playbooks]
+      summary: List playbook runs
+      responses:
+        '200': { description: Playbook runs }
+    post:
+      tags: [Playbooks]
+      summary: Start playbook run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                templateId: { type: string }
+                name: { type: string }
+                category: { type: string }
+                notes: { type: string }
+              required: [templateId, name]
+      responses:
+        '200': { description: Playbook created }
+    patch:
+      tags: [Playbooks]
+      summary: Update playbook run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id: { type: string }
+                status: { type: string, enum: [ACTIVE, PAUSED, COMPLETED] }
+                progress: { type: integer }
+                notes: { type: string }
+              required: [id]
+      responses:
+        '200': { description: Playbook updated }
+
+  /api/decision-trails:
+    get:
+      tags: [Decision Trails]
+      summary: List decision trail records
+      responses:
+        '200': { description: Decision trails list }
+
+  /api/decision-trails/rollback:
+    post:
+      tags: [Decision Trails]
+      summary: Roll back a decision record
+      description: Admin-only destructive action.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IdPayload' }
+      responses:
+        '200': { description: Rollback successful }
+        '403': { description: Admin required }
+
+  /api/notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifications
+      responses:
+        '200': { description: Notifications list }
+    post:
+      tags: [Notifications]
+      summary: Create notification and optionally email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                description: { type: string }
+                type: { type: string, enum: [INFO, SUCCESS, WARNING, ERROR] }
+                deliverEmail: { type: boolean }
+                source: { type: string }
+                channel: { type: string }
+              required: [title]
+      responses:
+        '200': { description: Notification created }
+    patch:
+      tags: [Notifications]
+      summary: Mark notifications read or clear
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id: { type: string }
+                markAll: { type: boolean }
+                clear: { type: boolean }
+      responses:
+        '200': { description: Notifications updated }
+
+  /api/docs:
+    get:
+      tags: [Media]
+      summary: List documentation entries
+      responses:
+        '200': { description: Docs list }
+    post:
+      tags: [Media]
+      summary: Create documentation entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                content: { type: string }
+                category: { type: string }
+                mediaUrl: { type: string }
+              required: [title]
+      responses:
+        '200': { description: Doc created }
+    patch:
+      tags: [Media]
+      summary: Update documentation entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id: { type: string }
+                title: { type: string }
+                content: { type: string }
+                category: { type: string }
+                mediaUrl: { type: string }
+              required: [id]
+      responses:
+        '200': { description: Doc updated }
+    delete:
+      tags: [Media]
+      summary: Delete documentation entry
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Doc deleted }
+
+  /api/gallery:
+    get:
+      tags: [Media]
+      summary: List gallery media
+      responses:
+        '200': { description: Gallery list }
+    post:
+      tags: [Media]
+      summary: Create gallery media item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                description: { type: string }
+                url: { type: string }
+                mediaType: { type: string }
+                size: { type: integer }
+              required: [title, url]
+      responses:
+        '200': { description: Item created }
+    patch:
+      tags: [Media]
+      summary: Update gallery media item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id: { type: string }
+              required: [id]
+      responses:
+        '200': { description: Item updated }
+    delete:
+      tags: [Media]
+      summary: Delete gallery media item
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Item deleted }
+
+  /api/uploads/cloudinary:
+    post:
+      tags: [Media]
+      summary: Upload file to Cloudinary
+      description: Requires authenticated user session and is rate-limited.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                folder:
+                  type: string
+              required: [file]
+      responses:
+        '200': { description: Upload result }
+        '401': { description: Authentication required }
+        '413': { description: File too large }
+        '415': { description: Unsupported media type }
+        '429': { description: Rate limited }
+
+  /api/portal:
+    get:
+      tags: [Client Portal]
+      summary: List client portals
+      responses:
+        '200': { description: Portal list }
+    post:
+      tags: [Client Portal]
+      summary: Create client portal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PortalCreateInput' }
+      responses:
+        '200': { description: Portal created }
+    patch:
+      tags: [Client Portal]
+      summary: Update client portal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PortalUpdateInput' }
+      responses:
+        '200': { description: Portal updated }
+
+  /api/portal/updates:
+    get:
+      tags: [Client Portal]
+      summary: List portal updates
+      parameters:
+        - name: portalId
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Updates list }
+    post:
+      tags: [Client Portal]
+      summary: Create portal update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                portalId: { type: string }
+                title: { type: string }
+                message: { type: string }
+                status: { type: string }
+              required: [portalId, title]
+      responses:
+        '200': { description: Update created }
+
+  /api/portal/documents:
+    get:
+      tags: [Client Portal]
+      summary: List portal documents
+      parameters:
+        - name: portalId
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Documents list }
+    post:
+      tags: [Client Portal]
+      summary: Add portal document
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                portalId: { type: string }
+                title: { type: string }
+                url: { type: string }
+                fileType: { type: string }
+                bytes: { type: integer }
+              required: [portalId, title, url]
+      responses:
+        '200': { description: Document added }
+
+  /api/portal/{code}:
+    get:
+      tags: [Client Portal]
+      summary: Public portal view by access code
+      security: []
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Portal payload }
+        '404': { description: Portal not found }
+        '429': { description: Rate limited }
+
+  /api/portal/{code}/approvals:
+    post:
+      tags: [Client Portal]
+      summary: Public approval/rejection on portal update
+      security: []
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                updateId: { type: string }
+                decision: { type: string, enum: [APPROVED, REJECTED] }
+                actorName: { type: string }
+              required: [updateId, decision]
+      responses:
+        '200': { description: Approval updated }
+        '404': { description: Portal or update not found }
+        '429': { description: Rate limited }
+
+  /api/webhooks:
+    get:
+      tags: [Webhooks]
+      summary: List configured webhook endpoints
+      description: Admin-only operation.
+      responses:
+        '200': { description: Webhooks list }
+        '403': { description: Admin required }
+    post:
+      tags: [Webhooks]
+      summary: Create webhook endpoint
+      description: Admin-only operation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WebhookInput' }
+      responses:
+        '200': { description: Webhook created }
+        '400': { description: Validation error }
+        '403': { description: Admin required }
+    patch:
+      tags: [Webhooks]
+      summary: Update webhook endpoint
+      description: Admin-only operation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/WebhookInput'
+                - type: object
+                  properties:
+                    id: { type: string }
+                    active: { type: boolean }
+                  required: [id]
+      responses:
+        '200': { description: Webhook updated }
+        '403': { description: Admin required }
+        '404': { description: Webhook not found }
+
+  /api/ai/chat:
+    post:
+      tags: [AI]
+      summary: Civis AI assistant chat endpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AIChatInput' }
+      responses:
+        '200': { description: AI response }
+        '401': { description: Authentication required }
+        '429': { description: Rate limited }
+        '500': { description: AI generation error }

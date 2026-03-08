@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
 
 export async function GET(_request: Request, context: { params: { code: string } }) {
   if (!process.env.DATABASE_URL) {
@@ -7,6 +8,16 @@ export async function GET(_request: Request, context: { params: { code: string }
   }
   try {
     const { code } = context.params
+    if (!code) return NextResponse.json({ error: "Portal code is required" }, { status: 400 })
+
+    const limit = rateLimit(getRateLimitKey(_request, `portal-view:${code}`), { limit: 100, windowMs: 60_000 })
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: "Too many portal requests. Please try again shortly." },
+        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
+      )
+    }
+
     const portal = await prisma.clientPortal.findUnique({
       where: { accessCode: code },
       include: {

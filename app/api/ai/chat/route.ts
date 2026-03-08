@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { resolveProvider, callProvider, type AiMessage } from "@/lib/ai/providers"
 import { buildFallbackResponse } from "@/lib/ai/fallback"
 import { findKnowledge } from "@/lib/ai/knowledge"
-import { getUserFromRequest } from "@/lib/request-user"
+import { getUserFromRequest, isRequestUserError } from "@/lib/request-user"
 import { createAuditLog } from "@/lib/audit"
 import { prisma } from "@/lib/prisma"
 import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
@@ -636,8 +636,8 @@ export async function POST(request: Request) {
         )
       }
     }
-    const fallbackEmail = request.headers.get("x-user-email")?.trim() || process.env.DEFAULT_USER_EMAIL || "ikchils@gmail.com"
-    const fallbackName = request.headers.get("x-user-name")?.trim() || fallbackEmail.split("@")[0] || "there"
+    const fallbackEmail = process.env.DEFAULT_USER_EMAIL || "ikchils@gmail.com"
+    const fallbackName = fallbackEmail.split("@")[0] || "there"
     let org: { id: string; name: string } = { id: "org-default", name: "Civis" }
     let user: { id: string; name: string; email: string } = {
       id: "user-local",
@@ -652,7 +652,20 @@ export async function POST(request: Request) {
       user = { id: resolved.user.id, name: resolved.user.name || fallbackName, email: resolved.user.email }
       hasDbUser = true
     } catch (error) {
-      console.warn("AI chat user resolution failed, using local fallback user", error)
+      if (isRequestUserError(error)) {
+        if (error.status === 401) {
+          return NextResponse.json({ error: error.message }, { status: 401 })
+        }
+        if (error.status === 503 && isDev) {
+          console.warn("AI chat user resolution failed because DB is unavailable; using local fallback user.")
+        } else {
+          return NextResponse.json({ error: error.message }, { status: error.status })
+        }
+      } else if (!isDev) {
+        return NextResponse.json({ error: "Failed to resolve authenticated user" }, { status: 500 })
+      } else {
+        console.warn("AI chat user resolution failed, using local fallback user", error)
+      }
     }
     const body = await request.json().catch(() => ({}))
     const requestedMode = (body?.mode || "qna") as AiMode

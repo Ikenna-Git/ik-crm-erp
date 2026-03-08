@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
+import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable approvals." }, { status: 503 })
@@ -14,6 +15,19 @@ const normalizeDecision = (value?: string) => {
 export async function POST(request: Request, { params }: { params: { code: string } }) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
+    const code = params.code?.trim()
+    if (!code) {
+      return NextResponse.json({ error: "Portal code is required" }, { status: 400 })
+    }
+
+    const limit = rateLimit(getRateLimitKey(request, `portal-approval:${code}`), { limit: 60, windowMs: 60_000 })
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: "Too many approval requests. Please retry shortly." },
+        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
+      )
+    }
+
     const body = await request.json()
     const { updateId, decision, actorName } = body || {}
     const normalized = normalizeDecision(decision)
@@ -22,7 +36,7 @@ export async function POST(request: Request, { params }: { params: { code: strin
     }
 
     const portal = await prisma.clientPortal.findUnique({
-      where: { accessCode: params.code },
+      where: { accessCode: code },
     })
     if (!portal) {
       return NextResponse.json({ error: "Portal not found" }, { status: 404 })
