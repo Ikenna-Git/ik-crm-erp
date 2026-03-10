@@ -238,6 +238,21 @@ paths:
         '200': { description: Health status }
         '500': { description: Health check failed, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
 
+  /api/openapi:
+    get:
+      tags: [Health]
+      summary: Get OpenAPI YAML specification
+      description: Returns the current API spec used by local Swagger UI.
+      security: []
+      responses:
+        '200':
+          description: OpenAPI YAML
+          content:
+            application/yaml:
+              schema:
+                type: string
+        '404': { description: Spec file not found }
+
   /api/auth/{nextauthPath}:
     get:
       tags: [Auth]
@@ -715,6 +730,22 @@ paths:
         '403': { description: Admin access required }
         '429': { description: Rate limited }
 
+  /api/reports/exports:
+    post:
+      tags: [Reports]
+      summary: REST-style alias for report export
+      description: Preferred resource-style endpoint. Same behavior as `/api/reports/export`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReportExportInput' }
+      responses:
+        '200': { description: CSV stream or send result }
+        '400': { description: Validation error }
+        '403': { description: Admin access required }
+        '429': { description: Rate limited }
+
   /api/reports/digest:
     post:
       tags: [Reports]
@@ -871,6 +902,28 @@ paths:
       responses:
         '200': { description: Rollback successful }
         '403': { description: Admin required }
+
+  /api/decision-trails/{id}/rollback:
+    post:
+      tags: [Decision Trails]
+      summary: REST-style rollback endpoint by decision ID
+      description: Preferred resource-style endpoint. Same behavior as `/api/decision-trails/rollback`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200': { description: Rollback successful }
+        '403': { description: Admin required }
+        '404': { description: Decision trail not found }
 
   /api/notifications:
     get:
@@ -1212,6 +1265,22 @@ paths:
     post:
       tags: [AI]
       summary: Civis AI assistant chat endpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AIChatInput' }
+      responses:
+        '200': { description: AI response }
+        '401': { description: Authentication required }
+        '429': { description: Rate limited }
+        '500': { description: AI generation error }
+
+  /api/ai/conversations:
+    post:
+      tags: [AI]
+      summary: REST-style alias for AI conversations
+      description: Preferred resource-style endpoint. Same behavior as `/api/ai/chat`.
       requestBody:
         required: true
         content:

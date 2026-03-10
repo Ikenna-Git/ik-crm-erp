@@ -40,19 +40,21 @@ Legend:
 | `/api/accounting/invoices` | GET, POST, PATCH, DELETE | session user | `invoiceNumber,clientName,amount,status,dueDate,issueDate,id` | invoice(s) | financial records | authenticated user | High |
 | `/api/accounting/expenses` | GET, POST, PATCH, DELETE | session user | `description,amount,category,date,status,submittedBy,id` | expense(s) | financial records | authenticated user | High |
 | `/api/reports/summary` | GET | session user | `type` query (`accounting/crm/vat`) | summary object | aggregated business metrics | authenticated user | Medium |
-| `/api/reports/export` | POST | public (current) | `type,target,email` | CSV attachment or send status | report data export + email target | anyone (current) | **Critical** |
+| `/api/reports/export` | POST | session admin | `type,target,email` | CSV attachment or send status | report data export + email target | admin/super-admin | High |
+| `/api/reports/exports` | POST | session admin | `type,target,email` | CSV attachment or send status | report data export + email target | admin/super-admin | High |
 | `/api/reports/digest` | POST | session user | `email,sendNow` | digest send result | KPI and business summary | authenticated user | High |
 
 ## 5) HR / Tasks / Ops
 
 | Endpoint | Methods | Auth (Current) | Request Fields | Response Fields | Sensitive Data | Who Can Call | Risk |
 |---|---|---|---|---|---|---|---|
-| `/api/tasks` | GET, POST, PATCH | public (current) | `title,dueDate,ownerId,relatedType,relatedId,id,status` | task(s) | work planning + ownership | anyone (current) | **Critical** |
+| `/api/tasks` | GET, POST, PATCH | session user | `title,dueDate,ownerId,relatedType,relatedId,id,status` | task(s) | work planning + ownership | authenticated user | Medium |
 | `/api/ops/command` | GET | session user | none | ops stats, decisions, activity | operational + financial summary | authenticated user | High |
 | `/api/ops/workflows` | GET, POST, PATCH | session user | `name,trigger,action,id,active` | workflows | automation definitions | authenticated user | High |
 | `/api/playbooks` | GET, POST, PATCH | session user | `templateId,name,category,notes,id,status,progress` | playbook runs | process and execution history | authenticated user | Medium |
 | `/api/decision-trails` | GET | session user | none | change trail records | action history, evidence | authenticated user | High |
 | `/api/decision-trails/rollback` | POST | session admin | `id` | rollback result | destructive change capability | admin/super-admin | **Critical** |
+| `/api/decision-trails/{id}/rollback` | POST | session admin | path `id` (+optional body) | rollback result | destructive change capability | admin/super-admin | **Critical** |
 
 ## 6) Notifications, Docs, Gallery, Uploads
 
@@ -61,7 +63,7 @@ Legend:
 | `/api/notifications` | GET, POST, PATCH | session user (with dev fallback) | `title,description,type,deliverEmail,source,channel,id,markAll,clear` | notifications + email status | user alerts + email channel | authenticated user | Medium |
 | `/api/docs` | GET, POST, PATCH, DELETE | session user | `title,content,category,mediaUrl,id` | docs | internal docs and links | authenticated user | Medium |
 | `/api/gallery` | GET, POST, PATCH, DELETE | session user | `title,description,url,mediaType,size,id` | gallery items | media metadata | authenticated user | Medium |
-| `/api/uploads/cloudinary` | POST | public (current) | multipart `file`, optional `folder` | uploaded URL/meta | storage abuse vector | anyone (current) | **Critical** |
+| `/api/uploads/cloudinary` | POST | session user | multipart `file`, optional `folder` | uploaded URL/meta | storage/PII media | authenticated user | High |
 
 ## 7) Client Portal
 
@@ -77,25 +79,21 @@ Legend:
 
 | Endpoint | Methods | Auth (Current) | Request Fields | Response Fields | Sensitive Data | Who Can Call | Risk |
 |---|---|---|---|---|---|---|---|
-| `/api/webhooks` | GET, POST, PATCH | session user | `name,url,events,id,active` | webhook config incl secret on create | outbound integration secrets | authenticated user | High |
-| `/api/ai/chat` | POST | session user (fallback behavior exists) | `messages,mode,provider,context` | AI message + optional actions | org metrics, conversational context | authenticated user | High |
+| `/api/webhooks` | GET, POST, PATCH | session admin | `name,url,events,id,active` | webhook config (secret protected) | outbound integration secrets | admin/super-admin | High |
+| `/api/ai/chat` | POST | session user | `messages,mode,provider,context` | AI message + optional actions | org metrics, conversational context | authenticated user | High |
+| `/api/ai/conversations` | POST | session user | `messages,mode,provider,context` | AI message + optional actions | org metrics, conversational context | authenticated user | High |
 
 ---
 
 ## Priority Fixes From This Matrix
 
-1. Lock down currently public business endpoints immediately:
-- `/api/tasks`
-- `/api/app/bootstrap`
-- `/api/reports/export`
-- `/api/uploads/cloudinary`
+1. Add endpoint-level authorization policy docs per module (USER vs ADMIN vs SUPER_ADMIN).
 
-2. Remove/strictly gate header-based identity fallback (`x-user-email`) outside local dev.
+2. Finish eliminating header fallback paths in all non-dev code paths.
 
-3. Add endpoint-level authorization policy docs per module (USER vs ADMIN vs SUPER_ADMIN).
-
-4. Add rate limiting to:
+3. Add rate limiting to:
 - public portal code endpoints
 - auth endpoints
 - upload and report export routes
 
+4. Adopt uniform pagination/filter/sort contract across list endpoints.

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { ChevronLeft, ChevronRight, BookOpen, FileText, MoreHorizontal, Plus, X, Upload, Loader2 } from "lucide-react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -591,10 +592,15 @@ export default function DocsPage() {
             {apiError ? <p className="text-xs text-muted-foreground mt-2">{apiError}</p> : null}
           </div>
         </div>
-        <Button onClick={() => openEditor()} className="gap-2">
-          <Plus className="w-4 h-4" />
-          Add Document
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline">
+            <Link href="/dashboard/docs/api">API Docs</Link>
+          </Button>
+          <Button onClick={() => openEditor()} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Add Document
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6">
