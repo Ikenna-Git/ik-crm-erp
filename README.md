@@ -73,3 +73,12 @@ Open `http://localhost:3000`.
 - `npm run dev` — start dev server
 - `npm run build` — production build
 - `npm run lint` — lint
+
+## Documentation
+- Project dossier: `docs/project-dossier.md`
+- Product overview: `docs/product-overview.md`
+- Technical handoff: `docs/technical-handoff.md`
+- Security architecture: `docs/security/system-architecture.md`
+- Endpoint inventory: `docs/security/endpoint-inventory.md`
+- NDPA/VAPT hardening plan: `docs/security/ndpa-vapt-hardening-plan.md`
+- OpenAPI spec: `docs/security/openapi.yaml`
