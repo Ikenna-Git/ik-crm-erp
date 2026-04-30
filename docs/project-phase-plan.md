@@ -1,6 +1,6 @@
 # Civis Phase Plan
 
-Updated: 2026-04-25
+Updated: 2026-04-30
 
 This plan translates the current repository state into a clean execution order.
 
@@ -36,6 +36,26 @@ Remaining:
 - validate 2FA end to end against the live database
 - finish production Google OAuth credentials
 - continue auth hardening cleanup in local worktree
+
+## Phase 1B: Admin Control Plane
+
+Status: local in-progress
+
+Completed locally:
+
+- separate `/admin` control-plane shell built
+- live admin overview route built
+- workspace admin pages for users, workspace settings, and security built
+- founder-locked super-admin policy enforced in admin role management
+- super-admin workspace provisioning route built for stakeholder onboarding
+
+Remaining:
+
+- validate admin pages against live database
+- commit and push the admin batch
+- redeploy Render with the control plane
+- connect admin invite flows to production email later if needed
+- expand from current org model into fuller multi-workspace lifecycle management over time
 
 ## Phase 2: CRM
 
@@ -201,15 +221,120 @@ The platform is no longer just “building features.” The next stage is discip
 - separate local experiments from deploy-ready code
 - finish one backend conversion cycle fully before starting the next
 
+## Phase 12: Tenant and Workspace Lifecycle
+
+Status: newly tracked, mostly pending
+
+Completed locally:
+
+- founder-locked super-admin policy
+- initial stakeholder workspace provisioning route
+- workspace-scoped admin UI foundation
+
+Remaining:
+
+- invite acceptance flow for seeded users
+- fuller multi-workspace membership model
+- workspace switching for founders/support users
+- workspace suspension, archive, and restore controls
+- org-level feature flags and lifecycle states
+- action-level permission matrix beyond page access
+
+## Phase 13: Billing, Entitlements, and Commercial Controls
+
+Status: pending
+
+Remaining:
+
+- seat and entitlement model
+- plan-aware feature gating
+- billing dashboard for workspace admins
+- upgrade, downgrade, and trial lifecycle flows
+- payment-backed subscription controls
+- commercial readiness for stakeholder pilots
+
+## Phase 14: Reliability, Observability, and Recovery
+
+Status: pending
+
+Remaining:
+
+- production error tracking
+- structured logs and alerting
+- uptime and health monitoring
+- background jobs/queue system for digests, webhooks, and async tasks
+- backup and restore workflow
+- tested incident response and recovery discipline
+
+## Phase 15: Data Governance and Enterprise Readiness
+
+Status: pending
+
+Remaining:
+
+- CSV importers for CRM, HR, inventory, and finance
+- export center for admin and compliance workflows
+- soft delete and recovery paths
+- retention and purge controls
+- NDPA/privacy request workflows
+- approval center for sensitive actions
+- white-label and enterprise branding controls
+
+## Phase 16: Support, Customer Success, and Go-to-Market
+
+Status: pending
+
+Remaining:
+
+- support/help center inside the product
+- support-grade impersonation with audit trail
+- customer usage and health views
+- changelog and release communication
+- accessibility and mobile QA sweep
+- stakeholder pitch readiness gate with explicit launch criteria
+
+## Stakeholder Pitch Gate
+
+### Must-have before stakeholder admin access
+
+- stable database and successful migration path
+- real admin control plane live on deploy
+- founder-locked super-admin policy live
+- stakeholder admin user creation and role control live
+- workspace settings and audit visibility live
+- core module data persistence verified against live DB
+- production auth secrets and session behavior stable
+
+### Should be ready before a paid pilot
+
+- invite acceptance flow
+- Google OAuth or another stable sign-in path
+- SMTP for admin/user notifications
+- Cloudinary or equivalent upload storage
+- error monitoring and alerting
+- backup and restore discipline
+- security hardening backlog started in implementation, not only documentation
+
+### Important but can follow after initial pitch
+
+- billing and entitlements
+- CSV imports and export center
+- support/help center
+- white-label controls
+- product usage analytics
+- advanced enterprise governance workflows
+
 ## Immediate Recommended Order
 
 1. database connectivity
 2. migration apply
-3. HR validation
-4. Projects validation
-5. Inventory validation
-6. commit and push local backend work
-7. Render deploy
-8. production integration setup
-9. AI polish and security backlog
-
+3. admin control-plane validation
+4. stakeholder pitch gate review
+5. HR validation
+6. Projects validation
+7. Inventory validation
+8. commit and push local backend work
+9. Render deploy
+10. production integration setup
+11. observability and recovery basics
+12. AI polish and security backlog

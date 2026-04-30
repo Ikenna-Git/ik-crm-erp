@@ -17,6 +17,11 @@ type DuplicateSummary = {
   duplicateCount: number
 }
 
+type Suggestion = {
+  icon: typeof Mail | typeof Phone | typeof Users | typeof AlertTriangle
+  label: string
+}
+
 const buildDuplicateSummary = (values: Array<string | null | undefined>): DuplicateSummary => {
   const map = new Map<string, number>()
   values
@@ -42,13 +47,13 @@ export function HrQualityScorecard({ employees }: { employees: EmployeeRecord[] 
   const phoneDuplicates = buildDuplicateSummary(employees.map((emp) => emp.phone || ""))
   const duplicateCount = emailDuplicates.duplicateCount + phoneDuplicates.duplicateCount
 
-  const suggestions = [
+  const suggestions: Suggestion[] = [
     missingEmail ? { icon: Mail, label: `Add emails for ${missingEmail} employees` } : null,
     missingPhone ? { icon: Phone, label: `Add phone numbers for ${missingPhone} employees` } : null,
     missingDepartment ? { icon: Users, label: `Assign departments for ${missingDepartment} employees` } : null,
     missingPosition ? { icon: AlertTriangle, label: `Assign positions for ${missingPosition} employees` } : null,
     duplicateCount ? { icon: AlertTriangle, label: `Resolve ${duplicateCount} duplicate contact entries` } : null,
-  ].filter(Boolean)
+  ].filter((item): item is Suggestion => item !== null)
 
   const qualityScore = totalEmployees
     ? Math.max(

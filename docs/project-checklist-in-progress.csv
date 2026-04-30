@@ -1,5 +1,13 @@
 "Phase","Area","Workstream","Task","Status","Deployment State","Priority","Notes","Next Step"
 "Phase 1","Auth","Security","Password hashing and verification helpers added","In Progress","Local only","P0","Auth hardening is in local worktree","Commit with next auth/backend batch"
+"Phase 1B","Admin","Control Plane","Separate /admin control-plane shell implemented","In Progress","Local only","P0","New admin route group and shell exist locally","Validate flow and ship with next backend batch"
+"Phase 1B","Admin","Overview","Live admin overview API and page implemented","In Progress","Local only","P0","Overview now reflects real org data and audit activity","Validate against live DB and deploy"
+"Phase 1B","Admin","User Management","Workspace user admin page and API expansion implemented","In Progress","Local only","P0","Admins can create, role-manage, and remove org users with founder lock rules","Validate and deploy"
+"Phase 1B","Admin","Workspace Controls","Workspace settings admin page and API implemented","In Progress","Local only","P1","Org settings are now split into admin control plane","Validate and deploy"
+"Phase 1B","Admin","Security Controls","Admin security page implemented","In Progress","Local only","P1","2FA coverage, privileged users, and audit visibility are surfaced","Validate and deploy"
+"Phase 1B","Admin","Platform Governance","Super-admin system page and workspace provisioning route implemented","In Progress","Local only","P0","Founder can create stakeholder workspaces without giving up SUPER_ADMIN","Validate and deploy"
+"Phase 12","Tenant Lifecycle","Workspace Provisioning","Founder-controlled stakeholder workspace provisioning foundation started","In Progress","Local only","P0","Super-admin can seed workspaces and initial admins, but acceptance and lifecycle are still incomplete","Validate and expand into full tenant lifecycle"
+"Phase 12","Tenant Lifecycle","Authorization","Founder lock and workspace-scoped admin boundaries started","In Progress","Local only","P0","Role boundaries now exist in admin flows, but action-level RBAC is not complete","Extend into module-by-module permission enforcement"
 "Phase 8","HR","Backend Conversion","HR API routes added (employees, payroll, attendance, positions)","In Progress","Local only","P0","Routes exist in local worktree","Apply migration, test, then commit"
 "Phase 8","HR","Frontend Rewire","HR page rewritten to call /api/hr/*","In Progress","Local only","P0","UI is being moved off mock/local-only state","Validate with live DB"
 "Phase 8","HR","Data Quality","HR scorecard/compliance views present","In Progress","Local only","P1","Support components exist locally","Finish polish and validation"
@@ -10,4 +18,3 @@
 "Phase 8","Shared Backend","Seed Data","Module seed helper added for HR/Projects/Inventory","In Progress","Local only","P1","Local seed helper exists","Keep only as controlled dev/demo behavior"
 "Phase 8","Shared Backend","Access Control","Org ownership checks added to new HR/Projects/Inventory routes","In Progress","Local only","P0","Mutation routes were tightened locally","Ship with backend conversion commit"
 "Phase 9","Infrastructure","Database","Pending migration created for HR/Projects/Inventory backend","In Progress","Local only","P0","Migration folder exists locally","Apply migration to active database"
-

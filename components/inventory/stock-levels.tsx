@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-interface StockItem {
+export interface StockItem {
   id: string
   sku: string
   name: string
@@ -52,8 +52,22 @@ const statusConfig = {
   critical: { badge: "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200", icon: "!" },
 }
 
-export function StockLevels({ searchQuery }: { searchQuery: string }) {
-  const [items, setItems] = useState<StockItem[]>(mockStockLevels)
+type StockLevelsProps = {
+  searchQuery: string
+  items?: StockItem[]
+  onAddItem?: (data: Omit<StockItem, "id">) => void
+  onUpdateItem?: (id: string, data: Omit<StockItem, "id">) => void
+  onDeleteItem?: (id: string) => void
+}
+
+export function StockLevels({
+  searchQuery,
+  items: providedItems,
+  onAddItem,
+  onUpdateItem,
+  onDeleteItem,
+}: StockLevelsProps) {
+  const [items, setItems] = useState<StockItem[]>(providedItems || mockStockLevels)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -69,6 +83,10 @@ export function StockLevels({ searchQuery }: { searchQuery: string }) {
   })
 
   useEffect(() => {
+    if (providedItems) {
+      setItems(providedItems)
+      return
+    }
     if (typeof window === "undefined") return
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
@@ -88,10 +106,10 @@ export function StockLevels({ searchQuery }: { searchQuery: string }) {
     } catch (err) {
       console.warn("Failed to load stock levels", err)
     }
-  }, [])
+  }, [providedItems])
 
   useEffect(() => {
-    if (typeof window === "undefined") return
+    if (providedItems || typeof window === "undefined") return
     const handler = (event: Event) => {
       const custom = event as CustomEvent<{ type?: string; items?: StockItem[] }>
       if (custom.detail?.type === "stock" && Array.isArray(custom.detail.items)) {
@@ -100,16 +118,16 @@ export function StockLevels({ searchQuery }: { searchQuery: string }) {
     }
     window.addEventListener(IMPORT_EVENT, handler)
     return () => window.removeEventListener(IMPORT_EVENT, handler)
-  }, [])
+  }, [providedItems])
 
   useEffect(() => {
-    if (typeof window === "undefined") return
+    if (providedItems || typeof window === "undefined") return
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
     } catch (err) {
       console.warn("Failed to persist stock levels", err)
     }
-  }, [items])
+  }, [items, providedItems])
 
   const filteredItems = items.filter(
     (item) =>
@@ -173,16 +191,30 @@ export function StockLevels({ searchQuery }: { searchQuery: string }) {
       status: form.status,
     }
     if (editingId) {
-      setItems((prev) => prev.map((i) => (i.id === editingId ? payload : i)))
+      if (onUpdateItem) {
+        const { id: _id, ...rest } = payload
+        onUpdateItem(editingId, rest)
+      } else {
+        setItems((prev) => prev.map((i) => (i.id === editingId ? payload : i)))
+      }
     } else {
-      setItems((prev) => [payload, ...prev])
+      if (onAddItem) {
+        const { id: _id, ...rest } = payload
+        onAddItem(rest)
+      } else {
+        setItems((prev) => [payload, ...prev])
+      }
     }
     setShowModal(false)
     setEditingId(null)
   }
 
   const deleteItem = (id: string) => {
-    setItems((prev) => prev.filter((i) => i.id !== id))
+    if (onDeleteItem) {
+      onDeleteItem(id)
+    } else {
+      setItems((prev) => prev.filter((i) => i.id !== id))
+    }
   }
 
   return (

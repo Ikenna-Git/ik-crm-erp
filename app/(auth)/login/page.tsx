@@ -18,6 +18,8 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [oauthReady, setOauthReady] = useState({ google: false })
+  const [requires2FA, setRequires2FA] = useState(false)
+  const [twoFactorToken, setTwoFactorToken] = useState("")
 
   useEffect(() => {
     const loadProviders = async () => {
@@ -40,18 +42,68 @@ export default function LoginPage() {
         return
       }
 
+      if (requires2FA) {
+        setError("Enter your 2FA code below to continue.")
+        return
+      }
+
+      const precheckResponse = await fetch("/api/auth/login/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const precheckData = await precheckResponse.json()
+
+      if (!precheckResponse.ok) {
+        throw new Error(precheckData.error || "Login failed. Please try again.")
+      }
+
+      if (precheckData?.requires2FA) {
+        setRequires2FA(true)
+        return
+      }
+
       const result = await signIn("credentials", {
         email,
         password,
         redirect: false,
       })
+
       if (result?.error) {
         setError("Login failed. Please try again.")
         return
       }
+
       router.push("/dashboard")
     } catch (err) {
-      setError("Login failed. Please try again.")
+      setError(err instanceof Error ? err.message : "Login failed. Please try again.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleVerify2FA = async () => {
+    if (!twoFactorToken || twoFactorToken.trim().length < 6) return
+
+    setLoading(true)
+    setError("")
+
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        twoFactorToken,
+        redirect: false,
+      })
+
+      if (result?.error) {
+        throw new Error("Invalid 2FA code")
+      }
+
+      router.push("/dashboard")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Verification failed")
     } finally {
       setLoading(false)
     }
@@ -113,6 +165,43 @@ export default function LoginPage() {
                 {loading ? "Signing in..." : "Sign In"}
               </Button>
             </form>
+
+            {requires2FA && (
+              <div className="space-y-4 pt-4 border-t">
+                <div className="space-y-2">
+                  <Label htmlFor="twoFactorToken">Two-Factor Authentication</Label>
+                  <Input
+                    id="twoFactorToken"
+                    type="text"
+                    placeholder="Enter authenticator or backup code"
+                    value={twoFactorToken}
+                    onChange={(e) => setTwoFactorToken(e.target.value)}
+                    maxLength={12}
+                    disabled={loading}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Enter the 6-digit app code or an 8-character backup code
+                  </p>
+                </div>
+                <Button
+                  onClick={handleVerify2FA}
+                  className="w-full"
+                  disabled={loading || twoFactorToken.trim().length < 6}
+                >
+                  {loading ? "Verifying..." : "Verify & Sign In"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setRequires2FA(false)
+                    setTwoFactorToken("")
+                  }}
+                  className="w-full"
+                >
+                  Back to Login
+                </Button>
+              </div>
+            )}
 
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground whitespace-nowrap">
               <span className="h-px flex-1 bg-border" />

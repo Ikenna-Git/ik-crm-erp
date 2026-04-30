@@ -97,6 +97,13 @@ model Org {
   expenses     Expense[]
   positions    Position[]
   employees    Employee[]
+  payrollRecords PayrollRecord[]
+  attendanceRecords AttendanceRecord[]
+  projects     Project[]
+  projectTasks ProjectTask[]
+  inventoryProducts InventoryProduct[]
+  inventoryStocks InventoryStock[]
+  purchaseOrders PurchaseOrder[]
   galleryItems GalleryItem[]
   docs         Doc[]
   notifications Notification[]
@@ -125,6 +132,9 @@ model User {
   locale       String?  @default("en-NG")
   emailVerified DateTime?
   image         String?
+  twoFactorEnabled Boolean @default(false)
+  twoFactorSecret String?
+  twoFactorBackupCodes String[] // Encrypted backup codes
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -353,6 +363,8 @@ model Position {
   orgId     String
   title     String
   department String?
+  headcount Int        @default(1)
+  status    String     @default("open")
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 
@@ -370,9 +382,156 @@ model Employee {
   department String?
   position   Position? @relation(fields: [positionId], references: [id])
   positionId String?
+  startDate  DateTime?
+  status     String    @default("active")
+  salary     Int       @default(0)
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
+  payrollRecords PayrollRecord[]
+  attendanceRecords AttendanceRecord[]
+
+  @@index([orgId])
+}
+
+model PayrollRecord {
+  id           String    @id @default(uuid())
+  org          Org       @relation(fields: [orgId], references: [id])
+  orgId        String
+  employee     Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  employeeId   String?
+  employeeName String
+  period       String
+  baseSalary   Int
+  bonus        Int       @default(0)
+  deductions   Int       @default(0)
+  netPay       Int
+  status       String    @default("pending")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([orgId])
+  @@index([employeeId])
+}
+
+model AttendanceRecord {
+  id             String    @id @default(uuid())
+  org            Org       @relation(fields: [orgId], references: [id])
+  orgId          String
+  employee       Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  employeeId     String?
+  employeeName   String
+  date           DateTime
+  status         String
+  checkIn        String?
+  checkOut       String?
+  hoursWorked    Float     @default(0)
+  leaveType      String?
+  leaveStart     DateTime?
+  leaveEnd       DateTime?
+  remindOnReturn Boolean   @default(false)
+  note           String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([orgId])
+  @@index([employeeId])
+  @@index([date])
+}
+
+model Project {
+  id          String      @id @default(uuid())
+  org         Org         @relation(fields: [orgId], references: [id])
+  orgId       String
+  name        String
+  description String
+  client      String?
+  status      String      @default("planning")
+  progress    Int         @default(0)
+  team        Int         @default(0)
+  budget      Int         @default(0)
+  spent       Int         @default(0)
+  startDate   DateTime?
+  endDate     DateTime?
+  priority    String      @default("medium")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  tasks       ProjectTask[]
+
+  @@index([orgId])
+}
+
+model ProjectTask {
+  id        String    @id @default(uuid())
+  org       Org       @relation(fields: [orgId], references: [id])
+  orgId     String
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  projectId String?
+  title     String
+  assignee  String?
+  startDate DateTime?
+  endDate   DateTime?
+  priority  String    @default("medium")
+  stage     String    @default("todo")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([orgId])
+  @@index([projectId])
+}
+
+model InventoryProduct {
+  id        String   @id @default(uuid())
+  org       Org      @relation(fields: [orgId], references: [id])
+  orgId     String
+  sku       String
+  name      String
+  category  String
+  price     Int
+  cost      Int
+  supplier  String
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([orgId, sku])
+  @@index([orgId])
+}
+
+model InventoryStock {
+  id                String   @id @default(uuid())
+  org               Org      @relation(fields: [orgId], references: [id])
+  orgId             String
+  sku               String
+  name              String
+  currentStock      Int
+  reorderPoint      Int
+  reorderQuantity   Int
+  warehouseLocation String
+  status            String   @default("ok")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([orgId, sku])
+  @@index([orgId])
+}
+
+model PurchaseOrder {
+  id               String   @id @default(uuid())
+  org              Org      @relation(fields: [orgId], references: [id])
+  orgId            String
+  orderNo          String
+  supplier         String
+  items            Int
+  totalValue       Int
+  orderDate        DateTime?
+  expectedDelivery DateTime?
+  status           String   @default("draft")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([orgId, orderNo])
   @@index([orgId])
 }
 

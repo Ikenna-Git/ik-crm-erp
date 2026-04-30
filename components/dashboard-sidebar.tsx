@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { signOut } from "next-auth/react"
+import { signOut, useSession } from "next-auth/react"
 import {
   BarChart3,
   DollarSign,
@@ -19,13 +19,17 @@ import {
   ClipboardList,
   LayoutGrid,
   Sparkles,
+  Mail,
+  ShieldCheck,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { isAdmin } from "@/lib/authz"
 
-const navigation = [
+const baseNavigation = [
   { name: "Overview", href: "/dashboard", icon: BarChart3 },
   { name: "Civis AI", href: "/dashboard/ai", icon: Sparkles },
   { name: "CRM", href: "/dashboard/crm", icon: Users },
+  { name: "Marketing", href: "/dashboard/marketing", icon: Mail },
   { name: "Client Portal", href: "/dashboard/portal", icon: LayoutGrid },
   { name: "Accounting", href: "/dashboard/accounting", icon: DollarSign },
   { name: "Inventory", href: "/dashboard/inventory", icon: Package },
@@ -41,6 +45,11 @@ const navigation = [
 
 export function DashboardSidebar() {
   const pathname = usePathname()
+  const { data: session } = useSession()
+  const navigation = [
+    ...baseNavigation,
+    ...(isAdmin(session?.user?.role) ? [{ name: "Admin", href: "/admin", icon: ShieldCheck }] : []),
+  ]
 
   const handleLogout = () => {
     localStorage.removeItem("user")

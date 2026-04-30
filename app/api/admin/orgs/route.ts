@@ -1,0 +1,112 @@
+import { NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
+import { createAuditLog } from "@/lib/audit"
+import { getUserFromRequest } from "@/lib/request-user"
+import { isSuperAdmin } from "@/lib/authz"
+
+const dbUnavailable = () =>
+  NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable org management." }, { status: 503 })
+
+export async function GET(request: Request) {
+  if (!process.env.DATABASE_URL) return dbUnavailable()
+
+  try {
+    const { user } = await getUserFromRequest(request)
+    if (!isSuperAdmin(user.role)) {
+      return NextResponse.json({ error: "Super admin access required" }, { status: 403 })
+    }
+
+    const orgs = await prisma.org.findMany({
+      orderBy: { updatedAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        theme: true,
+        notifyEmail: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: {
+          select: {
+            users: true,
+            contacts: true,
+            employees: true,
+            deals: true,
+            invoices: true,
+            automationWorkflows: true,
+          },
+        },
+      },
+    })
+
+    return NextResponse.json({ orgs })
+  } catch (error) {
+    console.error("Org listing failed", error)
+    return NextResponse.json({ error: "Failed to load organizations" }, { status: 500 })
+  }
+}
+
+export async function POST(request: Request) {
+  if (!process.env.DATABASE_URL) return dbUnavailable()
+
+  try {
+    const { user } = await getUserFromRequest(request)
+    if (!isSuperAdmin(user.role)) {
+      return NextResponse.json({ error: "Super admin access required" }, { status: 403 })
+    }
+
+    const body = await request.json()
+    const orgName = String(body?.name || "").trim()
+    const theme = String(body?.theme || "light").trim()
+    const notifyEmail = String(body?.notifyEmail || "").trim()
+    const adminName = String(body?.adminName || "").trim()
+    const adminEmail = String(body?.adminEmail || "").trim().toLowerCase()
+
+    if (!orgName || !adminName || !adminEmail) {
+      return NextResponse.json({ error: "name, adminName, and adminEmail are required" }, { status: 400 })
+    }
+
+    const created = await prisma.org.create({
+      data: {
+        name: orgName,
+        theme: theme || "light",
+        notifyEmail: notifyEmail || adminEmail,
+        users: {
+          create: {
+            name: adminName,
+            email: adminEmail,
+            role: "ADMIN",
+            title: "Workspace Admin",
+          },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        theme: true,
+        notifyEmail: true,
+        createdAt: true,
+        users: {
+          take: 1,
+          select: { id: true, name: true, email: true, role: true, title: true },
+        },
+      },
+    })
+
+    await createAuditLog({
+      orgId: created.id,
+      userId: user.id,
+      action: "admin.org.created",
+      entity: "Org",
+      entityId: created.id,
+      metadata: { name: created.name, adminEmail },
+    })
+
+    return NextResponse.json({
+      org: created,
+      message: "Workspace created. The initial admin can complete signup later using the same email address.",
+    })
+  } catch (error) {
+    console.error("Org creation failed", error)
+    return NextResponse.json({ error: "Failed to create workspace" }, { status: 500 })
+  }
+}

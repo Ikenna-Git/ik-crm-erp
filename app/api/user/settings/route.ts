@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getUserFromRequest } from "@/lib/request-user"
 import { createAuditLog } from "@/lib/audit"
 import { getDefaultKpis } from "@/lib/kpis"
+import { FOUNDER_SUPER_ADMIN_EMAIL } from "@/lib/authz"
 import { DEFAULT_CRM_VIEWS, DEFAULT_ONBOARDING_TASKS } from "@/lib/user-settings"
 
 const dbUnavailable = () =>
@@ -137,10 +138,9 @@ const toCrmViews = (settings: any) => ({
 })
 
 const getFallbackIdentity = (request: Request) => {
-  const email = request.headers.get("x-user-email")?.trim() || process.env.DEFAULT_USER_EMAIL || "ikchils@gmail.com"
+  const email = request.headers.get("x-user-email")?.trim() || process.env.DEFAULT_USER_EMAIL || FOUNDER_SUPER_ADMIN_EMAIL
   const name = request.headers.get("x-user-name")?.trim() || email.split("@")[0]
-  const defaultAdmin = (process.env.DEFAULT_SUPER_ADMIN_EMAIL || "ikchils@gmail.com").toLowerCase()
-  const role = email.toLowerCase() === defaultAdmin ? "SUPER_ADMIN" : "USER"
+  const role = email.toLowerCase() === FOUNDER_SUPER_ADMIN_EMAIL ? "SUPER_ADMIN" : "USER"
   return { name, email, role }
 }
 

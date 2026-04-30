@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server"
+import { Role } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
-import { getDefaultOrg } from "@/lib/defaultOrg"
+import { createAuditLog } from "@/lib/audit"
 import { getUserFromRequest } from "@/lib/request-user"
-import { isAdmin } from "@/lib/authz"
+import { canAssignRole, isAdmin } from "@/lib/authz"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable settings." }, { status: 503 })
@@ -10,12 +11,15 @@ const dbUnavailable = () =>
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { user } = await getUserFromRequest(request)
+    const { org, user } = await getUserFromRequest(request)
     if (!isAdmin(user.role)) {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 })
     }
-    const org = await getDefaultOrg()
-    const users = await prisma.user.findMany({ where: { orgId: org.id } })
+    const users = await prisma.user.findMany({
+      where: { orgId: org.id },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, name: true, email: true, role: true, title: true, twoFactorEnabled: true, createdAt: true },
+    })
     return NextResponse.json({ org, users })
   } catch (error) {
     console.error("Settings fetch failed", error)
@@ -26,16 +30,23 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { user } = await getUserFromRequest(request)
+    const { org, user } = await getUserFromRequest(request)
     if (!isAdmin(user.role)) {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 })
     }
     const body = await request.json()
     const { name, theme, notifyEmail } = body || {}
-    const org = await getDefaultOrg()
     const updated = await prisma.org.update({
       where: { id: org.id },
       data: { name: name ?? org.name, theme: theme ?? org.theme, notifyEmail: notifyEmail ?? org.notifyEmail },
+    })
+    await createAuditLog({
+      orgId: org.id,
+      userId: user.id,
+      action: "settings.org.updated",
+      entity: "Org",
+      entityId: org.id,
+      metadata: { name: updated.name, theme: updated.theme, notifyEmail: updated.notifyEmail },
     })
     return NextResponse.json({ org: updated })
   } catch (error) {
@@ -47,16 +58,31 @@ export async function PATCH(request: Request) {
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { user } = await getUserFromRequest(request)
+    const { org, user } = await getUserFromRequest(request)
     if (!isAdmin(user.role)) {
       return NextResponse.json({ error: "Admin access required" }, { status: 403 })
     }
     const body = await request.json()
     const { name, email, role } = body || {}
     if (!name || !email || !role) return NextResponse.json({ error: "name, email, role required" }, { status: 400 })
-    const org = await getDefaultOrg()
+    const normalizedRole = String(role).trim().toUpperCase() as Role
+    if (!["USER", "ADMIN"].includes(normalizedRole)) {
+      return NextResponse.json({ error: "Only USER and ADMIN can be created here" }, { status: 400 })
+    }
+    if (!canAssignRole({ actorRole: user.role, actorEmail: user.email, nextRole: normalizedRole })) {
+      return NextResponse.json({ error: "Not authorized to assign that role" }, { status: 403 })
+    }
     const createdUser = await prisma.user.create({
-      data: { name, email, role, orgId: org.id },
+      data: { name, email: String(email).toLowerCase(), role: normalizedRole, orgId: org.id },
+      select: { id: true, name: true, email: true, role: true, title: true, twoFactorEnabled: true, createdAt: true },
+    })
+    await createAuditLog({
+      orgId: org.id,
+      userId: user.id,
+      action: "settings.user.created",
+      entity: "User",
+      entityId: createdUser.id,
+      metadata: { email: createdUser.email, role: createdUser.role },
     })
     return NextResponse.json({ user: createdUser })
   } catch (error: any) {

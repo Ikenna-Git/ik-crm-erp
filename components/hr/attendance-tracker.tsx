@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog"
 import { Calendar, CheckCircle, XCircle, Clock, Laptop, Plus, Pencil } from "lucide-react"
 
-interface AttendanceRecord {
+export interface AttendanceRecord {
   id: string
   employee: string
   date: string
@@ -116,8 +116,20 @@ const mockAttendance: AttendanceRecord[] = [
   },
 ]
 
-export function AttendanceTracker({ searchQuery }: { searchQuery: string }) {
-  const [records, setRecords] = useState<AttendanceRecord[]>(mockAttendance)
+type AttendanceTrackerProps = {
+  searchQuery: string
+  records?: AttendanceRecord[]
+  onAddRecord?: (data: Omit<AttendanceRecord, "id">) => void
+  onUpdateRecord?: (id: string, data: Omit<AttendanceRecord, "id">) => void
+}
+
+export function AttendanceTracker({
+  searchQuery,
+  records: providedRecords,
+  onAddRecord,
+  onUpdateRecord,
+}: AttendanceTrackerProps) {
+  const [records, setRecords] = useState<AttendanceRecord[]>(providedRecords || mockAttendance)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -135,6 +147,10 @@ export function AttendanceTracker({ searchQuery }: { searchQuery: string }) {
     remindOnReturn: false,
     note: "",
   })
+
+  useEffect(() => {
+    if (providedRecords) setRecords(providedRecords)
+  }, [providedRecords])
 
   const filteredAttendance = records.filter((record) =>
     record.employee.toLowerCase().includes(searchQuery.toLowerCase()),
@@ -226,9 +242,19 @@ export function AttendanceTracker({ searchQuery }: { searchQuery: string }) {
     }
 
     if (editingId) {
-      setRecords((prev) => prev.map((record) => (record.id === editingId ? payload : record)))
+      if (onUpdateRecord) {
+        const { id: _id, ...rest } = payload
+        onUpdateRecord(editingId, rest)
+      } else {
+        setRecords((prev) => prev.map((record) => (record.id === editingId ? payload : record)))
+      }
     } else {
-      setRecords((prev) => [payload, ...prev])
+      if (onAddRecord) {
+        const { id: _id, ...rest } = payload
+        onAddRecord(rest)
+      } else {
+        setRecords((prev) => [payload, ...prev])
+      }
     }
     setDialogOpen(false)
   }

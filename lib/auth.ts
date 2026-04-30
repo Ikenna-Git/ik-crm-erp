@@ -2,11 +2,24 @@ import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import type { AuthOptions } from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import CredentialsProvider from "next-auth/providers/credentials"
+import speakeasy from "speakeasy"
 import { prisma, withPrismaRetry } from "@/lib/prisma"
 import { getDefaultOrg } from "@/lib/defaultOrg"
+import { FOUNDER_SUPER_ADMIN_EMAIL } from "@/lib/authz"
+import { hashPassword, verifyPassword } from "@/lib/password"
 
 const useAdapter = process.env.NODE_ENV === "production" || process.env.NEXTAUTH_USE_ADAPTER === "true"
-const allowCredentialsFallback = process.env.NODE_ENV !== "production" || process.env.NEXTAUTH_ALLOW_FALLBACK === "true"
+const allowCredentialsFallback =
+  process.env.NODE_ENV !== "production" || process.env.NEXTAUTH_ALLOW_FALLBACK === "true"
+
+const buildLocalUser = (email: string, name: string, role: string) =>
+  ({
+    id: `local-${Buffer.from(email).toString("hex").slice(0, 20)}`,
+    name,
+    email,
+    role,
+    twoFactorEnabled: false,
+  }) as any
 
 const buildProviders = () => {
   const providers = []
@@ -27,57 +40,151 @@ const buildProviders = () => {
         name: { label: "Name", type: "text" },
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        twoFactorToken: { label: "Two-Factor Token", type: "text" },
         mode: { label: "Mode", type: "text" },
       },
       authorize: async (credentials) => {
         const email = credentials?.email?.toLowerCase().trim()
-        if (!email) return null
-        const name = credentials?.name || email.split("@")[0]
-        const defaultAdmin = (process.env.DEFAULT_SUPER_ADMIN_EMAIL || "ikchils@gmail.com").toLowerCase()
-        const role = email === defaultAdmin ? "SUPER_ADMIN" : "USER"
+        const password = credentials?.password?.trim()
+        const twoFactorToken = credentials?.twoFactorToken?.trim()
+        const mode = credentials?.mode === "signup" ? "signup" : "login"
+
+        if (!email || !password) return null
+
+        const name = credentials?.name?.trim() || email.split("@")[0]
+        const role = email === FOUNDER_SUPER_ADMIN_EMAIL ? "SUPER_ADMIN" : "USER"
 
         if (!useAdapter) {
-          return {
-            id: `local-${Buffer.from(email).toString("hex").slice(0, 20)}`,
-            name,
-            email,
-            role,
-          } as any
+          return allowCredentialsFallback ? buildLocalUser(email, name, role) : null
         }
 
         try {
           const org = await getDefaultOrg()
 
-          const user = await withPrismaRetry("auth.authorize.upsertUser", () =>
-            prisma.user.upsert({
+          if (mode === "signup") {
+            const existingUser = await withPrismaRetry("auth.authorize.findUserForSignup", () =>
+              prisma.user.findUnique({
+                where: { email },
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  role: true,
+                  passwordHash: true,
+                  twoFactorEnabled: true,
+                },
+              }),
+            )
+
+            if (existingUser?.passwordHash) {
+              return null
+            }
+
+            if (existingUser) {
+              const updatedUser = await withPrismaRetry("auth.authorize.setPasswordForExistingUser", () =>
+                prisma.user.update({
+                  where: { id: existingUser.id },
+                  data: {
+                    name,
+                    passwordHash: hashPassword(password),
+                  },
+                }),
+              )
+
+              return {
+                id: updatedUser.id,
+                name: updatedUser.name,
+                email: updatedUser.email,
+                role: updatedUser.role,
+                twoFactorEnabled: updatedUser.twoFactorEnabled,
+              } as any
+            }
+
+            const createdUser = await withPrismaRetry("auth.authorize.createUser", () =>
+              prisma.user.create({
+                data: {
+                  email,
+                  name,
+                  role,
+                  orgId: org.id,
+                  passwordHash: hashPassword(password),
+                },
+              }),
+            )
+
+            return {
+              id: createdUser.id,
+              name: createdUser.name,
+              email: createdUser.email,
+              role: createdUser.role,
+              twoFactorEnabled: createdUser.twoFactorEnabled,
+            } as any
+          }
+
+          const user = await withPrismaRetry("auth.authorize.findUserForLogin", () =>
+            prisma.user.findUnique({
               where: { email },
-              update: { name },
-              create: {
-                email,
-                name,
-                role,
-                orgId: org.id,
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                passwordHash: true,
+                twoFactorEnabled: true,
+                twoFactorSecret: true,
+                twoFactorBackupCodes: true,
               },
             }),
           )
+
+          if (!user || !verifyPassword(password, user.passwordHash)) {
+            return null
+          }
+
+          if (user.twoFactorEnabled) {
+            if (!twoFactorToken || !user.twoFactorSecret) {
+              return null
+            }
+
+            const verified = speakeasy.totp.verify({
+              secret: user.twoFactorSecret,
+              encoding: "base32",
+              token: twoFactorToken,
+              window: 2,
+            })
+
+            if (!verified) {
+              const normalizedBackupCode = twoFactorToken.toUpperCase()
+              if (!user.twoFactorBackupCodes.includes(normalizedBackupCode)) {
+                return null
+              }
+
+              await withPrismaRetry("auth.authorize.consumeBackupCode", () =>
+                prisma.user.update({
+                  where: { id: user.id },
+                  data: {
+                    twoFactorBackupCodes: user.twoFactorBackupCodes.filter((code) => code !== normalizedBackupCode),
+                  },
+                }),
+              )
+            }
+          }
 
           return {
             id: user.id,
             name: user.name,
             email: user.email,
             role: user.role,
+            twoFactorEnabled: user.twoFactorEnabled,
           } as any
         } catch (error) {
           console.error("Credentials authorize failed", error)
+
           if (allowCredentialsFallback) {
             console.warn("Using local credentials fallback user (DB unavailable).")
-            return {
-              id: `local-${Buffer.from(email).toString("hex").slice(0, 20)}`,
-              name,
-              email,
-              role,
-            } as any
+            return buildLocalUser(email, name, role)
           }
+
           return null
         }
       },
@@ -98,14 +205,38 @@ export const authOptions: AuthOptions = {
   callbacks: {
     async session({ session, user, token }) {
       if (session.user) {
-        session.user.id = (user as any)?.id || token.sub
-        session.user.role = (user as any)?.role || (token as any)?.role
+        const sessionUser = session.user as typeof session.user & {
+          id?: string
+          role?: string
+          twoFactorEnabled?: boolean
+        }
+        const authUser = user as { id?: string; role?: string; twoFactorEnabled?: boolean } | undefined
+        sessionUser.id = authUser?.id || token.sub
+        sessionUser.role = authUser?.role || (token as any)?.role
+        sessionUser.twoFactorEnabled = authUser?.twoFactorEnabled || (token as any)?.twoFactorEnabled
       }
       return session
     },
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         ;(token as any).role = (user as any).role
+        ;(token as any).twoFactorEnabled = (user as any).twoFactorEnabled
+      } else if (trigger === "update" && token.email && useAdapter) {
+        try {
+          const currentUser = await withPrismaRetry("auth.jwt.refreshUser", () =>
+            prisma.user.findUnique({
+              where: { email: token.email as string },
+              select: { role: true, twoFactorEnabled: true },
+            }),
+          )
+
+          if (currentUser) {
+            ;(token as any).role = currentUser.role
+            ;(token as any).twoFactorEnabled = currentUser.twoFactorEnabled
+          }
+        } catch (error) {
+          console.error("Failed to refresh auth token claims", error)
+        }
       }
       return token
     },

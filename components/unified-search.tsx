@@ -2,16 +2,30 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ArrowUpRight, Search } from "lucide-react"
+import { ArrowUpRight, Search, Filter } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { unifiedSearchItems } from "@/lib/unified-search"
+
+type SearchResult = {
+  id: string
+  title: string
+  subtitle: string
+  category: string
+  href: string
+  type: string
+}
 
 export function UnifiedSearch() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
+  const [category, setCategory] = useState<string>("")
+  const [results, setResults] = useState<SearchResult[]>([])
+  const [loading, setLoading] = useState(false)
+  const [hasSearched, setHasSearched] = useState(false)
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -25,28 +39,64 @@ export function UnifiedSearch() {
   }, [])
 
   useEffect(() => {
-    if (!open) setQuery("")
+    if (!open) {
+      setQuery("")
+      setCategory("")
+      setResults([])
+      setHasSearched(false)
+    }
   }, [open])
 
-  const filtered = useMemo(() => {
-    const value = query.trim().toLowerCase()
-    if (!value) return unifiedSearchItems
-    return unifiedSearchItems.filter((item) => {
-      return (
-        item.title.toLowerCase().includes(value) ||
-        item.subtitle.toLowerCase().includes(value) ||
-        item.category.toLowerCase().includes(value)
-      )
-    })
-  }, [query])
+  useEffect(() => {
+    const search = async () => {
+      if (!query.trim() || query.length < 2) {
+        setResults([])
+        setHasSearched(false)
+        return
+      }
+
+      setLoading(true)
+      try {
+        const params = new URLSearchParams({ q: query })
+        if (category) params.set("category", category)
+
+        const response = await fetch(`/api/search?${params}`)
+        const data = await response.json()
+
+        if (response.ok) {
+          setResults(data.results || [])
+        } else {
+          setResults([])
+        }
+        setHasSearched(true)
+      } catch (error) {
+        console.error("Search failed:", error)
+        setResults([])
+        setHasSearched(true)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    const debounceTimer = setTimeout(search, 300)
+    return () => clearTimeout(debounceTimer)
+  }, [query, category])
 
   const grouped = useMemo(() => {
-    return filtered.reduce<Record<string, typeof filtered>>((acc, item) => {
+    const allResults = hasSearched ? results : unifiedSearchItems.filter(item =>
+      !query.trim() || (
+        item.title.toLowerCase().includes(query.toLowerCase()) ||
+        item.subtitle.toLowerCase().includes(query.toLowerCase()) ||
+        item.category.toLowerCase().includes(query.toLowerCase())
+      )
+    )
+
+    return allResults.reduce<Record<string, typeof allResults>>((acc, item) => {
       if (!acc[item.category]) acc[item.category] = []
       acc[item.category].push(item)
       return acc
     }, {})
-  }, [filtered])
+  }, [results, query, hasSearched])
 
   const groups = Object.entries(grouped)
 
@@ -75,20 +125,43 @@ export function UnifiedSearch() {
             <DialogDescription>Search contacts, deals, invoices, docs, and more.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <Input
-              placeholder="Type to search across Civis..."
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              autoFocus
-            />
+            <div className="flex gap-2">
+              <Input
+                placeholder="Type to search across Civis..."
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                autoFocus
+                className="flex-1"
+              />
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger className="w-32">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All</SelectItem>
+                  <SelectItem value="crm">CRM</SelectItem>
+                  <SelectItem value="accounting">Accounting</SelectItem>
+                  <SelectItem value="tasks">Tasks</SelectItem>
+                  <SelectItem value="contacts">Contacts</SelectItem>
+                  <SelectItem value="companies">Companies</SelectItem>
+                  <SelectItem value="deals">Deals</SelectItem>
+                  <SelectItem value="invoices">Invoices</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="max-h-[60vh] overflow-auto space-y-6 pr-2">
-              {groups.length === 0 ? (
-                <div className="text-sm text-muted-foreground">No results. Try another keyword.</div>
+              {loading ? (
+                <div className="text-sm text-muted-foreground">Searching...</div>
+              ) : Object.keys(grouped).length === 0 ? (
+                <div className="text-sm text-muted-foreground">
+                  {query.trim() ? "No results found. Try another keyword." : "Start typing to search..."}
+                </div>
               ) : (
-                groups.map(([category, items]) => (
-                  <div key={category} className="space-y-2">
+                Object.entries(grouped).map(([categoryName, items]) => (
+                  <div key={categoryName} className="space-y-2">
                     <div className="flex items-center justify-between text-xs uppercase tracking-wide text-muted-foreground">
-                      <span>{category}</span>
+                      <span>{categoryName}</span>
                       <Badge variant="outline">{items.length}</Badge>
                     </div>
                     <div className="space-y-2">

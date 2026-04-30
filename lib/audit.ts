@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 
 type AuditInput = {
@@ -18,7 +19,7 @@ export const createAuditLog = async ({ orgId, userId, action, entity, entityId, 
         action,
         entity: entity || null,
         entityId: entityId || null,
-        metadata: metadata || null,
+        metadata: (metadata as Prisma.InputJsonValue | undefined) ?? undefined,
       },
     })
   } catch (error) {

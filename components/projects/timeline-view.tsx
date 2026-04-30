@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PaginationControls } from "@/components/shared/pagination-controls"
 
-interface TimelineItem {
+export interface TimelineItem {
   id: string
   project: string
   startDate: string
@@ -45,10 +45,16 @@ const statusColors = {
   completed: "bg-green-200 dark:bg-green-500/30",
 }
 
-export function TimelineView({ searchQuery }: { searchQuery: string }) {
+type TimelineViewProps = {
+  searchQuery: string
+  items?: TimelineItem[]
+}
+
+export function TimelineView({ searchQuery, items }: TimelineViewProps) {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const filteredItems = mockTimeline.filter((item) => item.project.toLowerCase().includes(searchQuery.toLowerCase()))
+  const sourceItems = items || mockTimeline
+  const filteredItems = sourceItems.filter((item) => item.project.toLowerCase().includes(searchQuery.toLowerCase()))
 
   const sortedItems = [...filteredItems].sort((a, b) => b.startDate.localeCompare(a.startDate))
 

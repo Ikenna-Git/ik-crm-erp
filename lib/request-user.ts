@@ -3,8 +3,9 @@ import { getServerSession } from "next-auth"
 import { prisma, withPrismaRetry } from "@/lib/prisma"
 import { getDefaultOrg } from "@/lib/defaultOrg"
 import { authOptions } from "@/lib/auth"
+import { FOUNDER_SUPER_ADMIN_EMAIL } from "@/lib/authz"
 
-const fallbackEmail = "ikchils@gmail.com"
+const fallbackEmail = FOUNDER_SUPER_ADMIN_EMAIL
 const isDev = process.env.NODE_ENV !== "production"
 const allowDevHeaderIdentity = isDev && process.env.ALLOW_DEV_HEADER_IDENTITY === "true"
 const allowDevDefaultIdentity = isDev && process.env.ALLOW_DEV_DEFAULT_IDENTITY === "true"
@@ -18,8 +19,7 @@ type RequestIdentity = {
 const isRole = (value?: string | null): value is Role => value === "SUPER_ADMIN" || value === "ADMIN" || value === "USER"
 
 const deriveRoleFromEmail = (email: string): Role => {
-  const defaultAdmin = (process.env.DEFAULT_SUPER_ADMIN_EMAIL || fallbackEmail).toLowerCase()
-  return email.toLowerCase() === defaultAdmin ? "SUPER_ADMIN" : "USER"
+  return email.toLowerCase() === FOUNDER_SUPER_ADMIN_EMAIL ? "SUPER_ADMIN" : "USER"
 }
 
 const sanitizeIdentity = (emailRaw: string, nameRaw?: string | null, roleRaw?: string | null): RequestIdentity => {
@@ -43,9 +43,16 @@ export const isRequestUserError = (error: unknown): error is RequestUserError =>
 
 export const getSessionIdentityFromRequest = async (request: Request): Promise<RequestIdentity> => {
   const session = await getServerSession(authOptions)
-  const sessionEmail = session?.user?.email
+  const sessionUser = session?.user as
+    | ({
+        email?: string | null
+        name?: string | null
+        role?: string | null
+      } & Record<string, unknown>)
+    | undefined
+  const sessionEmail = sessionUser?.email
   if (sessionEmail) {
-    return sanitizeIdentity(sessionEmail, session.user?.name, session.user?.role)
+    return sanitizeIdentity(sessionEmail, sessionUser?.name, sessionUser?.role)
   }
 
   if (allowDevHeaderIdentity) {

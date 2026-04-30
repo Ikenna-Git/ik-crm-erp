@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Plus, Sparkles } from "lucide-react"
@@ -15,17 +15,86 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { EmployeesTable, type Employee, mockEmployees } from "@/components/hr/employees-table"
-import { PayrollTable, type PayrollRecord, mockPayroll } from "@/components/hr/payroll-table"
-import { AttendanceTracker } from "@/components/hr/attendance-tracker"
-import { PositionsTable } from "@/components/hr/positions-table"
+import { EmployeesTable, type Employee } from "@/components/hr/employees-table"
+import { PayrollTable, type PayrollRecord } from "@/components/hr/payroll-table"
+import { AttendanceTracker, type AttendanceRecord } from "@/components/hr/attendance-tracker"
+import { PositionsTable, type Position } from "@/components/hr/positions-table"
 import { HrQualityScorecard } from "@/components/hr/hr-quality-scorecard"
 import { CompliancePack } from "@/components/hr/compliance-pack"
 
+const today = () => new Date().toISOString().slice(0, 10)
+const toDateString = (value?: string | null) => (value ? String(value).slice(0, 10) : today())
+
+const requestJson = async (url: string, init?: RequestInit) => {
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...(init?.headers || {}),
+    },
+  })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(data.error || "Request failed")
+  }
+  return data
+}
+
+const mapEmployee = (employee: any): Employee => ({
+  id: employee.id,
+  name: employee.name,
+  email: employee.email || "",
+  phone: employee.phone || "",
+  department: employee.department || "Operations",
+  position: employee.position?.title || "Staff",
+  startDate: toDateString(employee.startDate || employee.createdAt),
+  status: employee.status === "leave" || employee.status === "inactive" ? employee.status : "active",
+  salary: Number(employee.salary || 0),
+})
+
+const mapPayroll = (record: any): PayrollRecord => ({
+  id: record.id,
+  employee: record.employeeName,
+  period: record.period,
+  baseSalary: Number(record.baseSalary || 0),
+  bonus: Number(record.bonus || 0),
+  deductions: Number(record.deductions || 0),
+  netPay: Number(record.netPay || 0),
+  status: record.status === "paid" || record.status === "processed" ? record.status : "pending",
+})
+
+const mapAttendance = (record: any): AttendanceRecord => ({
+  id: record.id,
+  employee: record.employeeName,
+  date: toDateString(record.date),
+  status: ["present", "absent", "late", "on-leave", "remote"].includes(record.status) ? record.status : "present",
+  checkIn: record.checkIn || "—",
+  checkOut: record.checkOut || "—",
+  hoursWorked: Number(record.hoursWorked || 0),
+  leaveType: record.leaveType || undefined,
+  leaveStart: record.leaveStart ? toDateString(record.leaveStart) : undefined,
+  leaveEnd: record.leaveEnd ? toDateString(record.leaveEnd) : undefined,
+  remindOnReturn: Boolean(record.remindOnReturn),
+  note: record.note || undefined,
+})
+
+const mapPosition = (position: any): Position => ({
+  id: position.id,
+  title: position.title,
+  department: position.department || "Operations",
+  headcount: Number(position.headcount || 1),
+  status: position.status === "filled" || position.status === "paused" ? position.status : "open",
+  updatedAt: toDateString(position.updatedAt),
+})
+
 export default function HRPage() {
   const searchQuery = ""
-  const [employees, setEmployees] = useState<Employee[]>(mockEmployees)
-  const [payroll, setPayroll] = useState<PayrollRecord[]>(mockPayroll)
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [payroll, setPayroll] = useState<PayrollRecord[]>([])
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([])
+  const [positions, setPositions] = useState<Position[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
   const [openEmployeeDialog, setOpenEmployeeDialog] = useState(false)
   const [employeeForm, setEmployeeForm] = useState({
     name: "",
@@ -43,42 +112,103 @@ export default function HRPage() {
     deductions: "",
   })
 
-  const handleAddEmployee = () => {
-    if (employeeForm.name && employeeForm.department) {
-      const payload: Omit<Employee, "id"> = {
+  const loadData = async () => {
+    setLoading(true)
+    setError("")
+    try {
+      const [employeesRes, payrollRes, attendanceRes, positionsRes] = await Promise.all([
+        requestJson("/api/hr/employees"),
+        requestJson("/api/hr/payroll"),
+        requestJson("/api/hr/attendance"),
+        requestJson("/api/hr/positions"),
+      ])
+      setEmployees((employeesRes.employees || []).map(mapEmployee))
+      setPayroll((payrollRes.payroll || []).map(mapPayroll))
+      setAttendance((attendanceRes.attendance || []).map(mapAttendance))
+      setPositions((positionsRes.positions || []).map(mapPosition))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load HR data")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const addEmployee = async (data: Omit<Employee, "id">) => {
+    const response = await requestJson("/api/hr/employees", {
+      method: "POST",
+      body: JSON.stringify(data),
+    })
+    setEmployees((prev) => [mapEmployee(response.employee), ...prev])
+  }
+
+  const handleAddEmployee = async () => {
+    if (!employeeForm.name || !employeeForm.department) return
+    try {
+      await addEmployee({
         name: employeeForm.name,
         email: employeeForm.email || "user@example.com",
         phone: employeeForm.phone || "",
         department: employeeForm.department,
         position: employeeForm.position || "Staff",
-        startDate: new Date().toISOString().slice(0, 10),
+        startDate: today(),
         status: "active",
         salary: 0,
-      }
-      setEmployees((prev) => [{ id: Date.now().toString(), ...payload }, ...prev])
+      })
       setEmployeeForm({ name: "", department: "", position: "", email: "", phone: "" })
       setOpenEmployeeDialog(false)
+      setError("")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add employee")
     }
   }
 
-  const handleUpdateEmployee = (id: string, data: Omit<Employee, "id">) => {
-    setEmployees((prev) => prev.map((emp) => (emp.id === id ? { id, ...data } : emp)))
+  const handleUpdateEmployee = async (id: string, data: Omit<Employee, "id">) => {
+    try {
+      const response = await requestJson("/api/hr/employees", {
+        method: "PATCH",
+        body: JSON.stringify({ id, ...data }),
+      })
+      setEmployees((prev) => prev.map((emp) => (emp.id === id ? mapEmployee(response.employee) : emp)))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update employee")
+    }
   }
 
-  const handleDeleteEmployee = (id: string) => {
-    setEmployees((prev) => prev.filter((emp) => emp.id !== id))
+  const handleDeleteEmployee = async (id: string) => {
+    try {
+      await requestJson(`/api/hr/employees?id=${id}`, { method: "DELETE" })
+      setEmployees((prev) => prev.filter((emp) => emp.id !== id))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete employee")
+    }
   }
 
-  const addPayrollRecord = (record: Omit<PayrollRecord, "id">) => {
-    setPayroll((prev) => [{ id: Date.now().toString(), ...record }, ...prev])
+  const addPayrollRecord = async (record: Omit<PayrollRecord, "id">) => {
+    const response = await requestJson("/api/hr/payroll", {
+      method: "POST",
+      body: JSON.stringify({
+        employee: record.employee,
+        period: record.period,
+        baseSalary: record.baseSalary,
+        bonus: record.bonus,
+        deductions: record.deductions,
+        status: record.status,
+      }),
+    })
+    setPayroll((prev) => [mapPayroll(response.record), ...prev])
   }
 
-  const handleAddPayroll = () => {
-    if (payrollForm.employeeName && payrollForm.baseSalary) {
+  const handleAddPayroll = async () => {
+    if (!payrollForm.employeeName || !payrollForm.baseSalary) return
+    try {
       const baseSalary = Number.parseFloat(payrollForm.baseSalary)
       const bonus = Number.parseFloat(payrollForm.bonus) || 0
       const deductions = Number.parseFloat(payrollForm.deductions) || 0
-      addPayrollRecord({
+      await addPayrollRecord({
         employee: payrollForm.employeeName,
         period: new Date().toLocaleString("en-US", { month: "long", year: "numeric" }),
         baseSalary,
@@ -89,20 +219,100 @@ export default function HRPage() {
       })
       setPayrollForm({ employeeName: "", baseSalary: "", bonus: "", deductions: "" })
       setOpenPayrollDialog(false)
+      setError("")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add payroll")
     }
   }
 
-  const handleUpdatePayroll = (id: string, data: Omit<PayrollRecord, "id">) => {
-    setPayroll((prev) => prev.map((record) => (record.id === id ? { id, ...data } : record)))
+  const handleUpdatePayroll = async (id: string, data: Omit<PayrollRecord, "id">) => {
+    try {
+      const response = await requestJson("/api/hr/payroll", {
+        method: "PATCH",
+        body: JSON.stringify({
+          id,
+          employee: data.employee,
+          period: data.period,
+          baseSalary: data.baseSalary,
+          bonus: data.bonus,
+          deductions: data.deductions,
+          status: data.status,
+        }),
+      })
+      setPayroll((prev) => prev.map((record) => (record.id === id ? mapPayroll(response.record) : record)))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update payroll")
+    }
   }
 
-  const handleDeletePayroll = (id: string) => {
-    setPayroll((prev) => prev.filter((record) => record.id !== id))
+  const handleDeletePayroll = async (id: string) => {
+    try {
+      await requestJson(`/api/hr/payroll?id=${id}`, { method: "DELETE" })
+      setPayroll((prev) => prev.filter((record) => record.id !== id))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete payroll")
+    }
+  }
+
+  const handleAddAttendance = async (data: Omit<AttendanceRecord, "id">) => {
+    try {
+      const response = await requestJson("/api/hr/attendance", {
+        method: "POST",
+        body: JSON.stringify(data),
+      })
+      setAttendance((prev) => [mapAttendance(response.record), ...prev])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add attendance")
+    }
+  }
+
+  const handleUpdateAttendance = async (id: string, data: Omit<AttendanceRecord, "id">) => {
+    try {
+      const response = await requestJson("/api/hr/attendance", {
+        method: "PATCH",
+        body: JSON.stringify({ id, ...data }),
+      })
+      setAttendance((prev) => prev.map((record) => (record.id === id ? mapAttendance(response.record) : record)))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update attendance")
+    }
+  }
+
+  const handleAddPosition = async (data: Omit<Position, "id">) => {
+    try {
+      const response = await requestJson("/api/hr/positions", {
+        method: "POST",
+        body: JSON.stringify(data),
+      })
+      setPositions((prev) => [mapPosition(response.position), ...prev])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add position")
+    }
+  }
+
+  const handleUpdatePosition = async (id: string, data: Omit<Position, "id">) => {
+    try {
+      const response = await requestJson("/api/hr/positions", {
+        method: "PATCH",
+        body: JSON.stringify({ id, ...data }),
+      })
+      setPositions((prev) => prev.map((position) => (position.id === id ? mapPosition(response.position) : position)))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update position")
+    }
+  }
+
+  const handleDeletePosition = async (id: string) => {
+    try {
+      await requestJson(`/api/hr/positions?id=${id}`, { method: "DELETE" })
+      setPositions((prev) => prev.filter((position) => position.id !== id))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete position")
+    }
   }
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold" data-ai-anchor="hr-header">
@@ -138,7 +348,7 @@ export default function HRPage() {
                   <Input
                     id="base-salary"
                     type="number"
-                    placeholder="e.g., 250,000"
+                    placeholder="e.g., 250000"
                     value={payrollForm.baseSalary}
                     onChange={(e) => setPayrollForm({ ...payrollForm, baseSalary: e.target.value })}
                   />
@@ -148,7 +358,7 @@ export default function HRPage() {
                   <Input
                     id="bonus"
                     type="number"
-                    placeholder="e.g., 50,000"
+                    placeholder="e.g., 50000"
                     value={payrollForm.bonus}
                     onChange={(e) => setPayrollForm({ ...payrollForm, bonus: e.target.value })}
                   />
@@ -158,7 +368,7 @@ export default function HRPage() {
                   <Input
                     id="deductions"
                     type="number"
-                    placeholder="e.g., 20,000"
+                    placeholder="e.g., 20000"
                     value={payrollForm.deductions}
                     onChange={(e) => setPayrollForm({ ...payrollForm, deductions: e.target.value })}
                   />
@@ -247,10 +457,11 @@ export default function HRPage() {
         </div>
       </div>
 
+      {error ? <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div> : null}
+
       <HrQualityScorecard employees={employees} />
       <CompliancePack employeesCount={employees.length} payrollRuns={payroll.length} />
 
-      {/* People Pulse */}
       <div className="rounded-xl border border-border bg-card/70 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-start gap-3">
           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -262,19 +473,17 @@ export default function HRPage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
-          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
-            Employees: {employees.length}
-          </span>
-          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
-            Payroll records: {payroll.length}
-          </span>
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">Employees: {employees.length}</span>
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">Payroll records: {payroll.length}</span>
           <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
             Active: {employees.filter((emp) => emp.status === "active").length}
+          </span>
+          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
+            {loading ? "Syncing" : "Live DB"}
           </span>
         </div>
       </div>
 
-      {/* Tabs */}
       <Tabs defaultValue="employees" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="employees">Employees</TabsTrigger>
@@ -283,18 +492,16 @@ export default function HRPage() {
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
         </TabsList>
 
-        {/* Employees Tab */}
         <TabsContent value="employees" className="space-y-4">
           <EmployeesTable
             searchQuery={searchQuery}
             employees={employees}
-            onAddEmployee={(data) => setEmployees((prev) => [{ id: Date.now().toString(), ...data }, ...prev])}
+            onAddEmployee={addEmployee}
             onUpdateEmployee={handleUpdateEmployee}
             onDeleteEmployee={handleDeleteEmployee}
           />
         </TabsContent>
 
-        {/* Payroll Tab */}
         <TabsContent value="payroll" className="space-y-4">
           <PayrollTable
             searchQuery={searchQuery}
@@ -306,12 +513,21 @@ export default function HRPage() {
         </TabsContent>
 
         <TabsContent value="positions" className="space-y-4">
-          <PositionsTable />
+          <PositionsTable
+            positions={positions}
+            onAddPosition={handleAddPosition}
+            onUpdatePosition={handleUpdatePosition}
+            onDeletePosition={handleDeletePosition}
+          />
         </TabsContent>
 
-        {/* Attendance Tab */}
         <TabsContent value="attendance" className="space-y-4">
-          <AttendanceTracker searchQuery={searchQuery} />
+          <AttendanceTracker
+            searchQuery={searchQuery}
+            records={attendance}
+            onAddRecord={handleAddAttendance}
+            onUpdateRecord={handleUpdateAttendance}
+          />
         </TabsContent>
       </Tabs>
     </div>

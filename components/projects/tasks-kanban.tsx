@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-interface Task {
+export interface Task {
   id: string
   title: string
   project: string
@@ -76,8 +76,16 @@ const priorityColors = {
   high: "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200",
 }
 
-export function TasksKanban({ searchQuery }: { searchQuery: string }) {
-  const [tasks, setTasks] = useState<Task[]>(mockTasks)
+type TasksKanbanProps = {
+  searchQuery: string
+  tasks?: Task[]
+  onAddTask?: (data: Omit<Task, "id">) => void
+  onUpdateTask?: (id: string, data: Omit<Task, "id">) => void
+  onDeleteTask?: (id: string) => void
+}
+
+export function TasksKanban({ searchQuery, tasks: providedTasks, onAddTask, onUpdateTask, onDeleteTask }: TasksKanbanProps) {
+  const [tasks, setTasks] = useState<Task[]>(providedTasks || mockTasks)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
@@ -94,6 +102,10 @@ export function TasksKanban({ searchQuery }: { searchQuery: string }) {
     priority: "medium" as Task["priority"],
     stage: "todo" as Task["stage"],
   })
+
+  useEffect(() => {
+    if (providedTasks) setTasks(providedTasks)
+  }, [providedTasks])
 
   const filteredTasks = tasks.filter((task) => {
     const query = searchQuery.toLowerCase()
@@ -164,23 +176,42 @@ export function TasksKanban({ searchQuery }: { searchQuery: string }) {
       stage: form.stage,
     }
     if (editingId) {
-      setTasks((prev) => prev.map((t) => (t.id === editingId ? payload : t)))
+      if (onUpdateTask) {
+        const { id: _id, ...rest } = payload
+        onUpdateTask(editingId, rest)
+      } else {
+        setTasks((prev) => prev.map((t) => (t.id === editingId ? payload : t)))
+      }
     } else {
-      setTasks((prev) => [payload, ...prev])
+      if (onAddTask) {
+        const { id: _id, ...rest } = payload
+        onAddTask(rest)
+      } else {
+        setTasks((prev) => [payload, ...prev])
+      }
     }
     setShowModal(false)
     setEditingId(null)
   }
 
   const deleteTask = (id: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id))
+    if (onDeleteTask) {
+      onDeleteTask(id)
+    } else {
+      setTasks((prev) => prev.filter((t) => t.id !== id))
+    }
   }
 
   const moveToNextStage = (task: Task) => {
     const stageOrder: Task["stage"][] = ["todo", "in-progress", "review", "done"]
     const currentIdx = stageOrder.indexOf(task.stage)
     const nextStage = stageOrder[Math.min(currentIdx + 1, stageOrder.length - 1)]
-    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, stage: nextStage } : t)))
+    if (onUpdateTask) {
+      const { id: _id, ...rest } = { ...task, stage: nextStage }
+      onUpdateTask(task.id, rest)
+    } else {
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, stage: nextStage } : t)))
+    }
   }
 
   return (

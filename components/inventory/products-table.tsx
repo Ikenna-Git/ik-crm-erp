@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-interface Product {
+export interface Product {
   id: string
   sku: string
   name: string
@@ -72,8 +72,22 @@ const formatNaira = (amount: number) => {
   }).format(amount * 805)
 }
 
-export function ProductsTable({ searchQuery }: { searchQuery: string }) {
-  const [products, setProducts] = useState<Product[]>(mockProducts)
+type ProductsTableProps = {
+  searchQuery: string
+  products?: Product[]
+  onAddProduct?: (data: Omit<Product, "id">) => void
+  onUpdateProduct?: (id: string, data: Omit<Product, "id">) => void
+  onDeleteProduct?: (id: string) => void
+}
+
+export function ProductsTable({
+  searchQuery,
+  products: providedProducts,
+  onAddProduct,
+  onUpdateProduct,
+  onDeleteProduct,
+}: ProductsTableProps) {
+  const [products, setProducts] = useState<Product[]>(providedProducts || mockProducts)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
@@ -89,6 +103,10 @@ export function ProductsTable({ searchQuery }: { searchQuery: string }) {
   })
 
   useEffect(() => {
+    if (providedProducts) {
+      setProducts(providedProducts)
+      return
+    }
     if (typeof window === "undefined") return
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
@@ -108,10 +126,10 @@ export function ProductsTable({ searchQuery }: { searchQuery: string }) {
     } catch (err) {
       console.warn("Failed to load products", err)
     }
-  }, [])
+  }, [providedProducts])
 
   useEffect(() => {
-    if (typeof window === "undefined") return
+    if (providedProducts || typeof window === "undefined") return
     const handler = (event: Event) => {
       const custom = event as CustomEvent<{ type?: string; items?: Product[] }>
       if (custom.detail?.type === "products" && Array.isArray(custom.detail.items)) {
@@ -120,16 +138,16 @@ export function ProductsTable({ searchQuery }: { searchQuery: string }) {
     }
     window.addEventListener(IMPORT_EVENT, handler)
     return () => window.removeEventListener(IMPORT_EVENT, handler)
-  }, [])
+  }, [providedProducts])
 
   useEffect(() => {
-    if (typeof window === "undefined") return
+    if (providedProducts || typeof window === "undefined") return
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(products))
     } catch (err) {
       console.warn("Failed to persist products", err)
     }
-  }, [products])
+  }, [products, providedProducts])
 
   const filteredProducts = products.filter(
     (product) =>
@@ -166,17 +184,31 @@ export function ProductsTable({ searchQuery }: { searchQuery: string }) {
       status: formData.status,
     }
     if (editingId) {
-      setProducts((prev) => prev.map((p) => (p.id === editingId ? payload : p)))
+      if (onUpdateProduct) {
+        const { id: _id, ...rest } = payload
+        onUpdateProduct(editingId, rest)
+      } else {
+        setProducts((prev) => prev.map((p) => (p.id === editingId ? payload : p)))
+      }
       setEditingId(null)
     } else {
-      setProducts([...products, payload])
+      if (onAddProduct) {
+        const { id: _id, ...rest } = payload
+        onAddProduct(rest)
+      } else {
+        setProducts((prev) => [...prev, payload])
+      }
     }
     setFormData({ sku: "", name: "", category: "", price: "", cost: "", supplier: "", status: "active" })
     setShowModal(false)
   }
 
   const handleDeleteProduct = (id: string) => {
-    setProducts(products.filter((p) => p.id !== id))
+    if (onDeleteProduct) {
+      onDeleteProduct(id)
+    } else {
+      setProducts((prev) => prev.filter((p) => p.id !== id))
+    }
   }
 
   const handleEditProduct = (product: Product) => {

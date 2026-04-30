@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { addApprovalRequest } from "@/lib/approvals"
 
-interface PurchaseOrder {
+export interface PurchaseOrder {
   id: string
   orderNo: string
   supplier: string
@@ -67,8 +67,22 @@ const formatNaira = (amount: number) => {
   }).format(amount * 805)
 }
 
-export function OrdersTable({ searchQuery }: { searchQuery: string }) {
-  const [orders, setOrders] = useState<PurchaseOrder[]>(mockOrders)
+type OrdersTableProps = {
+  searchQuery: string
+  orders?: PurchaseOrder[]
+  onAddOrder?: (data: Omit<PurchaseOrder, "id">) => void
+  onUpdateOrder?: (id: string, data: Omit<PurchaseOrder, "id">) => void
+  onDeleteOrder?: (id: string) => void
+}
+
+export function OrdersTable({
+  searchQuery,
+  orders: providedOrders,
+  onAddOrder,
+  onUpdateOrder,
+  onDeleteOrder,
+}: OrdersTableProps) {
+  const [orders, setOrders] = useState<PurchaseOrder[]>(providedOrders || mockOrders)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
@@ -83,6 +97,10 @@ export function OrdersTable({ searchQuery }: { searchQuery: string }) {
   })
 
   useEffect(() => {
+    if (providedOrders) {
+      setOrders(providedOrders)
+      return
+    }
     if (typeof window === "undefined") return
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
@@ -102,10 +120,10 @@ export function OrdersTable({ searchQuery }: { searchQuery: string }) {
     } catch (err) {
       console.warn("Failed to load orders", err)
     }
-  }, [])
+  }, [providedOrders])
 
   useEffect(() => {
-    if (typeof window === "undefined") return
+    if (providedOrders || typeof window === "undefined") return
     const handler = (event: Event) => {
       const custom = event as CustomEvent<{ type?: string; items?: PurchaseOrder[] }>
       if (custom.detail?.type === "orders" && Array.isArray(custom.detail.items)) {
@@ -114,16 +132,16 @@ export function OrdersTable({ searchQuery }: { searchQuery: string }) {
     }
     window.addEventListener(IMPORT_EVENT, handler)
     return () => window.removeEventListener(IMPORT_EVENT, handler)
-  }, [])
+  }, [providedOrders])
 
   useEffect(() => {
-    if (typeof window === "undefined") return
+    if (providedOrders || typeof window === "undefined") return
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(orders))
     } catch (err) {
       console.warn("Failed to persist orders", err)
     }
-  }, [orders])
+  }, [orders, providedOrders])
 
   const filteredOrders = orders.filter(
     (order) =>
@@ -185,16 +203,30 @@ export function OrdersTable({ searchQuery }: { searchQuery: string }) {
       status: form.status,
     }
     if (editingId) {
-      setOrders((prev) => prev.map((o) => (o.id === editingId ? payload : o)))
+      if (onUpdateOrder) {
+        const { id: _id, ...rest } = payload
+        onUpdateOrder(editingId, rest)
+      } else {
+        setOrders((prev) => prev.map((o) => (o.id === editingId ? payload : o)))
+      }
     } else {
-      setOrders((prev) => [payload, ...prev])
+      if (onAddOrder) {
+        const { id: _id, ...rest } = payload
+        onAddOrder(rest)
+      } else {
+        setOrders((prev) => [payload, ...prev])
+      }
     }
     setShowModal(false)
     setEditingId(null)
   }
 
   const deleteOrder = (id: string) => {
-    setOrders((prev) => prev.filter((o) => o.id !== id))
+    if (onDeleteOrder) {
+      onDeleteOrder(id)
+    } else {
+      setOrders((prev) => prev.filter((o) => o.id !== id))
+    }
   }
 
   const requestApproval = (order: PurchaseOrder) => {

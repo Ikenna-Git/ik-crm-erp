@@ -5,6 +5,7 @@
 "Phase 0","Foundation","Documentation","Project dossier created","Done","On main","P1","Snapshot-level project documentation exists","Keep updated after major releases"
 "Phase 0","Foundation","Documentation","Product overview created","Done","On main","P1","Business-facing project summary exists","Refine for investor/client use if needed"
 "Phase 0","Foundation","Documentation","Technical handoff created","Done","On main","P1","Developer-facing handoff doc exists","Update after backend shipping"
+"Phase 0","Foundation","Documentation","Platform readiness tracker expanded to full product scope","Done","Local only","P1","Checklist now explicitly tracks missing platform layers like admin, tenant lifecycle, billing, observability, support, and enterprise governance","Keep updated as scope evolves"
 "Phase 1","Auth","Authentication","NextAuth credentials login implemented","Done","On main","P0","Credentials flow exists","Keep testing against live DB"
 "Phase 1","Auth","Authentication","Google OAuth support path implemented","Done","On main","P1","Provider support exists in code","Add production credentials"
 "Phase 1","Auth","Authentication","2FA routes implemented","Done","Mostly local/in repo","P1","Setup, verify, disable, verify-login routes exist","Validate end-to-end with live DB"
@@ -42,4 +43,3 @@
 "Phase 7","Security","Compliance","NDPA/VAPT hardening plan created","Done","On main","P1","Security roadmap doc exists","Execute the hardening backlog"
 "Phase 7","Security","API Docs","OpenAPI spec created","Done","On main","P1","Swagger-importable YAML exists","Keep synchronized with routes"
 "Phase 7","Security","API Docs","In-app API docs page implemented","Done","On main","P1","/dashboard/docs/api exists","Use as internal reference"
-
