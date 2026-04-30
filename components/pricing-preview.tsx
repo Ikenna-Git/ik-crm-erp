@@ -1,75 +1,75 @@
 "use client"
 
 import Link from "next/link"
+import { Check } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Check } from "lucide-react"
 
 const plans = [
   {
     name: "Starter",
     price: "₦50,000",
     period: "/ month",
-    description: "Perfect for small teams",
-    features: ["Up to 5 users", "CRM module", "Basic invoicing", "Email support"],
+    description: "For small teams getting their first shared workspace in order.",
+    features: ["Up to 5 users", "CRM and workspace basics", "Simple invoicing", "Standard support"],
     highlighted: false,
   },
   {
     name: "Professional",
     price: "₦180,000",
     period: "/ 4 months",
-    description: "For growing teams that need all modules",
-    features: ["Up to 25 users", "All modules", "CSV export", "Priority support"],
+    description: "For growing teams that want one place for sales, people, money, and operations.",
+    features: ["Up to 25 users", "All core modules", "Admin control plane", "Priority support"],
     highlighted: true,
   },
   {
     name: "Enterprise",
     price: "Custom",
-    period: " per year",
-    description: "Tailored for larger organizations",
-    features: ["Unlimited users", "Custom integrations", "SLA", "Dedicated support"],
+    period: " / year",
+    description: "For multi-team rollouts, extra controls, and deeper implementation needs.",
+    features: ["Unlimited users", "Custom rollout support", "Advanced integrations", "Dedicated account support"],
     highlighted: false,
   },
 ]
 
 export function PricingPreview() {
   return (
-    <section id="pricing" className="py-16 lg:py-20 bg-muted/40">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
-        <div className="text-center space-y-3">
-          <h2 className="text-3xl sm:text-4xl font-bold">Pricing at a glance</h2>
-          <p className="text-muted-foreground text-lg">See plans now, view details anytime on the pricing page.</p>
+    <section id="pricing" className="py-18 bg-background lg:py-24">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-10 space-y-3 text-center">
+          <h2 className="text-3xl font-semibold sm:text-4xl">Pricing should feel understandable too.</h2>
+          <p className="mx-auto max-w-2xl text-base leading-7 text-muted-foreground">
+            These plans are framed around team size and rollout depth so buyers can understand where they fit quickly.
+          </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid gap-6 md:grid-cols-3">
           {plans.map((plan) => (
             <Card
               key={plan.name}
-              className={`${plan.highlighted ? "border-primary shadow-lg scale-[1.02]" : ""}`}
+              className={plan.highlighted ? "border-primary/40 bg-primary/[0.03] shadow-lg" : "border-border/80 bg-card"}
             >
-              <CardHeader>
-                <div className="flex items-start justify-between">
+              <CardHeader className="space-y-4">
+                <div className="flex items-start justify-between gap-3">
                   <div>
-                    <CardTitle className="text-xl">{plan.name}</CardTitle>
-                    <CardDescription>{plan.description}</CardDescription>
+                    <CardTitle className="text-2xl">{plan.name}</CardTitle>
+                    <CardDescription className="mt-2 text-sm leading-6">{plan.description}</CardDescription>
                   </div>
-                  {plan.highlighted && (
-                    <span className="px-2 py-1 text-xs font-semibold rounded-full bg-primary text-primary-foreground">
-                      Popular
-                    </span>
-                  )}
+                  {plan.highlighted ? (
+                    <span className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">Best fit</span>
+                  ) : null}
+                </div>
+                <div className="flex items-end gap-2">
+                  <span className="text-3xl font-semibold">{plan.price}</span>
+                  <span className="pb-1 text-sm text-muted-foreground">{plan.period}</span>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-bold">{plan.price}</span>
-                  <span className="text-sm text-muted-foreground">{plan.period}</span>
-                </div>
-                <div className="space-y-2">
+              <CardContent className="space-y-5">
+                <div className="space-y-3">
                   {plan.features.map((feature) => (
-                    <div key={feature} className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Check className="w-4 h-4 text-green-600" />
-                      {feature}
+                    <div key={feature} className="flex items-start gap-3 text-sm text-muted-foreground">
+                      <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent" />
+                      <span>{feature}</span>
                     </div>
                   ))}
                 </div>

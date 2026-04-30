@@ -14,11 +14,11 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { isAdmin, isSuperAdmin } from "@/lib/authz"
 
 const navItems = [
-  { href: "/admin", label: "Overview", icon: ShieldCheck, superOnly: false },
+  { href: "/admin", label: "Ops Center", icon: ShieldCheck, superOnly: false },
   { href: "/admin/users", label: "Users", icon: Users, superOnly: false },
   { href: "/admin/workspace", label: "Workspace", icon: Building2, superOnly: false },
-  { href: "/admin/security", label: "Security", icon: LockKeyhole, superOnly: false },
-  { href: "/admin/system", label: "System", icon: Cpu, superOnly: true },
+  { href: "/admin/security", label: "Risk & Access", icon: LockKeyhole, superOnly: false },
+  { href: "/admin/system", label: "Founder Desk", icon: Cpu, superOnly: true },
 ]
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
@@ -121,7 +121,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-5 py-5">
               <div>
                 <p className="text-xs uppercase tracking-[0.22em] text-emerald-300/80">Administration</p>
-                <h2 className="text-xl font-semibold">Governance, access, and workspace controls</h2>
+                <h2 className="text-xl font-semibold">Operations, access, and workspace control</h2>
               </div>
               <div className="flex items-center gap-3">
                 <Badge variant="outline" className="border-white/10 bg-white/5 text-slate-200">

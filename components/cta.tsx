@@ -1,95 +1,66 @@
 "use client"
 
 import Link from "next/link"
+import { ArrowRight, CheckCircle2, ShieldCheck, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { CheckCircle2, Award, Users, TrendingUp } from "lucide-react"
+
+const checklist = [
+  "Create your first workspace and invite the right admin",
+  "Start with CRM, finance, HR, ops, or client portal based on what your team needs first",
+  "Keep founder-level control while stakeholder admins manage their own companies",
+]
 
 export function CTA() {
   return (
     <section className="py-20 lg:py-28">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-gradient-to-r from-primary/90 to-accent/90 rounded-2xl p-12 lg:p-16">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            {/* Left Column - Heading and Buttons */}
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        <div className="overflow-hidden rounded-[34px] border border-border/80 bg-[linear-gradient(135deg,rgba(76,139,255,0.96),rgba(61,214,140,0.9))] p-10 text-primary-foreground shadow-2xl lg:p-14">
+          <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
             <div className="space-y-6">
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-primary-foreground">
-                Ready to Transform Your Business?
-              </h2>
-              <p className="text-lg text-primary-foreground/90">
-                Start your 14-day free trial today. No credit card required. Full access to all modules.
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-primary-foreground/80">Next step</p>
+              <h2 className="text-3xl font-semibold sm:text-4xl lg:text-5xl">Make Civis feel easier before you make it bigger.</h2>
+              <p className="text-base leading-7 text-primary-foreground/90">
+                Start with a cleaner rollout, a better admin control story, and a product that stakeholders can understand
+                from the first demo.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                <Button size="lg" asChild variant="secondary">
-                  <Link href="/signup">Start Free Trial</Link>
+              <div className="flex flex-col gap-4 sm:flex-row">
+                <Button size="lg" variant="secondary" asChild>
+                  <Link href="/signup">
+                    Start setup
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
                 </Button>
                 <Button size="lg" variant="secondary" asChild>
-                  <Link href="/dashboard/demo">Schedule Demo</Link>
+                  <Link href="/features">View product scope</Link>
                 </Button>
               </div>
             </div>
 
-            {/* Right Column - Trust Elements and Social Proof */}
-            <div className="space-y-8">
-              {/* Trust Badges */}
-              <div className="flex flex-col gap-3">
-                <h3 className="text-sm font-semibold text-primary-foreground/80 uppercase tracking-wide">
-                  Enterprise Grade Security
-                </h3>
-                <div className="flex flex-wrap gap-3">
-                  <div className="bg-primary-foreground/20 px-4 py-2 rounded-full text-sm text-primary-foreground font-medium">
-                    SOC 2 Certified
+            <div className="rounded-[28px] border border-white/20 bg-black/15 p-6 backdrop-blur">
+              <div className="mb-5 flex items-center gap-3">
+                <ShieldCheck className="h-5 w-5" />
+                <p className="font-medium">What a good Civis rollout should feel like</p>
+              </div>
+              <div className="space-y-4">
+                {checklist.map((item) => (
+                  <div key={item} className="flex items-start gap-3 text-sm leading-6 text-primary-foreground/90">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                    <span>{item}</span>
                   </div>
-                  <div className="bg-primary-foreground/20 px-4 py-2 rounded-full text-sm text-primary-foreground font-medium">
-                    GDPR Compliant
-                  </div>
-                  <div className="bg-primary-foreground/20 px-4 py-2 rounded-full text-sm text-primary-foreground font-medium">
-                    ISO 27001
-                  </div>
-                </div>
+                ))}
               </div>
 
-              {/* Feature Highlights */}
-              <div className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-primary-foreground flex-shrink-0 mt-0.5" />
-                  <span className="text-primary-foreground/90">Instant setup - get started in minutes</span>
+              <div className="mt-6 grid grid-cols-2 gap-4 border-t border-white/20 pt-6">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-primary-foreground/70">Control model</p>
+                  <p className="mt-2 text-lg font-semibold">Founder + workspace admin</p>
                 </div>
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-primary-foreground flex-shrink-0 mt-0.5" />
-                  <span className="text-primary-foreground/90">24/7 customer support included</span>
-                </div>
-                <div className="flex items-start gap-3">
-                  <CheckCircle2 className="w-5 h-5 text-primary-foreground flex-shrink-0 mt-0.5" />
-                  <span className="text-primary-foreground/90">99.9% uptime guarantee</span>
-                </div>
-              </div>
-
-              {/* Quick Stats */}
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-primary-foreground/20">
-                <div className="space-y-1">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-bold text-primary-foreground">10K+</span>
-                    <Users className="w-4 h-4 text-primary-foreground/80" />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    <p className="text-xs uppercase tracking-[0.2em] text-primary-foreground/70">Team shape</p>
                   </div>
-                  <p className="text-sm text-primary-foreground/80">Active Users</p>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-bold text-primary-foreground">4.9/5</span>
-                    <Award className="w-4 h-4 text-primary-foreground/80" />
-                  </div>
-                  <p className="text-sm text-primary-foreground/80">Customer Rating</p>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-bold text-primary-foreground">50+</span>
-                    <TrendingUp className="w-4 h-4 text-primary-foreground/80" />
-                  </div>
-                  <p className="text-sm text-primary-foreground/80">Countries</p>
-                </div>
-                <div className="space-y-1">
-                  <div className="text-2xl font-bold text-primary-foreground">14 days</div>
-                  <p className="text-sm text-primary-foreground/80">Free Trial</p>
+                  <p className="mt-2 text-lg font-semibold">Ops, finance, HR, sales, delivery</p>
                 </div>
               </div>
             </div>

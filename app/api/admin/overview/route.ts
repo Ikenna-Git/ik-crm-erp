@@ -6,6 +6,9 @@ import { getFounderSuperAdminEmail, isAdmin, isSuperAdmin } from "@/lib/authz"
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable admin overview." }, { status: 503 })
 
+type Severity = "critical" | "warning" | "info"
+type CheckStatus = "healthy" | "warning" | "critical"
+
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
 
@@ -65,6 +68,151 @@ export async function GET(request: Request) {
         : Promise.resolve([]),
     ])
 
+    const twoFactorCoverage = userCount ? Math.round((twoFactorCount / userCount) * 100) : 0
+    const inviteMode = process.env.NEXTAUTH_URL ? "ready" : "limited"
+    const aiConfigured = Boolean(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.GEMINI_API_KEY)
+    const aiProvider = process.env.AI_PROVIDER || "local"
+
+    const issues: Array<{
+      id: string
+      severity: Severity
+      title: string
+      detail: string
+      metric: string
+      href: string
+      cta: string
+    }> = []
+
+    if (overdueInvoiceCount > 0) {
+      issues.push({
+        id: "overdue-invoices",
+        severity: overdueInvoiceCount >= 5 ? "critical" : "warning",
+        title: "Revenue follow-up is lagging",
+        detail: "Overdue invoices need attention before they turn into silent cash leaks.",
+        metric: `${overdueInvoiceCount} overdue invoice${overdueInvoiceCount === 1 ? "" : "s"}`,
+        href: "/dashboard/accounting",
+        cta: "Open accounting",
+      })
+    }
+
+    if (pendingExpenseCount > 0) {
+      issues.push({
+        id: "pending-expenses",
+        severity: pendingExpenseCount >= 5 ? "critical" : "warning",
+        title: "Expense approvals are piling up",
+        detail: "Finance requests are waiting in queue and can block reimbursements or reporting.",
+        metric: `${pendingExpenseCount} pending expense${pendingExpenseCount === 1 ? "" : "s"}`,
+        href: "/dashboard/accounting",
+        cta: "Review expenses",
+      })
+    }
+
+    if (userCount > 0 && twoFactorCoverage < 60) {
+      issues.push({
+        id: "2fa-coverage",
+        severity: twoFactorCoverage < 35 ? "critical" : "warning",
+        title: "Admin security coverage is still weak",
+        detail: "More people need 2FA before wider rollout to customers and stakeholder admins.",
+        metric: `${twoFactorCoverage}% 2FA coverage`,
+        href: "/admin/security",
+        cta: "Open security",
+      })
+    }
+
+    if (!org.notifyEmail) {
+      issues.push({
+        id: "notify-email",
+        severity: "warning",
+        title: "No alert inbox is configured",
+        detail: "Critical workflow, invite, and operational alerts do not yet have a shared destination.",
+        metric: "Notify email missing",
+        href: "/admin/workspace",
+        cta: "Add notify email",
+      })
+    }
+
+    if (workflowCount === 0) {
+      issues.push({
+        id: "workflow-coverage",
+        severity: "info",
+        title: "Automation is still underused",
+        detail: "Your team is running manually without any live workflow guardrails or automations.",
+        metric: "0 active workflows",
+        href: "/dashboard/operations",
+        cta: "Set up workflows",
+      })
+    }
+
+    const healthChecks: Array<{
+      id: string
+      label: string
+      status: CheckStatus
+      detail: string
+    }> = [
+      {
+        id: "database",
+        label: "Database",
+        status: "healthy",
+        detail: "Core data queries are responding and migrations are in sync.",
+      },
+      {
+        id: "access",
+        label: "Access control",
+        status: twoFactorCoverage < 60 && userCount > 0 ? "warning" : "healthy",
+        detail: `Founder lock is active and ${adminCount} admin account${adminCount === 1 ? "" : "s"} currently manage this workspace.`,
+      },
+      {
+        id: "invites",
+        label: "Invite flow",
+        status: inviteMode === "ready" ? "healthy" : "warning",
+        detail:
+          inviteMode === "ready"
+            ? "Workspace invite links can be generated and shared from admin."
+            : "Set NEXTAUTH_URL correctly for reliable invite links across environments.",
+      },
+      {
+        id: "notifications",
+        label: "Alert routing",
+        status: org.notifyEmail ? "healthy" : "warning",
+        detail: org.notifyEmail ? `Critical notices route to ${org.notifyEmail}.` : "No shared notify email is configured yet.",
+      },
+      {
+        id: "ai",
+        label: "AI assistant",
+        status: aiConfigured ? "healthy" : "warning",
+        detail: aiConfigured ? `Provider mode: ${aiProvider}.` : "The assistant can fall back locally, but provider-based answers are not fully configured.",
+      },
+    ]
+
+    const criticalCount = issues.filter((item) => item.severity === "critical").length
+    const warningCount = issues.filter((item) => item.severity === "warning").length
+    const infoCount = issues.filter((item) => item.severity === "info").length
+    const healthScore = Math.max(36, 100 - criticalCount * 24 - warningCount * 12 - infoCount * 5)
+
+    const nextActions = [
+      {
+        id: "users",
+        title: "Invite the right workspace owners",
+        detail: "Create or refresh access for admins, engineers, support, finance, and HR without touching founder control.",
+        href: "/admin/users",
+        cta: "Manage users",
+      },
+      {
+        id: "security",
+        title: "Raise the security floor",
+        detail: "Push 2FA adoption, audit privileged users, and keep admin access inside its boundary.",
+        href: "/admin/security",
+        cta: "Open security",
+      },
+      {
+        id: "workspace",
+        title: "Make alerts and branding official",
+        detail: "Set the workspace identity, notify inbox, and basic control settings your team will actually use.",
+        href: "/admin/workspace",
+        cta: "Edit workspace",
+      },
+    ]
+
     return NextResponse.json({
       actor: {
         id: user.id,
@@ -79,6 +227,7 @@ export async function GET(request: Request) {
           userCount,
           adminCount,
           twoFactorCount,
+          twoFactorCoverage,
           contactCount,
           employeeCount,
           workflowCount,
@@ -88,6 +237,16 @@ export async function GET(request: Request) {
           activeProjectCount,
         },
         recentAuditEvents,
+      },
+      opsCenter: {
+        healthScore,
+        issueCount: issues.length,
+        criticalCount,
+        warningCount,
+        infoCount,
+        issues,
+        healthChecks,
+        nextActions,
       },
       platform: isSuperAdmin(user.role)
         ? {
