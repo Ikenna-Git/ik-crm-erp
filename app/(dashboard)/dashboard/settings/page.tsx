@@ -25,7 +25,7 @@ import {
 const timezones = ["Africa/Lagos", "UTC", "Europe/London", "America/New_York"]
 const currencies = ["NGN", "USD", "EUR", "GBP"]
 const industries = ["Technology", "Finance", "Retail", "Manufacturing", "Healthcare"]
-const roles = ["user", "admin", "super_admin"]
+const roles = ["user", "admin"]
 const digestDays = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
 const aiProviders = [
   { value: "auto", label: "Auto (use AI_PROVIDER env)" },
@@ -282,12 +282,39 @@ export default function SettingsPage() {
     pushChangeNotification("Organization updated", "Organization settings saved.")
   }
 
-  const handleInvite = () => {
+  const handleInvite = async () => {
     if (!org.inviteEmail) {
       pushChangeNotification("Invite needed", "Add an email address to send an invite.")
       return
     }
-    pushChangeNotification("Invite sent", `Invitation sent to ${org.inviteEmail}.`)
+
+    try {
+      setTeamError("")
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders(session?.user) },
+        body: JSON.stringify({
+          name: org.inviteEmail.split("@")[0],
+          email: org.inviteEmail,
+          title: "",
+          role: org.inviteRole.toUpperCase(),
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to create invite")
+
+      setTeamUsers((prev) => [data.user, ...prev.filter((user) => user.id !== data.user?.id)])
+      setOrg((current) => ({ ...current, inviteEmail: "" }))
+
+      await pushChangeNotification(
+        "Invite ready",
+        data?.invite?.inviteUrl
+          ? `Invite link created for ${data.user?.email}. Open the Admin control plane to copy the latest link.`
+          : data?.message || `Invite created for ${data.user?.email}.`,
+      )
+    } catch (err: any) {
+      setTeamError(err?.message || "Failed to create invite")
+    }
   }
 
   const handleRoleUpdate = async (id: string, role: string) => {

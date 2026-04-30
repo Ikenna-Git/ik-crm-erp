@@ -66,7 +66,7 @@ These are the next layer. The product can be pitched without every single item h
 
 ### Identity and User Access
 
-- invite acceptance flow for seeded users
+- invite acceptance flow deployed and smoke-tested on the target environment
 - stable Google OAuth or a clearly supported credentials flow
 - full 2FA validation against the live database
 - action-level RBAC matrix for sensitive workflows

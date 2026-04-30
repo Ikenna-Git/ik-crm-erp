@@ -223,17 +223,18 @@ The platform is no longer just “building features.” The next stage is discip
 
 ## Phase 12: Tenant and Workspace Lifecycle
 
-Status: newly tracked, mostly pending
+Status: in progress
 
 Completed locally:
 
 - founder-locked super-admin policy
 - initial stakeholder workspace provisioning route
 - workspace-scoped admin UI foundation
+- workspace-bound request resolution
+- invite issuance, validation, and signup acceptance flow
 
 Remaining:
 
-- invite acceptance flow for seeded users
 - fuller multi-workspace membership model
 - workspace switching for founders/support users
 - workspace suspension, archive, and restore controls
@@ -320,7 +321,7 @@ Remaining:
 
 ### Should be ready before a paid pilot
 
-- invite acceptance flow
+- invite acceptance flow deployed and smoke-tested
 - Google OAuth or another stable sign-in path
 - SMTP for admin/user notifications
 - Cloudinary or equivalent upload storage

@@ -77,16 +77,48 @@ export const getUserFromRequest = async (request: Request) => {
   }
 
   const identity = await getSessionIdentityFromRequest(request)
-  const org = await getDefaultOrg()
-  const user = await withPrismaRetry("getUserFromRequest.upsertUser", () =>
-    prisma.user.upsert({
+
+  const existingUser = await withPrismaRetry("getUserFromRequest.findUser", () =>
+    prisma.user.findUnique({
       where: { email: identity.email },
-      update: { name: identity.name },
-      create: {
+      include: {
+        org: true,
+      },
+    }),
+  )
+
+  if (existingUser) {
+    const nextRole = identity.email === FOUNDER_SUPER_ADMIN_EMAIL ? "SUPER_ADMIN" : existingUser.role
+    const user =
+      existingUser.name !== identity.name || existingUser.role !== nextRole
+        ? await withPrismaRetry("getUserFromRequest.updateUser", () =>
+            prisma.user.update({
+              where: { id: existingUser.id },
+              data: {
+                name: identity.name,
+                role: nextRole,
+              },
+              include: {
+                org: true,
+              },
+            }),
+          )
+        : existingUser
+
+    return { org: user.org, user }
+  }
+
+  const org = await getDefaultOrg()
+  const user = await withPrismaRetry("getUserFromRequest.createUser", () =>
+    prisma.user.create({
+      data: {
         email: identity.email,
         name: identity.name,
         role: identity.role,
         orgId: org.id,
+      },
+      include: {
+        org: true,
       },
     }),
   )

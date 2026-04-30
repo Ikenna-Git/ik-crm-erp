@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
 import { getUserFromRequest } from "@/lib/request-user"
 import { isSuperAdmin } from "@/lib/authz"
+import { issueSignupInvite } from "@/lib/invitations"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable org management." }, { status: 503 })
@@ -65,6 +66,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "name, adminName, and adminEmail are required" }, { status: 400 })
     }
 
+    const existingAdmin = await prisma.user.findUnique({
+      where: { email: adminEmail },
+      select: {
+        id: true,
+        orgId: true,
+      },
+    })
+
+    if (existingAdmin) {
+      return NextResponse.json(
+        {
+          error: "This admin email is already in use by another Civis account.",
+        },
+        { status: 409 },
+      )
+    }
+
     const created = await prisma.org.create({
       data: {
         name: orgName,
@@ -92,6 +110,12 @@ export async function POST(request: Request) {
       },
     })
 
+    const invite = await issueSignupInvite({
+      orgId: created.id,
+      email: adminEmail,
+      origin: new URL(request.url).origin,
+    })
+
     await createAuditLog({
       orgId: created.id,
       userId: user.id,
@@ -103,7 +127,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       org: created,
-      message: "Workspace created. The initial admin can complete signup later using the same email address.",
+      invite,
+      message: "Workspace created. Share the invite link with the initial admin so they can complete signup.",
     })
   } catch (error) {
     console.error("Org creation failed", error)

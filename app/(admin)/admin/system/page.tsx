@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
-import { Building2, Cpu, Sparkles } from "lucide-react"
+import { Building2, Copy, Cpu, Sparkles } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -29,6 +29,12 @@ type OrgRecord = {
   }
 }
 
+type InvitePayload = {
+  email: string
+  inviteUrl: string
+  expiresAt: string
+}
+
 export default function AdminSystemPage() {
   const { data: session } = useSession()
   const [orgs, setOrgs] = useState<OrgRecord[]>([])
@@ -36,6 +42,7 @@ export default function AdminSystemPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const [lastInvite, setLastInvite] = useState<InvitePayload | null>(null)
   const [form, setForm] = useState({
     name: "",
     theme: "light",
@@ -78,12 +85,30 @@ export default function AdminSystemPage() {
       const payload = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(payload?.error || "Failed to create workspace")
       setSuccess(payload.message || "Workspace created.")
+      setLastInvite(
+        payload.invite
+          ? {
+              email: form.adminEmail,
+              inviteUrl: payload.invite.inviteUrl,
+              expiresAt: payload.invite.expiresAt,
+            }
+          : null,
+      )
       setForm({ name: "", theme: "light", notifyEmail: "", adminName: "", adminEmail: "" })
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create workspace")
     } finally {
       setSaving(false)
+    }
+  }
+
+  const copyInvite = async (inviteUrl: string) => {
+    try {
+      await navigator.clipboard.writeText(inviteUrl)
+      setSuccess("Invite link copied.")
+    } catch {
+      setError("Failed to copy invite link.")
     }
   }
 
@@ -165,8 +190,8 @@ export default function AdminSystemPage() {
               <p className="font-medium text-slate-100">Provisioning note</p>
             </div>
             <p>
-              Civis creates the workspace and its initial admin record now. The stakeholder admin completes signup later
-              using the same email address you seed here.
+              Civis creates the workspace, seeds the first admin, and returns a real invite link for that stakeholder
+              admin to activate the workspace account.
             </p>
             <Button className="mt-4 w-full" onClick={handleCreateWorkspace} disabled={saving}>
               {saving ? "Creating workspace..." : "Create workspace"}
@@ -176,6 +201,24 @@ export default function AdminSystemPage() {
           </div>
         </CardContent>
       </Card>
+
+      {lastInvite ? (
+        <Card className="border-white/10 bg-white/5 text-slate-100">
+          <CardHeader>
+            <CardTitle className="text-base">Initial admin invite</CardTitle>
+            <CardDescription className="text-slate-400">
+              Share this link with {lastInvite.email}. It expires on {new Date(lastInvite.expiresAt).toLocaleString()}.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 md:flex-row">
+            <Input value={lastInvite.inviteUrl} readOnly className="border-white/10 bg-slate-950/50" />
+            <Button type="button" variant="outline" onClick={() => copyInvite(lastInvite.inviteUrl)}>
+              <Copy className="mr-2 h-4 w-4" />
+              Copy link
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card className="border-white/10 bg-white/5 text-slate-100">
         <CardHeader>

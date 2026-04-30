@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useSession } from "next-auth/react"
-import { Trash2, UserPlus } from "lucide-react"
+import { Copy, RotateCcw, Trash2, UserPlus } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,12 +19,19 @@ type AdminUser = {
   role: "USER" | "ADMIN" | "SUPER_ADMIN"
   title?: string | null
   twoFactorEnabled?: boolean
+  invitePending?: boolean
   createdAt: string
 }
 
 type UsersResponse = {
   users: AdminUser[]
   assignableRoles: Array<"USER" | "ADMIN">
+}
+
+type InvitePayload = {
+  email: string
+  inviteUrl: string
+  expiresAt: string
 }
 
 export default function AdminUsersPage() {
@@ -34,6 +41,7 @@ export default function AdminUsersPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const [lastInvite, setLastInvite] = useState<InvitePayload | null>(null)
   const [form, setForm] = useState({ name: "", email: "", title: "", role: "USER" as "USER" | "ADMIN" })
 
   const founderEmail = useMemo(() => FOUNDER_SUPER_ADMIN_EMAIL, [])
@@ -74,12 +82,65 @@ export default function AdminUsersPage() {
       const payload = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(payload?.error || "Failed to invite user")
       setSuccess(payload.message || "User created.")
+      setLastInvite(
+        payload.invite
+          ? {
+              email: payload.user?.email || form.email,
+              inviteUrl: payload.invite.inviteUrl,
+              expiresAt: payload.invite.expiresAt,
+            }
+          : null,
+      )
       setForm({ name: "", email: "", title: "", role: data?.assignableRoles?.[0] || "USER" })
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to invite user")
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleResendInvite = async (member: AdminUser) => {
+    try {
+      setSaving(true)
+      setError("")
+      setSuccess("")
+      const response = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: member.name,
+          email: member.email,
+          title: member.title || "",
+          role: member.role === "SUPER_ADMIN" ? "ADMIN" : member.role,
+        }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload?.error || "Failed to refresh invite")
+      setSuccess(payload.message || "Invite refreshed.")
+      setLastInvite(
+        payload.invite
+          ? {
+              email: member.email,
+              inviteUrl: payload.invite.inviteUrl,
+              expiresAt: payload.invite.expiresAt,
+            }
+          : null,
+      )
+      await load()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to refresh invite")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const copyInvite = async (inviteUrl: string) => {
+    try {
+      await navigator.clipboard.writeText(inviteUrl)
+      setSuccess("Invite link copied.")
+    } catch {
+      setError("Failed to copy invite link.")
     }
   }
 
@@ -183,8 +244,8 @@ export default function AdminUsersPage() {
           <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4 text-sm text-slate-300">
             <p className="font-medium text-slate-100">Invite flow</p>
             <p className="mt-2">
-              Civis creates the user record now. The teammate completes signup later with the same email address and gets
-              the role you assigned here.
+              Civis now creates the user record and generates a real signup link. The teammate uses that link to activate
+              the workspace account you assigned here.
             </p>
             <p className="mt-3 text-xs text-slate-400">
               Founder super-admin remains locked to <strong>{founderEmail}</strong>.
@@ -199,6 +260,23 @@ export default function AdminUsersPage() {
 
       {error ? <p className="text-sm text-rose-300">{error}</p> : null}
       {success ? <p className="text-sm text-emerald-300">{success}</p> : null}
+      {lastInvite ? (
+        <Card className="border-white/10 bg-white/5 text-slate-100">
+          <CardHeader>
+            <CardTitle className="text-base">Latest invite link</CardTitle>
+            <CardDescription className="text-slate-400">
+              Share this exact link with {lastInvite.email}. It expires on {new Date(lastInvite.expiresAt).toLocaleString()}.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 md:flex-row">
+            <Input value={lastInvite.inviteUrl} readOnly className="border-white/10 bg-slate-950/50" />
+            <Button type="button" variant="outline" onClick={() => copyInvite(lastInvite.inviteUrl)}>
+              <Copy className="mr-2 h-4 w-4" />
+              Copy link
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card className="border-white/10 bg-white/5 text-slate-100">
         <CardHeader>
@@ -216,6 +294,7 @@ export default function AdminUsersPage() {
                 <TableRow className="border-white/10 hover:bg-transparent">
                   <TableHead className="text-slate-300">User</TableHead>
                   <TableHead className="text-slate-300">Role</TableHead>
+                  <TableHead className="text-slate-300">Status</TableHead>
                   <TableHead className="text-slate-300">2FA</TableHead>
                   <TableHead className="text-slate-300">Created</TableHead>
                   <TableHead className="text-slate-300 text-right">Action</TableHead>
@@ -257,18 +336,38 @@ export default function AdminUsersPage() {
                           </Select>
                         )}
                       </TableCell>
+                      <TableCell>
+                        {member.invitePending ? (
+                          <Badge className="bg-amber-500/15 text-amber-300 hover:bg-amber-500/15">Invite pending</Badge>
+                        ) : (
+                          <Badge className="bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15">Active</Badge>
+                        )}
+                      </TableCell>
                       <TableCell>{member.twoFactorEnabled ? "Enabled" : "Not enabled"}</TableCell>
                       <TableCell>{new Date(member.createdAt).toLocaleDateString()}</TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-rose-300 hover:text-rose-200"
-                          disabled={isFounder || isSelf}
-                          onClick={() => handleDelete(member.id, member.email)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          {member.invitePending ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-slate-300 hover:text-slate-100"
+                              disabled={saving}
+                              onClick={() => handleResendInvite(member)}
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                          ) : null}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-rose-300 hover:text-rose-200"
+                            disabled={isFounder || isSelf}
+                            onClick={() => handleDelete(member.id, member.email)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )
