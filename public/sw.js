@@ -1,95 +1,18 @@
-// Service Worker for PWA functionality
-const CACHE_NAME = 'civis-v1';
-const STATIC_CACHE_URLS = [
-  '/',
-  '/dashboard',
-  '/offline.html',
-  '/manifest.json',
-  '/favicon.ico',
-  // Add other static assets
-];
+self.addEventListener("install", () => {
+  self.skipWaiting()
+})
 
-// Install event - cache static assets
-self.addEventListener('install', (event) => {
+self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        return cache.addAll(STATIC_CACHE_URLS);
-      })
-  );
-  self.skipWaiting();
-});
+    (async () => {
+      const cacheNames = await caches.keys()
+      await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)))
 
-// Activate event - clean up old caches
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
-  );
-  self.clients.claim();
-});
-
-// Fetch event - serve from cache or network
-self.addEventListener('fetch', (event) => {
-  // Only handle GET requests
-  if (event.request.method !== 'GET') return;
-
-  // Skip cross-origin requests
-  if (!event.request.url.startsWith(self.location.origin)) return;
-
-  event.respondWith(
-    caches.match(event.request)
-      .then((cachedResponse) => {
-        // Return cached response if available
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-
-        // Otherwise, fetch from network
-        return fetch(event.request)
-          .then((response) => {
-            // Don't cache non-successful responses
-            if (!response.ok) {
-              return response;
-            }
-
-            // Clone the response for caching
-            const responseClone = response.clone();
-
-            // Cache successful responses
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                cache.put(event.request, responseClone);
-              });
-
-            return response;
-          })
-          .catch(() => {
-            // Return offline page for navigation requests
-            if (event.request.mode === 'navigate') {
-              return caches.match('/offline.html');
-            }
-          });
-      })
-  );
-});
-
-// Background sync for offline actions
-self.addEventListener('sync', (event) => {
-  if (event.tag === 'background-sync') {
-    event.waitUntil(doBackgroundSync());
-  }
-});
-
-async function doBackgroundSync() {
-  // Implement background sync logic here
-  // This would sync any offline actions when connection is restored
-  console.log('Background sync triggered');
-}
+      const registrations = await self.registration.unregister()
+      if (registrations) {
+        const clients = await self.clients.matchAll({ includeUncontrolled: true, type: "window" })
+        await Promise.all(clients.map((client) => client.navigate(client.url)))
+      }
+    })(),
+  )
+})

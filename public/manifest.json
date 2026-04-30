@@ -10,16 +10,16 @@
   "scope": "/",
   "icons": [
     {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
+      "src": "/apple-icon.png",
+      "sizes": "180x180",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ],
   "categories": ["business", "productivity", "utilities"],
@@ -29,21 +29,21 @@
       "short_name": "Dashboard",
       "description": "View your dashboard",
       "url": "/dashboard",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/apple-icon.png", "sizes": "180x180", "type": "image/png" }]
     },
     {
       "name": "CRM",
       "short_name": "CRM",
       "description": "Manage contacts and deals",
       "url": "/dashboard/crm",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/apple-icon.png", "sizes": "180x180", "type": "image/png" }]
     },
     {
       "name": "Accounting",
       "short_name": "Accounting",
       "description": "Manage invoices and expenses",
       "url": "/dashboard/accounting",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+      "icons": [{ "src": "/apple-icon.png", "sizes": "180x180", "type": "image/png" }]
     }
   ]
 }
