@@ -4,10 +4,9 @@ import GoogleProvider from "next-auth/providers/google"
 import CredentialsProvider from "next-auth/providers/credentials"
 import speakeasy from "speakeasy"
 import { prisma, withPrismaRetry } from "@/lib/prisma"
-import { getDefaultOrg } from "@/lib/defaultOrg"
 import { FOUNDER_SUPER_ADMIN_EMAIL } from "@/lib/authz"
-import { consumeSignupInvite, getSignupInviteDetails } from "@/lib/invitations"
-import { hashPassword, verifyPassword } from "@/lib/password"
+import { completeCredentialsSignup } from "@/lib/credentials-signup"
+import { verifyPassword } from "@/lib/password"
 
 const useAdapter = process.env.NODE_ENV === "production" || process.env.NEXTAUTH_USE_ADAPTER === "true"
 const allowCredentialsFallback =
@@ -63,90 +62,14 @@ const buildProviders = () => {
 
         try {
           if (mode === "signup") {
-            const invite = inviteToken ? await getSignupInviteDetails(inviteToken) : null
-            const isFounderBootstrap = email === FOUNDER_SUPER_ADMIN_EMAIL
+            const signup = await completeCredentialsSignup({
+              name,
+              email,
+              password,
+              inviteToken,
+            })
 
-            if (inviteToken && (!invite || invite.active || invite.email !== email)) {
-              return null
-            }
-
-            const existingUser = await withPrismaRetry("auth.authorize.findUserForSignup", () =>
-              prisma.user.findUnique({
-                where: { email },
-                select: {
-                  id: true,
-                  orgId: true,
-                  name: true,
-                  email: true,
-                  role: true,
-                  passwordHash: true,
-                  twoFactorEnabled: true,
-                  _count: {
-                    select: {
-                      accounts: true,
-                    },
-                  },
-                },
-              }),
-            )
-
-            if (existingUser && (existingUser.passwordHash || existingUser._count.accounts > 0)) {
-              return null
-            }
-
-            if (existingUser) {
-              if (!invite && !isFounderBootstrap) {
-                return null
-              }
-
-              if (invite && existingUser.orgId !== invite.orgId) {
-                return null
-              }
-
-              const updatedUser = await withPrismaRetry("auth.authorize.setPasswordForExistingUser", () =>
-                prisma.user.update({
-                  where: { id: existingUser.id },
-                  data: {
-                    name,
-                    role,
-                    passwordHash: hashPassword(password),
-                  },
-                }),
-              )
-
-              if (inviteToken) {
-                await consumeSignupInvite(inviteToken)
-              }
-
-              return {
-                id: updatedUser.id,
-                name: updatedUser.name,
-                email: updatedUser.email,
-                role: updatedUser.role,
-                twoFactorEnabled: updatedUser.twoFactorEnabled,
-              } as any
-            }
-
-            const org = await getDefaultOrg()
-            const createdUser = await withPrismaRetry("auth.authorize.createUser", () =>
-              prisma.user.create({
-                data: {
-                  email,
-                  name,
-                  role,
-                  orgId: org.id,
-                  passwordHash: hashPassword(password),
-                },
-              }),
-            )
-
-            return {
-              id: createdUser.id,
-              name: createdUser.name,
-              email: createdUser.email,
-              role: createdUser.role,
-              twoFactorEnabled: createdUser.twoFactorEnabled,
-            } as any
+            return signup.ok ? (signup.user as any) : null
           }
 
           const user = await withPrismaRetry("auth.authorize.findUserForLogin", () =>

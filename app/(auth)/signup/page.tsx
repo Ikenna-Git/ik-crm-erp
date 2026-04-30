@@ -102,21 +102,39 @@ function SignupPageContent() {
         return
       }
 
+      const signupResponse = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          inviteToken: inviteToken || undefined,
+        }),
+      })
+
+      const signupData = await signupResponse.json().catch(() => ({}))
+
+      if (!signupResponse.ok) {
+        throw new Error(
+          signupData?.error ||
+            (inviteToken ? "Invite signup failed. Ask your admin to refresh the link." : "Signup failed. Please try again."),
+        )
+      }
+
       const result = await signIn("credentials", {
-        name: formData.name,
         email: formData.email,
         password: formData.password,
-        inviteToken: inviteToken || undefined,
-        mode: "signup",
         redirect: false,
       })
+
       if (result?.error) {
-        setError(inviteToken ? "Invite signup failed. Ask your admin to refresh the link." : "Signup failed. Please try again.")
+        setError("Account created, but automatic sign-in failed. Go to login and use the same password.")
         return
       }
       router.push("/dashboard")
     } catch (err) {
-      setError("Signup failed. Please try again.")
+      setError(err instanceof Error ? err.message : "Signup failed. Please try again.")
     } finally {
       setLoading(false)
     }
