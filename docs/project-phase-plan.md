@@ -293,6 +293,19 @@ Remaining:
 - accessibility and mobile QA sweep
 - stakeholder pitch readiness gate with explicit launch criteria
 
+## Phase 17: Brand, Positioning, and Landing Experience
+
+Status: future work, intentionally deferred
+
+Remaining:
+
+- full landing page redesign
+- sharper product positioning and messaging
+- stronger visual identity and premium look
+- better conversion flow for demo, signup, and contact
+- stronger trust signals, screenshots, and proof sections
+- cleaner differentiation between Civis and generic CRM/ERP templates
+
 ## Stakeholder Pitch Gate
 
 ### Must-have before stakeholder admin access
@@ -323,6 +336,7 @@ Remaining:
 - white-label controls
 - product usage analytics
 - advanced enterprise governance workflows
+- landing page and marketing-site redesign
 
 ## Immediate Recommended Order
 

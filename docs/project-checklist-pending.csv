@@ -40,3 +40,5 @@
 "Phase 16","Support","Communication","Release notes and changelog workflow implemented","Pending","Not started","P2","Customers should see product progress clearly","Add changelog discipline"
 "Phase 16","Go-To-Market","Quality","Accessibility and mobile QA sweep completed","Pending","Not started","P1","Pitching stakeholders on unstable mobile/accessibility experiences is risky","Run QA sweep and fix findings"
 "Phase 16","Go-To-Market","Readiness","Stakeholder pitch readiness gate completed","Pending","Not started","P0","You need a formal go/no-go checklist before handing this to serious stakeholders","Use the pitch-readiness document as the gate"
+"Phase 17","Brand","Marketing Site","Landing page redesign completed","Pending","Not started","P2","Current landing page is not yet strong enough for premium product positioning","Run a full brand and conversion redesign later"
+"Phase 17","Brand","Positioning","Product messaging and trust-signals upgraded","Pending","Not started","P2","The product needs clearer premium positioning for stakeholders and buyers","Rewrite positioning and supporting sections"

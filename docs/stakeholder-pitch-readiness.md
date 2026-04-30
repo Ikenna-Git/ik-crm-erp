@@ -113,6 +113,7 @@ These are real platform requirements, but they are not the first blockers for ea
 - sophisticated approval center for sensitive actions
 - broad localization/i18n
 - deeper enterprise governance workflows
+- landing page and marketing-site redesign
 
 ## Scorecard
 
