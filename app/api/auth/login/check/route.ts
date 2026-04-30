@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma, withPrismaRetry } from "@/lib/prisma"
+import { FOUNDER_SUPER_ADMIN_EMAIL } from "@/lib/authz"
 import { verifyPassword } from "@/lib/password"
 
 const allowCredentialsFallback =
@@ -46,6 +47,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (!user.passwordHash) {
+      if (normalizedEmail === FOUNDER_SUPER_ADMIN_EMAIL && user._count.accounts === 0) {
+        return NextResponse.json(
+          { error: "This founder account needs its first password. Use Sign up once with the same email to create it." },
+          { status: 409 },
+        )
+      }
+
       const provider = user.accounts[0]?.provider
       if (provider) {
         const providerName = provider === "google" ? "Google" : provider

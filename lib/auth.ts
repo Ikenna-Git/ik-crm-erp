@@ -64,6 +64,7 @@ const buildProviders = () => {
         try {
           if (mode === "signup") {
             const invite = inviteToken ? await getSignupInviteDetails(inviteToken) : null
+            const isFounderBootstrap = email === FOUNDER_SUPER_ADMIN_EMAIL
 
             if (inviteToken && (!invite || invite.active || invite.email !== email)) {
               return null
@@ -94,11 +95,11 @@ const buildProviders = () => {
             }
 
             if (existingUser) {
-              if (!invite) {
+              if (!invite && !isFounderBootstrap) {
                 return null
               }
 
-              if (existingUser.orgId !== invite.orgId) {
+              if (invite && existingUser.orgId !== invite.orgId) {
                 return null
               }
 
@@ -107,12 +108,15 @@ const buildProviders = () => {
                   where: { id: existingUser.id },
                   data: {
                     name,
+                    role,
                     passwordHash: hashPassword(password),
                   },
                 }),
               )
 
-              await consumeSignupInvite(inviteToken!)
+              if (inviteToken) {
+                await consumeSignupInvite(inviteToken)
+              }
 
               return {
                 id: updatedUser.id,
