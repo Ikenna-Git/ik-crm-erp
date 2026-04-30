@@ -26,11 +26,42 @@ export async function POST(request: NextRequest) {
           id: true,
           passwordHash: true,
           twoFactorEnabled: true,
+          _count: {
+            select: {
+              accounts: true,
+            },
+          },
+          accounts: {
+            take: 1,
+            select: {
+              provider: true,
+            },
+          },
         },
       }),
     )
 
-    if (!user || !verifyPassword(password, user.passwordHash)) {
+    if (!user) {
+      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 })
+    }
+
+    if (!user.passwordHash) {
+      const provider = user.accounts[0]?.provider
+      if (provider) {
+        const providerName = provider === "google" ? "Google" : provider
+        return NextResponse.json(
+          { error: `This account uses ${providerName} sign-in. Use that provider instead of a password.` },
+          { status: 409 },
+        )
+      }
+
+      return NextResponse.json(
+        { error: "This account has not completed password setup yet. Use the invite link or ask your admin to resend it." },
+        { status: 409 },
+      )
+    }
+
+    if (!verifyPassword(password, user.passwordHash)) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 })
     }
 
