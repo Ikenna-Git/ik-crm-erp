@@ -66,6 +66,13 @@ export default function SettingsPage() {
   const [teamUsers, setTeamUsers] = useState<any[]>([])
   const [teamLoading, setTeamLoading] = useState(false)
   const [teamError, setTeamError] = useState("")
+  const [passwords, setPasswords] = useState({
+    current: "",
+    next: "",
+    confirm: "",
+  })
+  const [passwordSaving, setPasswordSaving] = useState(false)
+  const [passwordStatus, setPasswordStatus] = useState("")
 
   const [billing] = useState({
     plan: "Pro",
@@ -333,8 +340,29 @@ export default function SettingsPage() {
     }
   }
 
-  const handlePasswordChange = () => {
-    pushChangeNotification("Password update requested", "Password change submitted.")
+  const handlePasswordChange = async () => {
+    try {
+      setPasswordSaving(true)
+      setPasswordStatus("")
+      const res = await fetch("/api/auth/password/set", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders(session?.user) },
+        body: JSON.stringify({
+          currentPassword: passwords.current,
+          newPassword: passwords.next,
+          confirmPassword: passwords.confirm,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to update password")
+      setPasswordStatus(data.message || "Password updated successfully.")
+      setPasswords({ current: "", next: "", confirm: "" })
+      await pushChangeNotification("Password updated", data.message || "Password updated successfully.", false)
+    } catch (err: any) {
+      setPasswordStatus(err?.message || "Failed to update password")
+    } finally {
+      setPasswordSaving(false)
+    }
   }
 
   return (
@@ -475,15 +503,33 @@ export default function SettingsPage() {
                 <div className="md:col-span-3 grid gap-4 md:grid-cols-3">
                   <div>
                     <Label htmlFor="current">Current password</Label>
-                    <Input id="current" type={showPasswords ? "text" : "password"} placeholder="••••••••" />
+                    <Input
+                      id="current"
+                      type={showPasswords ? "text" : "password"}
+                      placeholder="Leave blank if setting one for the first time"
+                      value={passwords.current}
+                      onChange={(e) => setPasswords((current) => ({ ...current, current: e.target.value }))}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="new">New password</Label>
-                    <Input id="new" type={showPasswords ? "text" : "password"} placeholder="••••••••" />
+                    <Input
+                      id="new"
+                      type={showPasswords ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={passwords.next}
+                      onChange={(e) => setPasswords((current) => ({ ...current, next: e.target.value }))}
+                    />
                   </div>
                   <div>
                     <Label htmlFor="confirm">Confirm new password</Label>
-                    <Input id="confirm" type={showPasswords ? "text" : "password"} placeholder="••••••••" />
+                    <Input
+                      id="confirm"
+                      type={showPasswords ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={passwords.confirm}
+                      onChange={(e) => setPasswords((current) => ({ ...current, confirm: e.target.value }))}
+                    />
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -495,8 +541,9 @@ export default function SettingsPage() {
                   <span className="text-sm text-muted-foreground">Show passwords</span>
                 </div>
               </div>
-              <Button className="w-fit" variant="secondary" onClick={handlePasswordChange}>
-                Change password
+              {passwordStatus ? <p className="text-sm text-muted-foreground">{passwordStatus}</p> : null}
+              <Button className="w-fit" variant="secondary" onClick={handlePasswordChange} disabled={passwordSaving}>
+                {passwordSaving ? "Saving..." : "Change password"}
               </Button>
             </CardContent>
           </Card>
