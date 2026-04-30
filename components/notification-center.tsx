@@ -111,7 +111,7 @@ export function NotificationCenter() {
     }
   }
 
-  const formatDate = (dateString: string) => {ZAAA
+  const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     const now = new Date()
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
