@@ -22,7 +22,7 @@ type SearchResult = {
 export function UnifiedSearch() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
-  const [category, setCategory] = useState<string>("")
+  const [category, setCategory] = useState<string>("all")
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
@@ -41,7 +41,7 @@ export function UnifiedSearch() {
   useEffect(() => {
     if (!open) {
       setQuery("")
-      setCategory("")
+      setCategory("all")
       setResults([])
       setHasSearched(false)
     }
@@ -58,7 +58,7 @@ export function UnifiedSearch() {
       setLoading(true)
       try {
         const params = new URLSearchParams({ q: query })
-        if (category) params.set("category", category)
+        if (category !== "all") params.set("category", category)
 
         const response = await fetch(`/api/search?${params}`)
         const data = await response.json()
@@ -83,13 +83,20 @@ export function UnifiedSearch() {
   }, [query, category])
 
   const grouped = useMemo(() => {
-    const allResults = hasSearched ? results : unifiedSearchItems.filter(item =>
-      !query.trim() || (
-        item.title.toLowerCase().includes(query.toLowerCase()) ||
-        item.subtitle.toLowerCase().includes(query.toLowerCase()) ||
-        item.category.toLowerCase().includes(query.toLowerCase())
-      )
-    )
+    const allResults = hasSearched
+      ? results
+      : unifiedSearchItems.filter((item) => {
+          const matchesQuery =
+            !query.trim() ||
+            item.title.toLowerCase().includes(query.toLowerCase()) ||
+            item.subtitle.toLowerCase().includes(query.toLowerCase()) ||
+            item.category.toLowerCase().includes(query.toLowerCase())
+
+          const matchesCategory =
+            category === "all" || item.category.toLowerCase() === category || (category === "crm" && item.category === "CRM")
+
+          return matchesQuery && matchesCategory
+        })
 
     return allResults.reduce<Record<string, typeof allResults>>((acc, item) => {
       if (!acc[item.category]) acc[item.category] = []
@@ -139,7 +146,7 @@ export function UnifiedSearch() {
                   <SelectValue placeholder="All" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All</SelectItem>
+                  <SelectItem value="all">All</SelectItem>
                   <SelectItem value="crm">CRM</SelectItem>
                   <SelectItem value="accounting">Accounting</SelectItem>
                   <SelectItem value="tasks">Tasks</SelectItem>
