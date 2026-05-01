@@ -12,19 +12,28 @@ import { addNotification } from "@/lib/notifications"
 import {
   DEFAULT_NOTIFICATION_SETTINGS,
   DEFAULT_PREFERENCES,
-  DEFAULT_PROFILE,
   applyThemePreference,
   getSessionHeaders,
+  seedProfileFromUser,
   syncLocalUser,
 } from "@/lib/user-settings"
 
 export default function ProfilePage() {
   const { data: session } = useSession()
-  const [profile, setProfile] = useState(DEFAULT_PROFILE)
+  const [profile, setProfile] = useState(() => seedProfileFromUser(session?.user))
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES)
   const [notificationSettings, setNotificationSettings] = useState(DEFAULT_NOTIFICATION_SETTINGS)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+
+  useEffect(() => {
+    if (!session?.user) return
+    setProfile((current) => ({
+      ...current,
+      name: current.name || session.user.name || "",
+      email: current.email || session.user.email || "",
+    }))
+  }, [session?.user?.email, session?.user?.name])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -37,7 +46,7 @@ export default function ProfilePage() {
         })
         const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data?.error || "Failed to load profile")
-        setProfile(data.profile || DEFAULT_PROFILE)
+        setProfile(data.profile || seedProfileFromUser(session?.user))
         const loadedPreferences = data.preferences || DEFAULT_PREFERENCES
         setPreferences(loadedPreferences)
         setNotificationSettings(data.notifications || DEFAULT_NOTIFICATION_SETTINGS)

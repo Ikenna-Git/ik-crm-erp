@@ -16,9 +16,9 @@ import {
   DEFAULT_NOTIFICATION_SETTINGS,
   DEFAULT_DIGEST_SETTINGS,
   DEFAULT_PREFERENCES,
-  DEFAULT_PROFILE,
   applyThemePreference,
   getSessionHeaders,
+  seedProfileFromUser,
   syncLocalUser,
 } from "@/lib/user-settings"
 
@@ -36,7 +36,7 @@ const aiProviders = [
 
 export default function SettingsPage() {
   const { data: session } = useSession()
-  const [profile, setProfile] = useState(DEFAULT_PROFILE)
+  const [profile, setProfile] = useState(() => seedProfileFromUser(session?.user))
 
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES)
 
@@ -89,6 +89,15 @@ export default function SettingsPage() {
   }
 
   useEffect(() => {
+    if (!session?.user) return
+    setProfile((current) => ({
+      ...current,
+      name: current.name || session.user.name || "",
+      email: current.email || session.user.email || "",
+    }))
+  }, [session?.user?.email, session?.user?.name])
+
+  useEffect(() => {
     if (typeof window === "undefined") return
     const load = (key: string, setter: (v: any) => void) => {
       try {
@@ -107,7 +116,7 @@ export default function SettingsPage() {
         })
         const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data?.error || "Failed to load settings")
-        setProfile(data.profile || DEFAULT_PROFILE)
+        setProfile(data.profile || seedProfileFromUser(session?.user))
         const loadedPreferences = data.preferences || DEFAULT_PREFERENCES
         setPreferences(loadedPreferences)
         setNotifications(data.notifications || DEFAULT_NOTIFICATION_SETTINGS)

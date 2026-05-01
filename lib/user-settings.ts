@@ -54,13 +54,19 @@ export type NotificationSettings = {
 }
 
 export const DEFAULT_PROFILE: UserProfile = {
-  name: "Adaeze Okafor",
-  email: "adaeze@civis.io",
-  title: "Operations Lead",
-  phone: "+234 801 000 1234",
+  name: "",
+  email: "",
+  title: "",
+  phone: "",
   timezone: "Africa/Lagos",
   locale: "en-NG",
 }
+
+export const seedProfileFromUser = (user?: { name?: string | null; email?: string | null }): UserProfile => ({
+  ...DEFAULT_PROFILE,
+  name: user?.name || "",
+  email: user?.email || "",
+})
 
 export const DEFAULT_PREFERENCES: UserPreferences = {
   theme: "dark",

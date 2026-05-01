@@ -10,6 +10,7 @@ import { DashboardHeader } from "@/components/dashboard-header"
 import { OfflineBanner } from "@/components/offline-banner"
 import { GuidedOnboarding } from "@/components/guided-onboarding"
 import { AiAssistPopover } from "@/components/ai-assist-popover"
+import { userUpdatedEventName } from "@/lib/user-settings"
 
 export default function DashboardLayout({
   children,
@@ -35,6 +36,7 @@ export default function DashboardLayout({
       role: session.user.role || "user",
     }
     localStorage.setItem("user", JSON.stringify(payload))
+    window.dispatchEvent(new CustomEvent(userUpdatedEventName, { detail: payload }))
   }, [session])
 
   if (loading) {
