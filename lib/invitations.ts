@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto"
 import type { Role } from "@prisma/client"
+import { sendTransactionalEmail, type MailSendResult } from "@/lib/mailer"
 import { prisma, withPrismaRetry } from "@/lib/prisma"
 
 const INVITE_PREFIX = "invite"
@@ -28,6 +29,8 @@ export type SignupInviteDetails = {
   expiresAt: string
   active: boolean
 }
+
+export type SignupInviteDelivery = MailSendResult
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase()
 
@@ -166,4 +169,63 @@ export const consumeSignupInvite = async (token: string) => {
       where: { token },
     }),
   ).catch(() => undefined)
+}
+
+export const sendSignupInviteEmail = async ({
+  to,
+  name,
+  orgName,
+  inviteUrl,
+  expiresAt,
+  sentBy,
+  role,
+}: {
+  to: string
+  name: string
+  orgName: string
+  inviteUrl: string
+  expiresAt: string
+  sentBy: string
+  role: Role
+}): Promise<SignupInviteDelivery> => {
+  const expiresLabel = new Date(expiresAt).toLocaleString()
+  const roleLabel = role === "ADMIN" ? "workspace admin" : "workspace user"
+  const safeName = name.trim() || to
+
+  const subject = `You're invited to ${orgName} on Civis`
+  const text = [
+    `Hi ${safeName},`,
+    "",
+    `${sentBy} invited you to join ${orgName} on Civis as a ${roleLabel}.`,
+    "",
+    `Complete your signup here: ${inviteUrl}`,
+    `This link expires on ${expiresLabel}.`,
+    "",
+    "If you were not expecting this invitation, you can ignore this email.",
+    "",
+    "Civis",
+  ].join("\n")
+
+  const html = `
+    <div style="font-family: Arial, Helvetica, sans-serif; color: #0f172a; line-height: 1.6;">
+      <p>Hi ${safeName},</p>
+      <p><strong>${sentBy}</strong> invited you to join <strong>${orgName}</strong> on Civis as a ${roleLabel}.</p>
+      <p>
+        <a href="${inviteUrl}" style="display: inline-block; padding: 12px 18px; border-radius: 999px; background: #0f172a; color: #ffffff; text-decoration: none;">
+          Complete signup
+        </a>
+      </p>
+      <p>If the button does not open, use this link instead:<br /><a href="${inviteUrl}">${inviteUrl}</a></p>
+      <p>This link expires on ${expiresLabel}.</p>
+      <p>If you were not expecting this invitation, you can ignore this email.</p>
+      <p>Civis</p>
+    </div>
+  `.trim()
+
+  return sendTransactionalEmail({
+    to,
+    subject,
+    text,
+    html,
+  })
 }

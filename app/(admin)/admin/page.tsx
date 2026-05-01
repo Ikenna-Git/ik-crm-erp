@@ -76,6 +76,13 @@ type OverviewResponse = {
       status: "healthy" | "warning" | "critical"
       detail: string
     }>
+    incidents: Array<{
+      id: string
+      message: string
+      href?: string | null
+      source?: string | null
+      createdAt: string
+    }>
     nextActions: Array<{
       id: string
       title: string
@@ -307,6 +314,28 @@ export default function AdminOverviewPage() {
                 <p className="mt-2 text-sm text-slate-300">{check.detail}</p>
               </div>
             ))}
+
+            <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="font-medium text-white">Recent live incidents</p>
+                <Badge className={opsCenter.incidents.length ? issueBadgeClasses.warning : checkBadgeClasses.healthy}>
+                  {opsCenter.incidents.length} captured
+                </Badge>
+              </div>
+              {opsCenter.incidents.length ? (
+                <div className="space-y-3">
+                  {opsCenter.incidents.map((incident) => (
+                    <div key={incident.id} className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                      <p className="text-sm font-medium text-white">{incident.message}</p>
+                      <p className="mt-1 text-xs text-slate-400">{incident.source || "client runtime"} • {formatDateTime(incident.createdAt)}</p>
+                      {incident.href ? <p className="mt-1 truncate text-xs text-slate-500">{incident.href}</p> : null}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-300">No recent browser/runtime incidents have been reported.</p>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>

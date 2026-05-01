@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
 import { getUserFromRequest } from "@/lib/request-user"
 import { isSuperAdmin } from "@/lib/authz"
-import { issueSignupInvite } from "@/lib/invitations"
+import { issueSignupInvite, sendSignupInviteEmail } from "@/lib/invitations"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable org management." }, { status: 503 })
@@ -115,6 +115,16 @@ export async function POST(request: Request) {
       email: adminEmail,
       origin: new URL(request.url).origin,
     })
+    const initialAdmin = created.users[0]
+    const delivery = await sendSignupInviteEmail({
+      to: adminEmail,
+      name: initialAdmin?.name || adminName,
+      orgName: created.name,
+      inviteUrl: invite.inviteUrl,
+      expiresAt: invite.expiresAt,
+      sentBy: user.name || user.email,
+      role: "ADMIN",
+    })
 
     await createAuditLog({
       orgId: created.id,
@@ -128,7 +138,12 @@ export async function POST(request: Request) {
     return NextResponse.json({
       org: created,
       invite,
-      message: "Workspace created. Share the invite link with the initial admin so they can complete signup.",
+      delivery,
+      message: delivery.sent
+        ? "Workspace created and the initial admin invite email was sent."
+        : delivery.skipped
+          ? "Workspace created. SMTP is not configured yet, so share the initial admin invite link manually."
+          : "Workspace created, but invite email delivery failed. Share the initial admin invite link manually.",
     })
   } catch (error) {
     console.error("Org creation failed", error)

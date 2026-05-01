@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { getUserFromRequest } from "@/lib/request-user"
 import { createAuditLog } from "@/lib/audit"
 import { canAssignRole, canDeleteUser, getAssignableRoles, isAdmin } from "@/lib/authz"
-import { issueSignupInvite } from "@/lib/invitations"
+import { issueSignupInvite, sendSignupInviteEmail } from "@/lib/invitations"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable admin management." }, { status: 503 })
@@ -172,6 +172,15 @@ export async function POST(request: Request) {
       email: created.email,
       origin,
     })
+    const delivery = await sendSignupInviteEmail({
+      to: created.email,
+      name: created.name,
+      orgName: org.name,
+      inviteUrl: invite.inviteUrl,
+      expiresAt: invite.expiresAt,
+      sentBy: actor.name || actor.email,
+      role: created.role,
+    })
 
     await createAuditLog({
       orgId: org.id,
@@ -185,9 +194,18 @@ export async function POST(request: Request) {
     return NextResponse.json({
       user: mapAdminUser(created),
       invite,
-      message: existing
-        ? "Invite refreshed. Share the new signup link with this teammate."
-        : "User created. Share the invite link so they can complete signup.",
+      delivery,
+      message: delivery.sent
+        ? existing
+          ? "Invite email sent and signup link refreshed."
+          : "User created and invite email sent."
+        : delivery.skipped
+          ? existing
+            ? "Invite refreshed. SMTP is not configured yet, so share the new signup link manually."
+            : "User created. SMTP is not configured yet, so share the invite link manually."
+          : existing
+            ? "Invite refreshed, but email delivery failed. Share the signup link manually."
+            : "User created, but email delivery failed. Share the invite link manually.",
     })
   } catch (error) {
     console.error("Admin user invite failed", error)

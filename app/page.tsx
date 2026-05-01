@@ -6,6 +6,8 @@ import { Benefits } from "@/components/benefits"
 import { CTA } from "@/components/cta"
 import { Footer } from "@/components/footer"
 import { PricingPreview } from "@/components/pricing-preview"
+import { ProofShowcase } from "@/components/proof-showcase"
+import { UseCasePreview } from "@/components/use-case-preview"
 
 export default function Home() {
   return (
@@ -14,7 +16,9 @@ export default function Home() {
       <Hero />
       <Features />
       <Modules />
+      <ProofShowcase />
       <Benefits />
+      <UseCasePreview />
       <PricingPreview />
       <CTA />
       <Footer />

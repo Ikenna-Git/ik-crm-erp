@@ -9,6 +9,12 @@ const dbUnavailable = () =>
 type Severity = "critical" | "warning" | "info"
 type CheckStatus = "healthy" | "warning" | "critical"
 
+const readMetadataString = (metadata: unknown, key: string) => {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null
+  const value = (metadata as Record<string, unknown>)[key]
+  return typeof value === "string" ? value : null
+}
+
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
 
@@ -30,6 +36,7 @@ export async function GET(request: Request) {
       pendingExpenseCount,
       activeProjectCount,
       recentAuditEvents,
+      recentClientIncidents,
       totalOrgs,
       totalUsers,
       recentOrgs,
@@ -49,6 +56,12 @@ export async function GET(request: Request) {
         orderBy: { createdAt: "desc" },
         take: 8,
         select: { id: true, action: true, entity: true, entityId: true, createdAt: true, metadata: true, userId: true },
+      }),
+      prisma.auditLog.findMany({
+        where: { orgId: org.id, action: "telemetry.client_error" },
+        orderBy: { createdAt: "desc" },
+        take: 6,
+        select: { id: true, createdAt: true, metadata: true },
       }),
       isSuperAdmin(user.role) ? prisma.org.count() : Promise.resolve(0),
       isSuperAdmin(user.role) ? prisma.user.count() : Promise.resolve(0),
@@ -70,8 +83,17 @@ export async function GET(request: Request) {
 
     const twoFactorCoverage = userCount ? Math.round((twoFactorCount / userCount) * 100) : 0
     const inviteMode = process.env.NEXTAUTH_URL ? "ready" : "limited"
+    const smtpConfigured = Boolean(process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASS)
     const aiConfigured = Boolean(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.GEMINI_API_KEY)
     const aiProvider = process.env.AI_PROVIDER || "local"
+    const incidentCount = recentClientIncidents.length
+    const incidents = recentClientIncidents.map((event) => ({
+      id: event.id,
+      message: readMetadataString(event.metadata, "message") || "Unhandled client error",
+      href: readMetadataString(event.metadata, "href"),
+      source: readMetadataString(event.metadata, "source"),
+      createdAt: event.createdAt,
+    }))
 
     const issues: Array<{
       id: string
@@ -143,6 +165,18 @@ export async function GET(request: Request) {
       })
     }
 
+    if (incidentCount > 0) {
+      issues.push({
+        id: "client-incidents",
+        severity: incidentCount >= 3 ? "critical" : "warning",
+        title: "Live client incidents were detected",
+        detail: "Unhandled browser/runtime errors are reaching real user sessions and should be reviewed before wider rollout.",
+        metric: `${incidentCount} recent client incident${incidentCount === 1 ? "" : "s"}`,
+        href: "/admin",
+        cta: "Review incidents",
+      })
+    }
+
     const healthChecks: Array<{
       id: string
       label: string
@@ -164,11 +198,13 @@ export async function GET(request: Request) {
       {
         id: "invites",
         label: "Invite flow",
-        status: inviteMode === "ready" ? "healthy" : "warning",
+        status: inviteMode === "ready" && smtpConfigured ? "healthy" : "warning",
         detail:
-          inviteMode === "ready"
-            ? "Workspace invite links can be generated and shared from admin."
-            : "Set NEXTAUTH_URL correctly for reliable invite links across environments.",
+          inviteMode !== "ready"
+            ? "Set NEXTAUTH_URL correctly for reliable invite links across environments."
+            : smtpConfigured
+              ? "Workspace invite links can be generated and emailed from admin."
+              : "Invite links work, but SMTP is not configured yet, so admin must still share them manually.",
       },
       {
         id: "notifications",
@@ -181,6 +217,15 @@ export async function GET(request: Request) {
         label: "AI assistant",
         status: aiConfigured ? "healthy" : "warning",
         detail: aiConfigured ? `Provider mode: ${aiProvider}.` : "The assistant can fall back locally, but provider-based answers are not fully configured.",
+      },
+      {
+        id: "telemetry",
+        label: "Live incident feed",
+        status: incidentCount > 0 ? (incidentCount >= 3 ? "critical" : "warning") : "healthy",
+        detail:
+          incidentCount > 0
+            ? `${incidentCount} recent client incident${incidentCount === 1 ? "" : "s"} were captured from live sessions.`
+            : "No recent client-side incidents have been captured.",
       },
     ]
 
@@ -246,6 +291,7 @@ export async function GET(request: Request) {
         infoCount,
         issues,
         healthChecks,
+        incidents,
         nextActions,
       },
       platform: isSuperAdmin(user.role)

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
-import { Building2, Copy, Cpu, Sparkles } from "lucide-react"
+import { AlertTriangle, Bot, Building2, Copy, Cpu, Mail, ShieldCheck, Sparkles } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -35,10 +35,43 @@ type InvitePayload = {
   expiresAt: string
 }
 
+type PlatformStatusResponse = {
+  readiness: Array<{
+    id: string
+    label: string
+    status: "healthy" | "warning" | "critical" | "info"
+    detail: string
+  }>
+  watchlist: Array<{
+    id: string
+    title: string
+    metric: string
+    detail: string
+  }>
+  aiProviders: {
+    openai: boolean
+    anthropic: boolean
+    gemini: boolean
+  }
+  meta: {
+    inviteCount: number
+    largestWorkspace: { name: string; users: number } | null
+  }
+}
+
+const readinessBadgeClasses = {
+  healthy: "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15",
+  warning: "bg-amber-500/15 text-amber-300 hover:bg-amber-500/15",
+  critical: "bg-rose-500/15 text-rose-300 hover:bg-rose-500/15",
+  info: "bg-sky-500/15 text-sky-300 hover:bg-sky-500/15",
+} as const
+
 export default function AdminSystemPage() {
   const { data: session } = useSession()
   const [orgs, setOrgs] = useState<OrgRecord[]>([])
+  const [status, setStatus] = useState<PlatformStatusResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [statusLoading, setStatusLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
@@ -66,9 +99,24 @@ export default function AdminSystemPage() {
     }
   }
 
+  const loadStatus = async () => {
+    try {
+      setStatusLoading(true)
+      const response = await fetch("/api/admin/platform-status")
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload?.error || "Failed to load founder status")
+      setStatus(payload)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load founder status")
+    } finally {
+      setStatusLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (isSuperAdmin(session?.user?.role)) {
       load()
+      loadStatus()
     }
   }, [session?.user?.role])
 
@@ -95,7 +143,7 @@ export default function AdminSystemPage() {
           : null,
       )
       setForm({ name: "", theme: "light", notifyEmail: "", adminName: "", adminEmail: "" })
-      await load()
+      await Promise.all([load(), loadStatus()])
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create workspace")
     } finally {
@@ -127,6 +175,104 @@ export default function AdminSystemPage() {
 
   return (
     <div className="space-y-6">
+      <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+        <Card className="border-white/10 bg-white/5 text-slate-100">
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle>Founder desk</CardTitle>
+                <CardDescription className="text-slate-400">
+                  The platform-level view for environment readiness, onboarding queues, and workspace rollout health.
+                </CardDescription>
+              </div>
+              <Badge className="bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15">Founder only</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {statusLoading ? (
+              <p className="text-sm text-slate-300">Loading founder status...</p>
+            ) : (
+              <>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {status?.readiness.map((item) => (
+                    <div key={item.id} className="rounded-3xl border border-white/10 bg-slate-950/55 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-medium text-white">{item.label}</p>
+                        <Badge className={readinessBadgeClasses[item.status]}>{item.status}</Badge>
+                      </div>
+                      <p className="mt-2 text-sm text-slate-300">{item.detail}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  {status?.watchlist.map((item) => (
+                    <div key={item.id} className="rounded-3xl border border-white/10 bg-slate-950/55 p-4">
+                      <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{item.title}</p>
+                      <p className="mt-2 text-2xl font-semibold text-white">{item.metric}</p>
+                      <p className="mt-2 text-sm text-slate-300">{item.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/10 bg-white/5 text-slate-100">
+          <CardHeader>
+            <CardTitle>Readiness notes</CardTitle>
+            <CardDescription className="text-slate-400">
+              Keep these signals visible as you push toward stakeholder demos and broader rollout.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm text-slate-300">
+            <div className="rounded-3xl border border-white/10 bg-slate-950/55 p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <Bot className="h-4 w-4 text-emerald-300" />
+                <p className="font-medium text-white">AI providers</p>
+              </div>
+              <p>
+                OpenAI: {status?.aiProviders.openai ? "ready" : "missing"} • Anthropic:{" "}
+                {status?.aiProviders.anthropic ? "ready" : "missing"} • Gemini:{" "}
+                {status?.aiProviders.gemini ? "ready" : "missing"}
+              </p>
+            </div>
+            <div className="rounded-3xl border border-white/10 bg-slate-950/55 p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <Mail className="h-4 w-4 text-emerald-300" />
+                <p className="font-medium text-white">Invite flow</p>
+              </div>
+              <p>
+                {status?.meta.inviteCount || 0} live invite link{status?.meta.inviteCount === 1 ? "" : "s"} are active
+                right now across the platform.
+              </p>
+            </div>
+            <div className="rounded-3xl border border-white/10 bg-slate-950/55 p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-emerald-300" />
+                <p className="font-medium text-white">Largest workspace</p>
+              </div>
+              <p>
+                {status?.meta.largestWorkspace
+                  ? `${status.meta.largestWorkspace.name} currently has ${status.meta.largestWorkspace.users} users.`
+                  : "No workspace activity yet."}
+              </p>
+            </div>
+            <div className="rounded-3xl border border-white/10 bg-slate-950/55 p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-emerald-300" />
+                <p className="font-medium text-white">Control model</p>
+              </div>
+              <p>
+                Founder access stays platform-wide. Company admins stay inside their workspace boundary and invite only
+                their own users.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card className="border-white/10 bg-white/5 text-slate-100">
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
@@ -136,7 +282,7 @@ export default function AdminSystemPage() {
                 Stand up a new org and seed the first workspace admin without surrendering founder control.
               </CardDescription>
             </div>
-            <Badge className="bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15">Founder only</Badge>
+            <Badge className="bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15">Provisioning</Badge>
           </div>
         </CardHeader>
         <CardContent className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
@@ -158,7 +304,7 @@ export default function AdminSystemPage() {
               <Input
                 value={form.adminName}
                 onChange={(event) => setForm((current) => ({ ...current, adminName: event.target.value }))}
-                placeholder="Adaeze Okafor"
+                placeholder="Workspace owner"
               />
             </div>
             <div className="space-y-2">
@@ -184,7 +330,7 @@ export default function AdminSystemPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4 text-sm text-slate-300">
+          <div className="rounded-3xl border border-white/10 bg-slate-950/55 p-4 text-sm text-slate-300">
             <div className="mb-3 flex items-center gap-3">
               <Sparkles className="h-5 w-5 text-emerald-300" />
               <p className="font-medium text-slate-100">Provisioning note</p>
