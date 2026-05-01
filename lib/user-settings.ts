@@ -186,6 +186,8 @@ export const syncLocalUser = (profile: UserProfile) => {
       ...existing,
       name: profile.name || existing.name,
       email: profile.email || existing.email,
+      accessProfile: existing.accessProfile || "GENERAL",
+      moduleAccess: existing.moduleAccess || null,
     }
     localStorage.setItem("user", JSON.stringify(next))
     window.dispatchEvent(new CustomEvent(userUpdatedEventName, { detail: next }))

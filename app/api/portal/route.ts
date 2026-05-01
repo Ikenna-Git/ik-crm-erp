@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
+import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
 
 const dbUnavailable = () =>
@@ -11,7 +11,7 @@ const generateAccessCode = () => Math.random().toString(36).slice(2, 10)
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org } = await requireModuleAccess(request, "portal", "view")
     const portals = await prisma.clientPortal.findMany({
       where: { orgId: org.id },
       orderBy: { updatedAt: "desc" },
@@ -22,15 +22,14 @@ export async function GET(request: Request) {
     })
     return NextResponse.json({ portals })
   } catch (error) {
-    console.error("Client portals fetch failed", error)
-    return NextResponse.json({ error: "Failed to load client portals" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load client portals")
   }
 }
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "portal", "manage")
     const body = await request.json()
     const { name, contactName, contactEmail, summary } = body || {}
     if (!name) return NextResponse.json({ error: "name is required" }, { status: 400 })
@@ -69,15 +68,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ portal })
   } catch (error) {
-    console.error("Client portal create failed", error)
-    return NextResponse.json({ error: "Failed to create client portal" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to create client portal")
   }
 }
 
 export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "portal", "manage")
     const body = await request.json()
     const { id, status, summary } = body || {}
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
@@ -105,7 +103,6 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ portal })
   } catch (error) {
-    console.error("Client portal update failed", error)
-    return NextResponse.json({ error: "Failed to update client portal" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to update client portal")
   }
 }

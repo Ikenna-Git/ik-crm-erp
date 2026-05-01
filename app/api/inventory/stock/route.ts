@@ -1,24 +1,16 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
-import { getUserFromRequest, isRequestUserError } from "@/lib/request-user"
+import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { seedInventoryData } from "@/lib/module-seeds"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable inventory stock." }, { status: 503 })
 
-const handleError = (error: unknown, fallback: string) => {
-  console.error(fallback, error)
-  if (isRequestUserError(error)) {
-    return NextResponse.json({ error: error.message }, { status: error.status })
-  }
-  return NextResponse.json({ error: fallback }, { status: 500 })
-}
-
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org } = await requireModuleAccess(request, "inventory", "view")
     await seedInventoryData(org.id)
     const stock = await prisma.inventoryStock.findMany({
       where: { orgId: org.id },
@@ -26,14 +18,14 @@ export async function GET(request: Request) {
     })
     return NextResponse.json({ stock })
   } catch (error) {
-    return handleError(error, "Failed to load inventory stock")
+    return handleAccessRouteError(error, "Failed to load inventory stock")
   }
 }
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "inventory", "manage")
     const body = await request.json()
     const items = Array.isArray(body) ? body : [body]
     if (!items.length) {
@@ -77,14 +69,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ stock: created })
   } catch (error) {
-    return handleError(error, "Failed to save inventory stock")
+    return handleAccessRouteError(error, "Failed to save inventory stock")
   }
 }
 
 export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "inventory", "manage")
     const body = await request.json()
     const { id, sku, name, currentStock, reorderPoint, reorderQuantity, warehouseLocation, status } = body || {}
     if (!id) {
@@ -122,14 +114,14 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ stock })
   } catch (error) {
-    return handleError(error, "Failed to update inventory stock")
+    return handleAccessRouteError(error, "Failed to update inventory stock")
   }
 }
 
 export async function DELETE(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "inventory", "manage")
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) {
@@ -155,6 +147,6 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    return handleError(error, "Failed to delete inventory stock")
+    return handleAccessRouteError(error, "Failed to delete inventory stock")
   }
 }

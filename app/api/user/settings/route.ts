@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getUserFromRequest } from "@/lib/request-user"
 import { createAuditLog } from "@/lib/audit"
+import { buildModuleAccessForUser } from "@/lib/access-control"
 import { getDefaultKpis } from "@/lib/kpis"
 import { FOUNDER_SUPER_ADMIN_EMAIL } from "@/lib/authz"
 import { DEFAULT_CRM_VIEWS, DEFAULT_ONBOARDING_TASKS } from "@/lib/user-settings"
@@ -255,6 +256,11 @@ export async function GET(request: Request) {
       digest: toDigest(settings, user.email),
       onboarding: toOnboarding(settings),
       crmViews: toCrmViews(settings),
+      access: {
+        role: user.role,
+        accessProfile: user.accessProfile,
+        modules: buildModuleAccessForUser(user),
+      },
     })
   } catch (error) {
     console.error("User settings fetch failed", error)

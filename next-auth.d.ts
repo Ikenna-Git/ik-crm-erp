@@ -1,4 +1,5 @@
 import "next-auth"
+import type { AccessProfile, ModuleAccessInput } from "@/lib/access-control"
 
 declare module "next-auth" {
   interface Session {
@@ -6,6 +7,8 @@ declare module "next-auth" {
       id?: string
       role?: string
       orgId?: string
+      accessProfile?: AccessProfile
+      moduleAccess?: ModuleAccessInput
       twoFactorEnabled?: boolean
       name?: string | null
       email?: string | null
@@ -16,6 +19,8 @@ declare module "next-auth" {
   interface User {
     role?: string
     orgId?: string
+    accessProfile?: AccessProfile
+    moduleAccess?: ModuleAccessInput
     twoFactorEnabled?: boolean
   }
 }

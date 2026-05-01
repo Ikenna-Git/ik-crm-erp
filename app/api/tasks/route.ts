@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest, isRequestUserError } from "@/lib/request-user"
+import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable tasks." }, { status: 503 })
@@ -14,22 +14,18 @@ const toTaskStatus = (value?: string | null): "OPEN" | "DONE" | null => {
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org } = await requireModuleAccess(request, "projects", "view")
     const tasks = await prisma.task.findMany({ where: { orgId: org.id }, orderBy: { createdAt: "desc" } })
     return NextResponse.json({ tasks })
   } catch (error) {
-    if (isRequestUserError(error)) {
-      return NextResponse.json({ error: error.message }, { status: error.status })
-    }
-    console.error("Tasks fetch failed", error)
-    return NextResponse.json({ error: "Failed to load tasks" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load tasks")
   }
 }
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "projects", "manage")
     const body = await request.json()
     const { title, dueDate, ownerId, relatedType, relatedId } = body || {}
     if (!title) return NextResponse.json({ error: "Title required" }, { status: 400 })
@@ -54,18 +50,14 @@ export async function POST(request: Request) {
     })
     return NextResponse.json({ task })
   } catch (error) {
-    if (isRequestUserError(error)) {
-      return NextResponse.json({ error: error.message }, { status: error.status })
-    }
-    console.error("Task create failed", error)
-    return NextResponse.json({ error: "Failed to create task" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to create task")
   }
 }
 
 export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org } = await requireModuleAccess(request, "projects", "manage")
     const body = await request.json()
     const { id, status } = body || {}
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 })
@@ -80,10 +72,6 @@ export async function PATCH(request: Request) {
     })
     return NextResponse.json({ task })
   } catch (error) {
-    if (isRequestUserError(error)) {
-      return NextResponse.json({ error: error.message }, { status: error.status })
-    }
-    console.error("Task update failed", error)
-    return NextResponse.json({ error: "Failed to update task" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to update task")
   }
 }

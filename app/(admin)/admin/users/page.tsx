@@ -10,6 +10,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  ACCESS_PROFILE_DESCRIPTIONS,
+  ACCESS_PROFILE_LABELS,
+  ACCESS_PROFILES,
+  type AccessProfile,
+} from "@/lib/access-control"
 import { FOUNDER_SUPER_ADMIN_EMAIL } from "@/lib/authz"
 
 type AssignableRole = "USER" | "ADMIN" | "ORG_OWNER"
@@ -19,6 +25,8 @@ type AdminUser = {
   name: string
   email: string
   role: "USER" | "ADMIN" | "ORG_OWNER" | "SUPER_ADMIN"
+  accessProfile: AccessProfile
+  accessSummary: string[]
   title?: string | null
   twoFactorEnabled?: boolean
   invitePending?: boolean
@@ -28,6 +36,7 @@ type AdminUser = {
 type UsersResponse = {
   users: AdminUser[]
   assignableRoles: AssignableRole[]
+  accessProfiles: AccessProfile[]
 }
 
 type InvitePayload = {
@@ -44,7 +53,13 @@ export default function AdminUsersPage() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [lastInvite, setLastInvite] = useState<InvitePayload | null>(null)
-  const [form, setForm] = useState({ name: "", email: "", title: "", role: "USER" as AssignableRole })
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    title: "",
+    role: "USER" as AssignableRole,
+    accessProfile: "GENERAL" as AccessProfile,
+  })
 
   const founderEmail = useMemo(() => FOUNDER_SUPER_ADMIN_EMAIL, [])
 
@@ -59,6 +74,7 @@ export default function AdminUsersPage() {
       setForm((current) => ({
         ...current,
         role: payload.assignableRoles?.includes(current.role) ? current.role : payload.assignableRoles?.[0] || "USER",
+        accessProfile: payload.accessProfiles?.includes(current.accessProfile) ? current.accessProfile : "GENERAL",
       }))
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load users")
@@ -93,7 +109,13 @@ export default function AdminUsersPage() {
             }
           : null,
       )
-      setForm({ name: "", email: "", title: "", role: data?.assignableRoles?.[0] || "USER" })
+      setForm({
+        name: "",
+        email: "",
+        title: "",
+        role: data?.assignableRoles?.[0] || "USER",
+        accessProfile: "GENERAL",
+      })
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to invite user")
@@ -115,6 +137,7 @@ export default function AdminUsersPage() {
           email: member.email,
           title: member.title || "",
           role: member.role === "SUPER_ADMIN" ? "ADMIN" : member.role,
+          accessProfile: member.accessProfile,
         }),
       })
       const payload = await response.json().catch(() => ({}))
@@ -166,6 +189,29 @@ export default function AdminUsersPage() {
       )
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update role")
+    }
+  }
+
+  const handleAccessProfileChange = async (userId: string, accessProfile: AccessProfile) => {
+    try {
+      setError("")
+      const response = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: userId, accessProfile }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload?.error || "Failed to update access profile")
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              users: current.users.map((item) => (item.id === userId ? payload.user : item)),
+            }
+          : current,
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update access profile")
     }
   }
 
@@ -228,7 +274,17 @@ export default function AdminUsersPage() {
             </div>
             <div className="space-y-2">
               <Label>Role</Label>
-              <Select value={form.role} onValueChange={(value: AssignableRole) => setForm((current) => ({ ...current, role: value }))}>
+              <Select
+                value={form.role}
+                onValueChange={(value: AssignableRole) =>
+                  setForm((current) => ({
+                    ...current,
+                    role: value,
+                    accessProfile:
+                      value === "ORG_OWNER" ? "EXECUTIVE" : value === "ADMIN" ? "ADMINISTRATION" : current.accessProfile,
+                  }))
+                }
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -240,6 +296,25 @@ export default function AdminUsersPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label>Access profile</Label>
+              <Select
+                value={form.accessProfile}
+                onValueChange={(value: AccessProfile) => setForm((current) => ({ ...current, accessProfile: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(data?.accessProfiles || ACCESS_PROFILES).map((profile) => (
+                    <SelectItem key={profile} value={profile}>
+                      {ACCESS_PROFILE_LABELS[profile]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-400">{ACCESS_PROFILE_DESCRIPTIONS[form.accessProfile]}</p>
             </div>
           </div>
 
@@ -296,6 +371,7 @@ export default function AdminUsersPage() {
                 <TableRow className="border-white/10 hover:bg-transparent">
                   <TableHead className="text-slate-300">User</TableHead>
                   <TableHead className="text-slate-300">Role</TableHead>
+                  <TableHead className="text-slate-300">Access</TableHead>
                   <TableHead className="text-slate-300">Status</TableHead>
                   <TableHead className="text-slate-300">2FA</TableHead>
                   <TableHead className="text-slate-300">Created</TableHead>
@@ -307,6 +383,7 @@ export default function AdminUsersPage() {
                   const isFounder = member.email.toLowerCase() === founderEmail
                   const isSelf = member.email.toLowerCase() === session?.user?.email?.toLowerCase()
                   const canEditMemberRole = !isFounder && member.role !== "SUPER_ADMIN" && data?.assignableRoles.includes(member.role as AssignableRole)
+                  const canEditAccessProfile = canEditMemberRole
                   return (
                     <TableRow key={member.id} className="border-white/10 hover:bg-white/5">
                       <TableCell>
@@ -337,6 +414,39 @@ export default function AdminUsersPage() {
                               ))}
                             </SelectContent>
                           </Select>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {canEditAccessProfile ? (
+                          <div className="space-y-2">
+                            <Select
+                              value={member.accessProfile}
+                              onValueChange={(value: AccessProfile) => handleAccessProfileChange(member.id, value)}
+                            >
+                              <SelectTrigger className="w-44 border-white/10 bg-slate-950/50">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {(data?.accessProfiles || ACCESS_PROFILES).map((profile) => (
+                                  <SelectItem key={profile} value={profile}>
+                                    {ACCESS_PROFILE_LABELS[profile]}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="max-w-xs text-xs text-slate-400">
+                              {member.accessSummary.length ? member.accessSummary.join(", ") : "No workspace modules assigned yet."}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <Badge className="bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15">
+                              {member.role === "SUPER_ADMIN" ? "Founder access" : ACCESS_PROFILE_LABELS[member.accessProfile]}
+                            </Badge>
+                            <p className="max-w-xs text-xs text-slate-400">
+                              {member.accessSummary.length ? member.accessSummary.join(", ") : "Full privileged access."}
+                            </p>
+                          </div>
                         )}
                       </TableCell>
                       <TableCell>

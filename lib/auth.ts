@@ -7,6 +7,7 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import speakeasy from "speakeasy"
 import { prisma, withPrismaRetry } from "@/lib/prisma"
 import { FOUNDER_SUPER_ADMIN_EMAIL } from "@/lib/authz"
+import { buildModuleAccessForUser, getDefaultAccessProfileForRole } from "@/lib/access-control"
 import { completeCredentialsSignup } from "@/lib/credentials-signup"
 import { getDefaultOrg } from "@/lib/defaultOrg"
 import { verifyPassword } from "@/lib/password"
@@ -21,6 +22,8 @@ const buildLocalUser = (email: string, name: string, role: string) =>
     name,
     email,
     role,
+    accessProfile: getDefaultAccessProfileForRole(role),
+    moduleAccess: buildModuleAccessForUser({ role, accessProfile: getDefaultAccessProfileForRole(role) }),
     twoFactorEnabled: false,
   }) as any
 
@@ -83,6 +86,8 @@ const buildProviders = () => {
                 name: true,
                 email: true,
                 role: true,
+                accessProfile: true,
+                moduleAccess: true,
                 passwordHash: true,
                 twoFactorEnabled: true,
                 twoFactorSecret: true,
@@ -124,13 +129,15 @@ const buildProviders = () => {
             }
           }
 
-          return {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-            twoFactorEnabled: user.twoFactorEnabled,
-          } as any
+            return {
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              role: user.role,
+              accessProfile: user.accessProfile,
+              moduleAccess: user.moduleAccess,
+              twoFactorEnabled: user.twoFactorEnabled,
+            } as any
         } catch (error) {
           console.error("Credentials authorize failed", error)
 
@@ -167,6 +174,11 @@ const buildAdapter = (): Adapter | undefined => {
           image: data.image,
           emailVerified: data.emailVerified ?? null,
           role: email === FOUNDER_SUPER_ADMIN_EMAIL ? "SUPER_ADMIN" : "USER",
+          accessProfile: getDefaultAccessProfileForRole(email === FOUNDER_SUPER_ADMIN_EMAIL ? "SUPER_ADMIN" : "USER"),
+          moduleAccess: buildModuleAccessForUser({
+            role: email === FOUNDER_SUPER_ADMIN_EMAIL ? "SUPER_ADMIN" : "USER",
+            accessProfile: getDefaultAccessProfileForRole(email === FOUNDER_SUPER_ADMIN_EMAIL ? "SUPER_ADMIN" : "USER"),
+          }),
         },
       })
 
@@ -182,6 +194,15 @@ const buildAdapter = (): Adapter | undefined => {
           image: data.image,
           emailVerified: data.emailVerified ?? undefined,
           role: email === FOUNDER_SUPER_ADMIN_EMAIL ? "SUPER_ADMIN" : undefined,
+          accessProfile:
+            email === FOUNDER_SUPER_ADMIN_EMAIL ? getDefaultAccessProfileForRole("SUPER_ADMIN") : undefined,
+          moduleAccess:
+            email === FOUNDER_SUPER_ADMIN_EMAIL
+              ? buildModuleAccessForUser({
+                  role: "SUPER_ADMIN",
+                  accessProfile: getDefaultAccessProfileForRole("SUPER_ADMIN"),
+                })
+              : undefined,
         },
       })
 
@@ -205,12 +226,25 @@ export const authOptions: AuthOptions = {
           id?: string
           role?: string
           orgId?: string
+          accessProfile?: string
+          moduleAccess?: Record<string, string>
           twoFactorEnabled?: boolean
         }
-        const authUser = user as { id?: string; role?: string; orgId?: string; twoFactorEnabled?: boolean } | undefined
+        const authUser = user as
+          | {
+              id?: string
+              role?: string
+              orgId?: string
+              accessProfile?: string
+              moduleAccess?: Record<string, string>
+              twoFactorEnabled?: boolean
+            }
+          | undefined
         sessionUser.id = authUser?.id || token.sub
         sessionUser.role = authUser?.role || (token as any)?.role
         sessionUser.orgId = authUser?.orgId || (token as any)?.orgId
+        sessionUser.accessProfile = authUser?.accessProfile || (token as any)?.accessProfile
+        sessionUser.moduleAccess = authUser?.moduleAccess || (token as any)?.moduleAccess
         sessionUser.twoFactorEnabled = authUser?.twoFactorEnabled || (token as any)?.twoFactorEnabled
       }
       return session
@@ -219,19 +253,23 @@ export const authOptions: AuthOptions = {
       if (user) {
         ;(token as any).role = (user as any).role
         ;(token as any).orgId = (user as any).orgId
+        ;(token as any).accessProfile = (user as any).accessProfile
+        ;(token as any).moduleAccess = (user as any).moduleAccess
         ;(token as any).twoFactorEnabled = (user as any).twoFactorEnabled
       } else if (token.email && useAdapter) {
         try {
           const currentUser = await withPrismaRetry("auth.jwt.refreshUser", () =>
             prisma.user.findUnique({
               where: { email: token.email as string },
-              select: { role: true, orgId: true, twoFactorEnabled: true },
+              select: { role: true, orgId: true, accessProfile: true, moduleAccess: true, twoFactorEnabled: true },
             }),
           )
 
           if (currentUser) {
             ;(token as any).role = currentUser.role
             ;(token as any).orgId = currentUser.orgId
+            ;(token as any).accessProfile = currentUser.accessProfile
+            ;(token as any).moduleAccess = currentUser.moduleAccess
             ;(token as any).twoFactorEnabled = currentUser.twoFactorEnabled
           }
         } catch (error) {

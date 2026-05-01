@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
+import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
 
 const dbUnavailable = () =>
@@ -9,22 +9,21 @@ const dbUnavailable = () =>
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org } = await requireModuleAccess(request, "playbooks", "view")
     const runs = await prisma.playbookRun.findMany({
       where: { orgId: org.id },
       orderBy: { updatedAt: "desc" },
     })
     return NextResponse.json({ runs })
   } catch (error) {
-    console.error("Playbook runs fetch failed", error)
-    return NextResponse.json({ error: "Failed to load playbooks" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load playbooks")
   }
 }
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "playbooks", "manage")
     const body = await request.json()
     const { templateId, name, category, notes } = body || {}
     if (!templateId || !name || !category) {
@@ -55,15 +54,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ run })
   } catch (error) {
-    console.error("Playbook create failed", error)
-    return NextResponse.json({ error: "Failed to launch playbook" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to launch playbook")
   }
 }
 
 export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "playbooks", "manage")
     const body = await request.json()
     const { id, status, progress, notes } = body || {}
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
@@ -92,7 +90,6 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ run })
   } catch (error) {
-    console.error("Playbook update failed", error)
-    return NextResponse.json({ error: "Failed to update playbook" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to update playbook")
   }
 }

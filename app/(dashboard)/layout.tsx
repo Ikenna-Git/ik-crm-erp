@@ -3,13 +3,14 @@
 import type React from "react"
 
 import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { OfflineBanner } from "@/components/offline-banner"
 import { GuidedOnboarding } from "@/components/guided-onboarding"
 import { AiAssistPopover } from "@/components/ai-assist-popover"
+import { getDashboardModuleFromPath, getFirstAccessibleDashboardPath, hasModuleAccess } from "@/lib/access-control"
 import { userUpdatedEventName } from "@/lib/user-settings"
 
 export default function DashboardLayout({
@@ -18,6 +19,7 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const router = useRouter()
+  const pathname = usePathname()
   const { data: session, status } = useSession()
   const isAuthenticated = status === "authenticated"
   const loading = status === "loading"
@@ -29,11 +31,21 @@ export default function DashboardLayout({
   }, [router, status])
 
   useEffect(() => {
+    if (status !== "authenticated" || !session?.user || !pathname) return
+    const module = getDashboardModuleFromPath(pathname)
+    if (!module) return
+    if (hasModuleAccess(session.user, module, "view")) return
+    router.replace(getFirstAccessibleDashboardPath(session.user))
+  }, [pathname, router, session, status])
+
+  useEffect(() => {
     if (!session?.user) return
     const payload = {
       name: session.user.name || "",
       email: session.user.email || "",
       role: session.user.role || "user",
+      accessProfile: session.user.accessProfile || "GENERAL",
+      moduleAccess: session.user.moduleAccess || null,
     }
     localStorage.setItem("user", JSON.stringify(payload))
     window.dispatchEvent(new CustomEvent(userUpdatedEventName, { detail: payload }))

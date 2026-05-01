@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
+import { requireModuleAccess, handleAccessRouteError } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
 
 const dbUnavailable = () =>
@@ -9,22 +9,21 @@ const dbUnavailable = () =>
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org } = await requireModuleAccess(request, "crm", "view")
     const companies = await prisma.company.findMany({
       where: { orgId: org.id },
       orderBy: { updatedAt: "desc" },
     })
     return NextResponse.json({ companies })
   } catch (error) {
-    console.error("CRM companies fetch failed", error)
-    return NextResponse.json({ error: "Failed to load companies" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load companies")
   }
 }
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "crm", "manage")
     const body = await request.json()
     const { name, industry, size, ownerId, customFields } = body || {}
     if (!name) {
@@ -51,15 +50,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ company })
   } catch (error) {
-    console.error("CRM company create failed", error)
-    return NextResponse.json({ error: "Failed to create company" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to create company")
   }
 }
 
 export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "crm", "manage")
     const body = await request.json()
     const { id, name, industry, size, ownerId, customFields } = body || {}
     if (!id) {
@@ -86,15 +84,14 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ company })
   } catch (error) {
-    console.error("CRM company update failed", error)
-    return NextResponse.json({ error: "Failed to update company" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to update company")
   }
 }
 
 export async function DELETE(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "crm", "manage")
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) {
@@ -111,7 +108,6 @@ export async function DELETE(request: Request) {
     })
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error("CRM company delete failed", error)
-    return NextResponse.json({ error: "Failed to delete company" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to delete company")
   }
 }

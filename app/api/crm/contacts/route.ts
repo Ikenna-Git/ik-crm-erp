@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
+import { requireModuleAccess, handleAccessRouteError } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
 import { contactSnapshot, createDecisionTrail } from "@/lib/decision-trails"
 
@@ -10,7 +10,7 @@ const dbUnavailable = () =>
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org } = await requireModuleAccess(request, "crm", "view")
     const contacts = await prisma.contact.findMany({
       where: { orgId: org.id },
       include: { company: true },
@@ -18,15 +18,14 @@ export async function GET(request: Request) {
     })
     return NextResponse.json({ contacts })
   } catch (error) {
-    console.error("CRM contacts fetch failed", error)
-    return NextResponse.json({ error: "Failed to load contacts" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load contacts")
   }
 }
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "crm", "manage")
     const body = await request.json()
     const { name, email, phone, company, status, revenue, lastContact, tags, ownerId, notes, customFields } = body || {}
     if (!name || !email) {
@@ -71,15 +70,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ contact })
   } catch (error) {
-    console.error("CRM contact create failed", error)
-    return NextResponse.json({ error: "Failed to create contact" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to create contact")
   }
 }
 
 export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "crm", "manage")
     const body = await request.json()
     const { id, name, email, phone, company, status, revenue, lastContact, tags, ownerId, notes, customFields } = body || {}
 
@@ -140,15 +138,14 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ contact })
   } catch (error) {
-    console.error("CRM contact update failed", error)
-    return NextResponse.json({ error: "Failed to update contact" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to update contact")
   }
 }
 
 export async function DELETE(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "crm", "manage")
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) {
@@ -165,7 +162,6 @@ export async function DELETE(request: Request) {
     })
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error("CRM contact delete failed", error)
-    return NextResponse.json({ error: "Failed to delete contact" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to delete contact")
   }
 }

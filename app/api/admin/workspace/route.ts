@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
 import { getUserFromRequest } from "@/lib/request-user"
-import { canManageWorkspaceSettings, isAdmin } from "@/lib/authz"
+import { canManageWorkspaceSettings, isAdmin, isSuperAdmin } from "@/lib/authz"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable workspace settings." }, { status: 503 })
@@ -28,6 +28,11 @@ export async function GET(request: Request) {
         userCount,
         adminCount,
         crmFieldCount,
+      },
+      permissions: {
+        canManageWorkspace: canManageWorkspaceSettings(user.role),
+        canManageBilling: canManageWorkspaceSettings(user.role),
+        isPlatformSuperAdmin: isSuperAdmin(user.role),
       },
     })
   } catch (error) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
+import { requireModuleAccess, handleAccessRouteError } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
 import { createDecisionTrail, dealSnapshot } from "@/lib/decision-trails"
 
@@ -10,7 +10,7 @@ const dbUnavailable = () =>
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org } = await requireModuleAccess(request, "crm", "view")
     const deals = await prisma.deal.findMany({
       where: { orgId: org.id },
       include: { company: true },
@@ -18,15 +18,14 @@ export async function GET(request: Request) {
     })
     return NextResponse.json({ deals })
   } catch (error) {
-    console.error("CRM deals fetch failed", error)
-    return NextResponse.json({ error: "Failed to load deals" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load deals")
   }
 }
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "crm", "manage")
     const body = await request.json()
     const { title, value, stage, company, companyId, contactId, ownerId, expectedClose, customFields } = body || {}
     if (!title || typeof value !== "number") {
@@ -70,15 +69,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ deal })
   } catch (error) {
-    console.error("CRM deal create failed", error)
-    return NextResponse.json({ error: "Failed to create deal" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to create deal")
   }
 }
 
 export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "crm", "manage")
     const body = await request.json()
     const { id, title, value, stage, company, companyId, contactId, ownerId, expectedClose, customFields } = body || {}
     if (!id) {
@@ -135,15 +133,14 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ deal: updated })
   } catch (error) {
-    console.error("CRM deal update failed", error)
-    return NextResponse.json({ error: "Failed to update deal" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to update deal")
   }
 }
 
 export async function DELETE(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "crm", "manage")
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) {
@@ -160,7 +157,6 @@ export async function DELETE(request: Request) {
     })
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error("CRM deal delete failed", error)
-    return NextResponse.json({ error: "Failed to delete deal" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to delete deal")
   }
 }

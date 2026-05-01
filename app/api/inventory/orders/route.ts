@@ -1,24 +1,16 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
-import { getUserFromRequest, isRequestUserError } from "@/lib/request-user"
+import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { seedInventoryData } from "@/lib/module-seeds"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable purchase orders." }, { status: 503 })
 
-const handleError = (error: unknown, fallback: string) => {
-  console.error(fallback, error)
-  if (isRequestUserError(error)) {
-    return NextResponse.json({ error: error.message }, { status: error.status })
-  }
-  return NextResponse.json({ error: fallback }, { status: 500 })
-}
-
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org } = await requireModuleAccess(request, "inventory", "view")
     await seedInventoryData(org.id)
     const orders = await prisma.purchaseOrder.findMany({
       where: { orgId: org.id },
@@ -26,14 +18,14 @@ export async function GET(request: Request) {
     })
     return NextResponse.json({ orders })
   } catch (error) {
-    return handleError(error, "Failed to load purchase orders")
+    return handleAccessRouteError(error, "Failed to load purchase orders")
   }
 }
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "inventory", "manage")
     const body = await request.json()
     const items = Array.isArray(body) ? body : [body]
     if (!items.length) {
@@ -77,14 +69,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ orders: created })
   } catch (error) {
-    return handleError(error, "Failed to save purchase orders")
+    return handleAccessRouteError(error, "Failed to save purchase orders")
   }
 }
 
 export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "inventory", "manage")
     const body = await request.json()
     const { id, orderNo, supplier, items, totalValue, orderDate, expectedDelivery, status } = body || {}
     if (!id) {
@@ -122,14 +114,14 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ order })
   } catch (error) {
-    return handleError(error, "Failed to update purchase order")
+    return handleAccessRouteError(error, "Failed to update purchase order")
   }
 }
 
 export async function DELETE(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "inventory", "manage")
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) {
@@ -155,6 +147,6 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    return handleError(error, "Failed to delete purchase order")
+    return handleAccessRouteError(error, "Failed to delete purchase order")
   }
 }

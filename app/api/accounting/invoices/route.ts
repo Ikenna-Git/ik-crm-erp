@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
+import { requireModuleAccess, handleAccessRouteError } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
 import { createDecisionTrail, invoiceSnapshot } from "@/lib/decision-trails"
 
@@ -10,22 +10,21 @@ const dbUnavailable = () =>
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org } = await requireModuleAccess(request, "accounting", "view")
     const invoices = await prisma.invoice.findMany({
       where: { orgId: org.id },
       orderBy: { updatedAt: "desc" },
     })
     return NextResponse.json({ invoices })
   } catch (error) {
-    console.error("Accounting invoices fetch failed", error)
-    return NextResponse.json({ error: "Failed to load invoices" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load invoices")
   }
 }
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "accounting", "manage")
     const body = await request.json()
     const { invoiceNumber, clientName, amount, status, dueDate, issueDate } = body || {}
     if (!invoiceNumber || !clientName || typeof amount !== "number") {
@@ -55,15 +54,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ invoice })
   } catch (error) {
-    console.error("Accounting invoice create failed", error)
-    return NextResponse.json({ error: "Failed to create invoice" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to create invoice")
   }
 }
 
 export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "accounting", "manage")
     const body = await request.json()
     const { id, invoiceNumber, clientName, amount, status, dueDate, issueDate } = body || {}
     if (!id) {
@@ -106,15 +104,14 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ invoice })
   } catch (error) {
-    console.error("Accounting invoice update failed", error)
-    return NextResponse.json({ error: "Failed to update invoice" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to update invoice")
   }
 }
 
 export async function DELETE(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "accounting", "manage")
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) {
@@ -131,7 +128,6 @@ export async function DELETE(request: Request) {
     })
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error("Accounting invoice delete failed", error)
-    return NextResponse.json({ error: "Failed to delete invoice" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to delete invoice")
   }
 }

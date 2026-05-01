@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getUserFromRequest, isRequestUserError } from "@/lib/request-user"
+import { hasModuleAccess } from "@/lib/access-control"
 
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) {
@@ -10,14 +11,20 @@ export async function GET(request: Request) {
     )
   }
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org, user } = await getUserFromRequest(request)
     const [contacts, companies, deals, tasks, invoices, expenses] = await Promise.all([
-      prisma.contact.findMany({ where: { orgId: org.id } }),
-      prisma.company.findMany({ where: { orgId: org.id } }),
-      prisma.deal.findMany({ where: { orgId: org.id } }),
-      prisma.task.findMany({ where: { orgId: org.id } }),
-      prisma.invoice.findMany({ where: { orgId: org.id } }),
-      prisma.expense.findMany({ where: { orgId: org.id } }),
+      hasModuleAccess(user, "crm", "view") ? prisma.contact.findMany({ where: { orgId: org.id } }) : Promise.resolve([]),
+      hasModuleAccess(user, "crm", "view") ? prisma.company.findMany({ where: { orgId: org.id } }) : Promise.resolve([]),
+      hasModuleAccess(user, "crm", "view") ? prisma.deal.findMany({ where: { orgId: org.id } }) : Promise.resolve([]),
+      hasModuleAccess(user, "projects", "view")
+        ? prisma.task.findMany({ where: { orgId: org.id } })
+        : Promise.resolve([]),
+      hasModuleAccess(user, "accounting", "view")
+        ? prisma.invoice.findMany({ where: { orgId: org.id } })
+        : Promise.resolve([]),
+      hasModuleAccess(user, "accounting", "view")
+        ? prisma.expense.findMany({ where: { orgId: org.id } })
+        : Promise.resolve([]),
     ])
     return NextResponse.json({ org, contacts, companies, deals, tasks, invoices, expenses })
   } catch (error) {

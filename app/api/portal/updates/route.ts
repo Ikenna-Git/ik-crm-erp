@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
+import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
 
 const dbUnavailable = () =>
@@ -9,7 +9,7 @@ const dbUnavailable = () =>
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org } = await requireModuleAccess(request, "portal", "view")
     const { searchParams } = new URL(request.url)
     const portalId = searchParams.get("portalId")
     if (!portalId) return NextResponse.json({ error: "portalId is required" }, { status: 400 })
@@ -21,15 +21,14 @@ export async function GET(request: Request) {
     })
     return NextResponse.json({ updates })
   } catch (error) {
-    console.error("Portal updates fetch failed", error)
-    return NextResponse.json({ error: "Failed to load portal updates" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load portal updates")
   }
 }
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "portal", "manage")
     const body = await request.json()
     const { portalId, title, message, status } = body || {}
     if (!portalId || !title) {
@@ -70,7 +69,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ update })
   } catch (error) {
-    console.error("Portal update create failed", error)
-    return NextResponse.json({ error: "Failed to create portal update" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to create portal update")
   }
 }

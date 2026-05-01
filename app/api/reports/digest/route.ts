@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import nodemailer from "nodemailer"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
+import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { buildAccountingSummary, buildCrmSummary } from "@/lib/report-builders"
 import { formatNaira } from "@/lib/currency"
 import { createAuditLog } from "@/lib/audit"
@@ -114,7 +114,7 @@ const formatDigestEmail = (payload: Awaited<ReturnType<typeof buildDigestPayload
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "analytics", "view")
     const body = await request.json().catch(() => ({}))
     const { email, sendNow } = body || {}
 
@@ -176,7 +176,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, message: `Digest sent to ${targetEmail}` })
   } catch (error) {
-    console.error("Digest send failed", error)
-    return NextResponse.json({ error: "Failed to send digest" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to send digest")
   }
 }

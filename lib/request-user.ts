@@ -1,6 +1,7 @@
 import { Role } from "@prisma/client"
 import { getServerSession } from "next-auth"
 import { prisma, withPrismaRetry } from "@/lib/prisma"
+import { buildModuleAccessForUser, getDefaultAccessProfileForRole } from "@/lib/access-control"
 import { getDefaultOrg } from "@/lib/defaultOrg"
 import { authOptions } from "@/lib/auth"
 import { FOUNDER_SUPER_ADMIN_EMAIL } from "@/lib/authz"
@@ -90,14 +91,25 @@ export const getUserFromRequest = async (request: Request) => {
 
   if (existingUser) {
     const nextRole = identity.email === FOUNDER_SUPER_ADMIN_EMAIL ? "SUPER_ADMIN" : existingUser.role
+    const nextAccessProfile = existingUser.accessProfile || getDefaultAccessProfileForRole(nextRole)
+    const nextModuleAccess = buildModuleAccessForUser({
+      role: nextRole,
+      accessProfile: nextAccessProfile,
+      moduleAccess: existingUser.moduleAccess,
+    })
     const user =
-      existingUser.name !== identity.name || existingUser.role !== nextRole
+      existingUser.name !== identity.name ||
+      existingUser.role !== nextRole ||
+      existingUser.accessProfile !== nextAccessProfile ||
+      !existingUser.moduleAccess
         ? await withPrismaRetry("getUserFromRequest.updateUser", () =>
             prisma.user.update({
               where: { id: existingUser.id },
               data: {
                 name: identity.name,
                 role: nextRole,
+                accessProfile: nextAccessProfile,
+                moduleAccess: nextModuleAccess,
               },
               include: {
                 org: true,
@@ -116,6 +128,11 @@ export const getUserFromRequest = async (request: Request) => {
         email: identity.email,
         name: identity.name,
         role: identity.role,
+        accessProfile: getDefaultAccessProfileForRole(identity.role),
+        moduleAccess: buildModuleAccessForUser({
+          role: identity.role,
+          accessProfile: getDefaultAccessProfileForRole(identity.role),
+        }),
         orgId: org.id,
       },
       include: {

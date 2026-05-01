@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useSession } from "next-auth/react"
 import { ArrowRight, Building2, Palette, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,9 +23,15 @@ type WorkspaceResponse = {
     adminCount: number
     crmFieldCount: number
   }
+  permissions: {
+    canManageWorkspace: boolean
+    canManageBilling: boolean
+    isPlatformSuperAdmin: boolean
+  }
 }
 
 export default function AdminWorkspacePage() {
+  const { data: session } = useSession()
   const [data, setData] = useState<WorkspaceResponse | null>(null)
   const [form, setForm] = useState({ name: "", theme: "light", notifyEmail: "" })
   const [loading, setLoading] = useState(true)
@@ -57,6 +64,7 @@ export default function AdminWorkspacePage() {
   }, [])
 
   const handleSave = async () => {
+    if (!data?.permissions?.canManageWorkspace) return
     try {
       setSaving(true)
       setError("")
@@ -87,14 +95,19 @@ export default function AdminWorkspacePage() {
         <CardHeader>
           <CardTitle>Workspace profile</CardTitle>
           <CardDescription className="text-slate-400">
-            Control the visible identity and notification routing for this workspace.
+            Control the visible identity and notification routing for this workspace. Owners change workspace controls.
+            Admins can inspect them without crossing the ownership boundary.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="grid gap-4">
             <div className="space-y-2">
               <Label>Workspace name</Label>
-              <Input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
+              <Input
+                value={form.name}
+                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                disabled={!data?.permissions?.canManageWorkspace}
+              />
             </div>
             <div className="space-y-2">
               <Label>Notify email</Label>
@@ -102,11 +115,16 @@ export default function AdminWorkspacePage() {
                 value={form.notifyEmail}
                 onChange={(event) => setForm((current) => ({ ...current, notifyEmail: event.target.value }))}
                 placeholder="ops@company.com"
+                disabled={!data?.permissions?.canManageWorkspace}
               />
             </div>
             <div className="space-y-2">
               <Label>Theme mode</Label>
-              <Select value={form.theme} onValueChange={(value) => setForm((current) => ({ ...current, theme: value }))}>
+              <Select
+                value={form.theme}
+                onValueChange={(value) => setForm((current) => ({ ...current, theme: value }))}
+                disabled={!data?.permissions?.canManageWorkspace}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -117,9 +135,16 @@ export default function AdminWorkspacePage() {
                 </SelectContent>
               </Select>
             </div>
-            <Button className="w-fit" onClick={handleSave} disabled={saving}>
-              {saving ? "Saving..." : "Save workspace"}
+            <Button className="w-fit" onClick={handleSave} disabled={saving || !data?.permissions?.canManageWorkspace}>
+              {saving ? "Saving..." : data?.permissions?.canManageWorkspace ? "Save workspace" : "Owner access required"}
             </Button>
+            {!data?.permissions?.canManageWorkspace ? (
+              <p className="text-xs text-amber-300">
+                {session?.user?.role === "ADMIN"
+                  ? "Workspace admins can manage people and permissions, but only organization owners can change workspace settings."
+                  : "This workspace is view-only from your current access level."}
+              </p>
+            ) : null}
             {error ? <p className="text-sm text-rose-300">{error}</p> : null}
             {success ? <p className="text-sm text-emerald-300">{success}</p> : null}
           </div>
@@ -142,8 +167,8 @@ export default function AdminWorkspacePage() {
                 <p className="font-medium">Governance guardrail</p>
               </div>
               <p className="text-sm text-slate-300">
-                Workspace admins manage team operations here. Platform-level org creation and founder controls stay in
-                the super-admin system page.
+                Org owners control workspace identity and billing decisions. Workspace admins manage people access. Platform org
+                creation and founder controls stay in the super-admin system page.
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
@@ -153,7 +178,7 @@ export default function AdminWorkspacePage() {
               </div>
               <Button variant="outline" className="w-full justify-between border-white/10 bg-transparent text-slate-100" asChild>
                 <Link href="/admin/users">
-                  Open team and roles
+                  Open team, roles, and job access
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>

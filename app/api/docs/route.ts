@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
+import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
 
 const dbUnavailable = () =>
@@ -9,22 +9,21 @@ const dbUnavailable = () =>
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org } = await requireModuleAccess(request, "docs", "view")
     const docs = await prisma.doc.findMany({
       where: { orgId: org.id },
       orderBy: { updatedAt: "desc" },
     })
     return NextResponse.json({ docs })
   } catch (error) {
-    console.error("Docs fetch failed", error)
-    return NextResponse.json({ error: "Failed to load docs" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load docs")
   }
 }
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "docs", "manage")
     const body = await request.json()
     const { title, content, category, mediaUrl } = body || {}
     if (!title) {
@@ -50,15 +49,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ doc })
   } catch (error) {
-    console.error("Docs create failed", error)
-    return NextResponse.json({ error: "Failed to create doc" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to create doc")
   }
 }
 
 export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "docs", "manage")
     const body = await request.json()
     const { id, title, content, category, mediaUrl } = body || {}
     if (!id) {
@@ -84,15 +82,14 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ doc })
   } catch (error) {
-    console.error("Docs update failed", error)
-    return NextResponse.json({ error: "Failed to update doc" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to update doc")
   }
 }
 
 export async function DELETE(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "docs", "manage")
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
@@ -107,7 +104,6 @@ export async function DELETE(request: Request) {
     })
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error("Docs delete failed", error)
-    return NextResponse.json({ error: "Failed to delete doc" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to delete doc")
   }
 }

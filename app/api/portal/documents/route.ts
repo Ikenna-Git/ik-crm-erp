@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
+import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
 
 const dbUnavailable = () =>
@@ -9,7 +9,7 @@ const dbUnavailable = () =>
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org } = await requireModuleAccess(request, "portal", "view")
     const { searchParams } = new URL(request.url)
     const portalId = searchParams.get("portalId")
     if (!portalId) return NextResponse.json({ error: "portalId is required" }, { status: 400 })
@@ -21,15 +21,14 @@ export async function GET(request: Request) {
     })
     return NextResponse.json({ documents })
   } catch (error) {
-    console.error("Portal documents fetch failed", error)
-    return NextResponse.json({ error: "Failed to load portal documents" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load portal documents")
   }
 }
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "portal", "manage")
     const body = await request.json()
     const { portalId, title, url, fileType, bytes } = body || {}
     if (!portalId || !title || !url) {
@@ -63,7 +62,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ document })
   } catch (error) {
-    console.error("Portal document create failed", error)
-    return NextResponse.json({ error: "Failed to add portal document" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to add portal document")
   }
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
+import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
 import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
 
@@ -71,7 +71,7 @@ const ensureUniqueKey = async (orgId: string, entity: string, base: string) => {
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org } = await requireModuleAccess(request, "crm", "view")
     const { searchParams } = new URL(request.url)
     const entity = toEntity(searchParams.get("entity"))
     if (!entity) {
@@ -83,8 +83,7 @@ export async function GET(request: Request) {
     })
     return NextResponse.json({ fields })
   } catch (error) {
-    console.error("CRM fields fetch failed", error)
-    return NextResponse.json({ error: "Failed to load CRM fields" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load CRM fields")
   }
 }
 
@@ -98,7 +97,7 @@ export async function POST(request: Request) {
         { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
       )
     }
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "crm", "manage")
     const body = await request.json()
     const entity = toEntity(body?.entity)
     const type = toFieldType(body?.type)
@@ -150,15 +149,14 @@ export async function POST(request: Request) {
     if (mapped) {
       return NextResponse.json({ error: mapped.error }, { status: mapped.status })
     }
-    console.error("CRM field create failed", error)
-    return NextResponse.json({ error: "Failed to create CRM field" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to create CRM field")
   }
 }
 
 export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "crm", "manage")
     const body = await request.json()
     const { id, name, options, required, archived, order } = body || {}
     if (!id) {
@@ -187,15 +185,14 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ field })
   } catch (error) {
-    console.error("CRM field update failed", error)
-    return NextResponse.json({ error: "Failed to update CRM field" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to update CRM field")
   }
 }
 
 export async function DELETE(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "crm", "manage")
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) {
@@ -215,7 +212,6 @@ export async function DELETE(request: Request) {
     })
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error("CRM field delete failed", error)
-    return NextResponse.json({ error: "Failed to remove CRM field" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to remove CRM field")
   }
 }

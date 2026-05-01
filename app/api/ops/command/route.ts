@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
+import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable ops insights." }, { status: 503 })
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
 
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org } = await requireModuleAccess(request, "operations", "view")
     const now = new Date()
     const monthStart = startOfMonth(now)
 
@@ -116,16 +116,6 @@ export async function GET(request: Request) {
       recentActivity,
     })
   } catch (error) {
-    console.error("Ops command center fetch failed", error)
-    const detail = error instanceof Error ? error.message : "Unknown error"
-    return NextResponse.json(
-      {
-        error:
-          process.env.NODE_ENV === "development"
-            ? `Failed to load ops command center: ${detail}`
-            : "Failed to load ops command center",
-      },
-      { status: 503 },
-    )
+    return handleAccessRouteError(error, "Failed to load ops command center")
   }
 }

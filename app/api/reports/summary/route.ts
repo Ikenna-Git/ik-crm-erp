@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { getUserFromRequest } from "@/lib/request-user"
+import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { buildAccountingSummary, buildCrmSummary, buildVatSummary } from "@/lib/report-builders"
 
 const dbUnavailable = () =>
@@ -8,7 +8,7 @@ const dbUnavailable = () =>
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org } = await requireModuleAccess(request, "analytics", "view")
     const { searchParams } = new URL(request.url)
     const type = searchParams.get("type")
 
@@ -29,7 +29,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ error: "Invalid report type" }, { status: 400 })
   } catch (error) {
-    console.error("Report summary fetch failed", error)
-    return NextResponse.json({ error: "Failed to load report summary" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load report summary")
   }
 }

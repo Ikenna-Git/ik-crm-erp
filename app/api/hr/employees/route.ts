@@ -1,24 +1,16 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
-import { getUserFromRequest, isRequestUserError } from "@/lib/request-user"
+import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { seedHrData } from "@/lib/module-seeds"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable HR data." }, { status: 503 })
 
-const handleError = (error: unknown, fallback: string) => {
-  console.error(fallback, error)
-  if (isRequestUserError(error)) {
-    return NextResponse.json({ error: error.message }, { status: error.status })
-  }
-  return NextResponse.json({ error: fallback }, { status: 500 })
-}
-
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org } = await requireModuleAccess(request, "hr", "view")
     await seedHrData(org.id)
     const employees = await prisma.employee.findMany({
       where: { orgId: org.id },
@@ -27,14 +19,14 @@ export async function GET(request: Request) {
     })
     return NextResponse.json({ employees })
   } catch (error) {
-    return handleError(error, "Failed to load employees")
+    return handleAccessRouteError(error, "Failed to load employees")
   }
 }
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "hr", "manage")
     const body = await request.json()
     const { name, email, phone, department, position, startDate, status, salary } = body || {}
 
@@ -81,14 +73,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ employee })
   } catch (error) {
-    return handleError(error, "Failed to create employee")
+    return handleAccessRouteError(error, "Failed to create employee")
   }
 }
 
 export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "hr", "manage")
     const body = await request.json()
     const { id, name, email, phone, department, position, startDate, status, salary } = body || {}
 
@@ -144,14 +136,14 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ employee })
   } catch (error) {
-    return handleError(error, "Failed to update employee")
+    return handleAccessRouteError(error, "Failed to update employee")
   }
 }
 
 export async function DELETE(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "hr", "manage")
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) {
@@ -177,6 +169,6 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    return handleError(error, "Failed to delete employee")
+    return handleAccessRouteError(error, "Failed to delete employee")
   }
 }

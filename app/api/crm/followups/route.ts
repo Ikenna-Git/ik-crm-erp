@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { isTransientPrismaError, prisma } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
+import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
 
 const dbUnavailable = () =>
@@ -213,11 +213,10 @@ export async function GET(request: Request) {
     return dbUnavailable()
   }
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org } = await requireModuleAccess(request, "crm", "view")
     const summary = await buildSummarySafe(org.id)
     return NextResponse.json({ summary })
   } catch (error) {
-    console.error("Follow-up summary fetch failed", error)
     if (isTransientPrismaError(error)) {
       if (isDev) return NextResponse.json({ summary: buildSimulatedSummary(), simulated: true })
       return NextResponse.json(
@@ -225,7 +224,7 @@ export async function GET(request: Request) {
         { status: 503 },
       )
     }
-    return NextResponse.json({ error: "Failed to load follow-up summary" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load follow-up summary")
   }
 }
 
@@ -242,7 +241,7 @@ export async function POST(request: Request) {
     return dbUnavailable()
   }
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "crm", "manage")
     const summary = await buildSummarySafe(org.id)
     const contactItems = summary.inactiveContacts.items
     const dealItems = summary.stalledDeals.items
@@ -355,7 +354,6 @@ export async function POST(request: Request) {
       errors: process.env.NODE_ENV === "development" ? createErrors.slice(0, 5) : undefined,
     })
   } catch (error) {
-    console.error("Follow-up generation failed", error)
     if (isTransientPrismaError(error)) {
       if (isDev) {
         return NextResponse.json({
@@ -370,9 +368,6 @@ export async function POST(request: Request) {
         { status: 503 },
       )
     }
-    const detail = error instanceof Error ? error.message : "Unknown error"
-    const message =
-      process.env.NODE_ENV === "development" ? `Failed to generate follow-ups: ${detail}` : "Failed to generate follow-ups"
-    return NextResponse.json({ error: message }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to generate follow-ups")
   }
 }

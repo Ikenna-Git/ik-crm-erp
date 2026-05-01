@@ -7,10 +7,10 @@ info:
     This spec is intended for Swagger/SwaggerHub documentation and VAPT planning.
 
 servers:
-  - url: http://localhost:3000
-    description: Local development
   - url: https://ik-crm-erp.onrender.com
     description: Production
+  - url: http://localhost:3000
+    description: Local development
 
 tags:
   - name: Auth

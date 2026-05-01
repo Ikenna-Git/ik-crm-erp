@@ -3,6 +3,13 @@ import { Role } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { getUserFromRequest } from "@/lib/request-user"
 import { createAuditLog } from "@/lib/audit"
+import {
+  ACCESS_PROFILES,
+  buildModuleAccessForUser,
+  getDefaultAccessProfileForRole,
+  normalizeAccessProfile,
+  summarizeModuleAccess,
+} from "@/lib/access-control"
 import { canAssignRole, canDeleteUser, getAssignableRoles, isAdmin } from "@/lib/authz"
 import { issueSignupInvite, sendSignupInviteEmail } from "@/lib/invitations"
 import { getPublicOrigin } from "@/lib/public-url"
@@ -15,6 +22,8 @@ const mapAdminUser = (user: {
   name: string
   email: string
   role: Role
+  accessProfile: string
+  moduleAccess?: unknown
   title: string | null
   twoFactorEnabled: boolean
   createdAt: Date
@@ -25,10 +34,12 @@ const mapAdminUser = (user: {
   name: user.name,
   email: user.email,
   role: user.role,
+  accessProfile: user.accessProfile,
   title: user.title,
   twoFactorEnabled: user.twoFactorEnabled,
   createdAt: user.createdAt,
   invitePending: !user.passwordHash && (user._count?.accounts || 0) === 0,
+  accessSummary: summarizeModuleAccess(user),
 })
 
 export async function GET(request: Request) {
@@ -46,6 +57,8 @@ export async function GET(request: Request) {
         name: true,
         email: true,
         role: true,
+        accessProfile: true,
+        moduleAccess: true,
         title: true,
         twoFactorEnabled: true,
         createdAt: true,
@@ -57,7 +70,11 @@ export async function GET(request: Request) {
         },
       },
     })
-    return NextResponse.json({ users: users.map(mapAdminUser), assignableRoles: getAssignableRoles(user.role) })
+    return NextResponse.json({
+      users: users.map(mapAdminUser),
+      assignableRoles: getAssignableRoles(user.role),
+      accessProfiles: ACCESS_PROFILES,
+    })
   } catch (error) {
     console.error("Admin users fetch failed", error)
     return NextResponse.json({ error: "Failed to load users" }, { status: 500 })
@@ -77,6 +94,7 @@ export async function POST(request: Request) {
     const email = String(body?.email || "").trim().toLowerCase()
     const title = String(body?.title || "").trim()
     const normalized = String(body?.role || "USER").trim().toUpperCase() as Role
+    const accessProfile = normalizeAccessProfile(body?.accessProfile || getDefaultAccessProfileForRole(normalized))
     const assignableRoles = getAssignableRoles(actor.role)
 
     if (!name || !email) {
@@ -100,6 +118,8 @@ export async function POST(request: Request) {
         name: true,
         email: true,
         role: true,
+        accessProfile: true,
+        moduleAccess: true,
         title: true,
         twoFactorEnabled: true,
         createdAt: true,
@@ -127,12 +147,16 @@ export async function POST(request: Request) {
             name,
             title: title || null,
             role: normalized,
+            accessProfile,
+            moduleAccess: buildModuleAccessForUser({ role: normalized, accessProfile }),
           },
           select: {
             id: true,
             name: true,
             email: true,
             role: true,
+            accessProfile: true,
+            moduleAccess: true,
             title: true,
             twoFactorEnabled: true,
             createdAt: true,
@@ -151,12 +175,16 @@ export async function POST(request: Request) {
             email,
             title: title || null,
             role: normalized,
+            accessProfile,
+            moduleAccess: buildModuleAccessForUser({ role: normalized, accessProfile }),
           },
           select: {
             id: true,
             name: true,
             email: true,
             role: true,
+            accessProfile: true,
+            moduleAccess: true,
             title: true,
             twoFactorEnabled: true,
             createdAt: true,
@@ -190,7 +218,7 @@ export async function POST(request: Request) {
       action: existing ? "admin.user.reinvited" : "admin.user.invited",
       entity: "User",
       entityId: created.id,
-      metadata: { email: created.email, role: created.role },
+      metadata: { email: created.email, role: created.role, accessProfile: created.accessProfile },
     })
 
     return NextResponse.json({
@@ -224,19 +252,19 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json()
-    const { id, role } = body || {}
-    if (!id || !role) {
-      return NextResponse.json({ error: "id and role required" }, { status: 400 })
+    const { id, role, accessProfile } = body || {}
+    if (!id || (role === undefined && accessProfile === undefined)) {
+      return NextResponse.json({ error: "id and at least one update field are required" }, { status: 400 })
     }
 
-    const normalized = String(role).toUpperCase() as Role
-    if (!["USER", "ADMIN", "ORG_OWNER", "SUPER_ADMIN"].includes(normalized)) {
+    const normalized = role !== undefined ? (String(role).toUpperCase() as Role) : undefined
+    if (normalized && !["USER", "ADMIN", "ORG_OWNER", "SUPER_ADMIN"].includes(normalized)) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 })
     }
 
     const target = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, orgId: true, role: true, email: true, name: true },
+      select: { id: true, orgId: true, role: true, accessProfile: true, email: true, name: true },
     })
     if (!target) return NextResponse.json({ error: "User not found" }, { status: 404 })
     if (target.orgId !== org.id) {
@@ -249,20 +277,34 @@ export async function PATCH(request: Request) {
         actorEmail: actor.email,
         targetRole: target.role,
         targetEmail: target.email,
-        nextRole: normalized,
+        nextRole: normalized || target.role,
       })
     ) {
       return NextResponse.json({ error: "Not authorized to change that role" }, { status: 403 })
     }
 
+    const nextRole = normalized || target.role
+    const nextAccessProfile =
+      accessProfile !== undefined
+        ? normalizeAccessProfile(accessProfile)
+        : normalized
+          ? getDefaultAccessProfileForRole(nextRole)
+          : normalizeAccessProfile(target.accessProfile || getDefaultAccessProfileForRole(nextRole))
+
     const updated = await prisma.user.update({
       where: { id },
-      data: { role: normalized },
+      data: {
+        role: nextRole,
+        accessProfile: nextAccessProfile,
+        moduleAccess: buildModuleAccessForUser({ role: nextRole, accessProfile: nextAccessProfile }),
+      },
       select: {
         id: true,
         name: true,
         email: true,
         role: true,
+        accessProfile: true,
+        moduleAccess: true,
         title: true,
         twoFactorEnabled: true,
         createdAt: true,
@@ -281,7 +323,12 @@ export async function PATCH(request: Request) {
       action: "admin.user.role_updated",
       entity: "User",
       entityId: updated.id,
-      metadata: { previousRole: target.role, nextRole: updated.role, targetEmail: updated.email },
+      metadata: {
+        previousRole: target.role,
+        nextRole: updated.role,
+        accessProfile: updated.accessProfile,
+        targetEmail: updated.email,
+      },
     })
 
     return NextResponse.json({ user: mapAdminUser(updated) })

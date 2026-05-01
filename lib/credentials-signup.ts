@@ -1,6 +1,7 @@
 import { prisma, withPrismaRetry } from "@/lib/prisma"
 import { getDefaultOrg } from "@/lib/defaultOrg"
 import { FOUNDER_SUPER_ADMIN_EMAIL } from "@/lib/authz"
+import { buildModuleAccessForUser, getDefaultAccessProfileForRole } from "@/lib/access-control"
 import { consumeSignupInvite, getSignupInviteDetails } from "@/lib/invitations"
 import { hashPassword } from "@/lib/password"
 
@@ -19,6 +20,8 @@ type SignupResult =
         name: string
         email: string
         role: string
+        accessProfile: string
+        moduleAccess: unknown
         twoFactorEnabled: boolean
       }
     }
@@ -59,6 +62,8 @@ export const completeCredentialsSignup = async ({
         name: true,
         email: true,
         role: true,
+        accessProfile: true,
+        moduleAccess: true,
         passwordHash: true,
         twoFactorEnabled: true,
         _count: {
@@ -88,7 +93,13 @@ export const completeCredentialsSignup = async ({
         where: { id: existingUser.id },
         data: {
           name: normalizedName,
-          role,
+          role: isFounderBootstrap ? "SUPER_ADMIN" : existingUser.role,
+          accessProfile: existingUser.accessProfile || getDefaultAccessProfileForRole(existingUser.role),
+          moduleAccess: buildModuleAccessForUser({
+            role: isFounderBootstrap ? "SUPER_ADMIN" : existingUser.role,
+            accessProfile: existingUser.accessProfile || getDefaultAccessProfileForRole(existingUser.role),
+            moduleAccess: existingUser.moduleAccess,
+          }),
           passwordHash: hashPassword(trimmedPassword),
         },
       }),
@@ -105,6 +116,8 @@ export const completeCredentialsSignup = async ({
         name: updatedUser.name,
         email: updatedUser.email,
         role: updatedUser.role,
+        accessProfile: updatedUser.accessProfile,
+        moduleAccess: updatedUser.moduleAccess,
         twoFactorEnabled: updatedUser.twoFactorEnabled,
       },
     }
@@ -117,6 +130,11 @@ export const completeCredentialsSignup = async ({
         email: normalizedEmail,
         name: normalizedName,
         role,
+        accessProfile: getDefaultAccessProfileForRole(role),
+        moduleAccess: buildModuleAccessForUser({
+          role,
+          accessProfile: getDefaultAccessProfileForRole(role),
+        }),
         orgId: org.id,
         passwordHash: hashPassword(trimmedPassword),
       },
@@ -130,6 +148,8 @@ export const completeCredentialsSignup = async ({
       name: createdUser.name,
       email: createdUser.email,
       role: createdUser.role,
+      accessProfile: createdUser.accessProfile,
+      moduleAccess: createdUser.moduleAccess,
       twoFactorEnabled: createdUser.twoFactorEnabled,
     },
   }

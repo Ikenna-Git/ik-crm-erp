@@ -14,6 +14,20 @@ enum Role {
   USER
 }
 
+enum AccessProfile {
+  GENERAL
+  SALES
+  MARKETING
+  SUPPORT
+  FINANCE
+  HR
+  OPERATIONS
+  PROJECT_MANAGER
+  INVENTORY
+  EXECUTIVE
+  ADMINISTRATION
+}
+
 enum DealStage {
   PROSPECT
   QUALIFIED
@@ -126,6 +140,8 @@ model User {
   email        String   @unique
   name         String
   role         Role     @default(USER)
+  accessProfile AccessProfile @default(GENERAL)
+  moduleAccess Json?
   passwordHash String?
   title        String?
   phone        String?

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { Role } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
+import { buildModuleAccessForUser, getDefaultAccessProfileForRole } from "@/lib/access-control"
 import { getUserFromRequest } from "@/lib/request-user"
 import { canAssignRole, canManageWorkspaceSettings, getAssignableRoles, isAdmin } from "@/lib/authz"
 
@@ -31,8 +32,8 @@ export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org, user } = await getUserFromRequest(request)
-    if (!isAdmin(user.role)) {
-      return NextResponse.json({ error: "Admin access required" }, { status: 403 })
+    if (!canManageWorkspaceSettings(user.role)) {
+      return NextResponse.json({ error: "Organization owner access required" }, { status: 403 })
     }
     const body = await request.json()
     const { name, theme, notifyEmail } = body || {}
@@ -73,9 +74,26 @@ export async function POST(request: Request) {
     if (!canAssignRole({ actorRole: user.role, actorEmail: user.email, nextRole: normalizedRole })) {
       return NextResponse.json({ error: "Not authorized to assign that role" }, { status: 403 })
     }
+    const accessProfile = getDefaultAccessProfileForRole(normalizedRole)
     const createdUser = await prisma.user.create({
-      data: { name, email: String(email).toLowerCase(), role: normalizedRole, orgId: org.id },
-      select: { id: true, name: true, email: true, role: true, title: true, twoFactorEnabled: true, createdAt: true },
+      data: {
+        name,
+        email: String(email).toLowerCase(),
+        role: normalizedRole,
+        accessProfile,
+        moduleAccess: buildModuleAccessForUser({ role: normalizedRole, accessProfile }),
+        orgId: org.id,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        accessProfile: true,
+        title: true,
+        twoFactorEnabled: true,
+        createdAt: true,
+      },
     })
     await createAuditLog({
       orgId: org.id,

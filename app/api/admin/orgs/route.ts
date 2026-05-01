@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
+import { buildModuleAccessForUser, getDefaultAccessProfileForRole } from "@/lib/access-control"
 import { getUserFromRequest } from "@/lib/request-user"
 import { isSuperAdmin } from "@/lib/authz"
 import { issueSignupInvite, sendSignupInviteEmail } from "@/lib/invitations"
@@ -94,6 +95,11 @@ export async function POST(request: Request) {
             name: ownerName,
             email: ownerEmail,
             role: "ORG_OWNER",
+            accessProfile: getDefaultAccessProfileForRole("ORG_OWNER"),
+            moduleAccess: buildModuleAccessForUser({
+              role: "ORG_OWNER",
+              accessProfile: getDefaultAccessProfileForRole("ORG_OWNER"),
+            }),
             title: "Organization Owner",
           },
         },

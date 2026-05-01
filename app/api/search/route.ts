@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getUserFromRequest, isRequestUserError } from "@/lib/request-user"
+import { hasModuleAccess } from "@/lib/access-control"
 
 export async function GET(request: NextRequest) {
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org, user } = await getUserFromRequest(request)
 
     const { searchParams } = new URL(request.url)
     const query = searchParams.get("q")?.toLowerCase() || ""
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
     const results: any[] = []
 
     // Search contacts
-    if (!category || category === "crm" || category === "contacts") {
+    if (hasModuleAccess(user, "crm", "view") && (!category || category === "crm" || category === "contacts")) {
       const contacts = await prisma.contact.findMany({
         where: {
           orgId: org.id,
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Search companies
-    if (!category || category === "crm" || category === "companies") {
+    if (hasModuleAccess(user, "crm", "view") && (!category || category === "crm" || category === "companies")) {
       const companies = await prisma.company.findMany({
         where: {
           orgId: org.id,
@@ -64,7 +65,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Search deals
-    if (!category || category === "crm" || category === "deals") {
+    if (hasModuleAccess(user, "crm", "view") && (!category || category === "crm" || category === "deals")) {
       const deals = await prisma.deal.findMany({
         where: {
           orgId: org.id,
@@ -88,7 +89,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Search invoices
-    if (!category || category === "accounting" || category === "invoices") {
+    if (hasModuleAccess(user, "accounting", "view") && (!category || category === "accounting" || category === "invoices")) {
       const invoices = await prisma.invoice.findMany({
         where: {
           orgId: org.id,
@@ -112,7 +113,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Search tasks
-    if (!category || category === "tasks") {
+    if (hasModuleAccess(user, "projects", "view") && (!category || category === "tasks")) {
       const tasks = await prisma.task.findMany({
         where: {
           orgId: org.id,

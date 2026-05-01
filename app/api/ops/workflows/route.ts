@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
+import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
 
 const dbUnavailable = () =>
@@ -9,22 +9,21 @@ const dbUnavailable = () =>
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org } = await requireModuleAccess(request, "operations", "view")
     const workflows = await prisma.automationWorkflow.findMany({
       where: { orgId: org.id },
       orderBy: { updatedAt: "desc" },
     })
     return NextResponse.json({ workflows })
   } catch (error) {
-    console.error("Workflow fetch failed", error)
-    return NextResponse.json({ error: "Failed to load workflows" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load workflows")
   }
 }
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "operations", "manage")
     const body = await request.json()
     const { name, trigger, action } = body || {}
     if (!name || !trigger || !action) {
@@ -53,15 +52,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ workflow })
   } catch (error) {
-    console.error("Workflow create failed", error)
-    return NextResponse.json({ error: "Failed to create workflow" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to create workflow")
   }
 }
 
 export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "operations", "manage")
     const body = await request.json()
     const { id, active, name, trigger, action } = body || {}
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
@@ -87,7 +85,6 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ workflow })
   } catch (error) {
-    console.error("Workflow update failed", error)
-    return NextResponse.json({ error: "Failed to update workflow" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to update workflow")
   }
 }

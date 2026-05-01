@@ -2,8 +2,7 @@ import { NextResponse } from "next/server"
 import nodemailer from "nodemailer"
 import { generateCsv } from "@/lib/reports"
 import { buildAccountingRows, buildCrmRows, buildVatRows, buildAuditRows } from "@/lib/report-builders"
-import { getUserFromRequest, isRequestUserError } from "@/lib/request-user"
-import { isAdmin } from "@/lib/authz"
+import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
 import { createAuditLog } from "@/lib/audit"
 
@@ -41,10 +40,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { org, user } = await getUserFromRequest(request)
-    if (!isAdmin(user.role)) {
-      return NextResponse.json({ error: "Admin access required for report exports" }, { status: 403 })
-    }
+    const { org, user } = await requireModuleAccess(request, "analytics", "view")
 
     const rows =
       type === "accounting"
@@ -119,10 +115,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, message: `Report sent to ${email}` })
   } catch (err) {
-    if (isRequestUserError(err)) {
-      return NextResponse.json({ error: err.message }, { status: err.status })
-    }
-    console.error("Email send failed", err)
-    return NextResponse.json({ error: "Failed to export report" }, { status: 500 })
+    return handleAccessRouteError(err, "Failed to export report")
   }
 }

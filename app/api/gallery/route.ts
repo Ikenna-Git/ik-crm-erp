@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
+import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
 
 const dbUnavailable = () =>
@@ -9,22 +9,21 @@ const dbUnavailable = () =>
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org } = await requireModuleAccess(request, "gallery", "view")
     const items = await prisma.galleryItem.findMany({
       where: { orgId: org.id },
       orderBy: { createdAt: "desc" },
     })
     return NextResponse.json({ items })
   } catch (error) {
-    console.error("Gallery fetch failed", error)
-    return NextResponse.json({ error: "Failed to load gallery" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load gallery")
   }
 }
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "gallery", "manage")
     const body = await request.json()
     const { title, description, url, mediaType, size } = body || {}
 
@@ -53,15 +52,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ item })
   } catch (error) {
-    console.error("Gallery create failed", error)
-    return NextResponse.json({ error: "Failed to create gallery item" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to create gallery item")
   }
 }
 
 export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "gallery", "manage")
     const body = await request.json()
     const { id, ...updates } = body || {}
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
@@ -87,15 +85,14 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ item })
   } catch (error) {
-    console.error("Gallery update failed", error)
-    return NextResponse.json({ error: "Failed to update gallery item" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to update gallery item")
   }
 }
 
 export async function DELETE(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "gallery", "manage")
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
@@ -110,7 +107,6 @@ export async function DELETE(request: Request) {
     })
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error("Gallery delete failed", error)
-    return NextResponse.json({ error: "Failed to delete gallery item" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to delete gallery item")
   }
 }

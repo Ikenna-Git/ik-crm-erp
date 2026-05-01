@@ -23,31 +23,32 @@ import {
   ShieldCheck,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { hasModuleAccess, type AccessModule } from "@/lib/access-control"
 import { isAdmin } from "@/lib/authz"
 
 const baseNavigation = [
-  { name: "Overview", href: "/dashboard", icon: BarChart3 },
-  { name: "Civis AI", href: "/dashboard/ai", icon: Sparkles },
-  { name: "CRM", href: "/dashboard/crm", icon: Users },
-  { name: "Marketing", href: "/dashboard/marketing", icon: Mail },
-  { name: "Client Portal", href: "/dashboard/portal", icon: LayoutGrid },
-  { name: "Accounting", href: "/dashboard/accounting", icon: DollarSign },
-  { name: "Inventory", href: "/dashboard/inventory", icon: Package },
-  { name: "Projects", href: "/dashboard/projects", icon: CheckSquare },
-  { name: "HR", href: "/dashboard/hr", icon: Users },
-  { name: "Gallery", href: "/dashboard/gallery", icon: ImageIcon },
-  { name: "Docs", href: "/dashboard/docs", icon: BookOpen },
-  { name: "Demo", href: "/dashboard/demo", icon: Play },
-  { name: "Playbooks", href: "/dashboard/playbooks", icon: ClipboardList },
-  { name: "Analytics", href: "/dashboard/analytics", icon: TrendingUp },
-  { name: "Operations", href: "/dashboard/operations", icon: Workflow },
+  { name: "Overview", href: "/dashboard", icon: BarChart3, module: "overview" as AccessModule },
+  { name: "Civis AI", href: "/dashboard/ai", icon: Sparkles, module: "ai" as AccessModule },
+  { name: "CRM", href: "/dashboard/crm", icon: Users, module: "crm" as AccessModule },
+  { name: "Marketing", href: "/dashboard/marketing", icon: Mail, module: "marketing" as AccessModule },
+  { name: "Client Portal", href: "/dashboard/portal", icon: LayoutGrid, module: "portal" as AccessModule },
+  { name: "Accounting", href: "/dashboard/accounting", icon: DollarSign, module: "accounting" as AccessModule },
+  { name: "Inventory", href: "/dashboard/inventory", icon: Package, module: "inventory" as AccessModule },
+  { name: "Projects", href: "/dashboard/projects", icon: CheckSquare, module: "projects" as AccessModule },
+  { name: "HR", href: "/dashboard/hr", icon: Users, module: "hr" as AccessModule },
+  { name: "Gallery", href: "/dashboard/gallery", icon: ImageIcon, module: "gallery" as AccessModule },
+  { name: "Docs", href: "/dashboard/docs", icon: BookOpen, module: "docs" as AccessModule },
+  { name: "Demo", href: "/dashboard/demo", icon: Play, module: "demo" as AccessModule },
+  { name: "Playbooks", href: "/dashboard/playbooks", icon: ClipboardList, module: "playbooks" as AccessModule },
+  { name: "Analytics", href: "/dashboard/analytics", icon: TrendingUp, module: "analytics" as AccessModule },
+  { name: "Operations", href: "/dashboard/operations", icon: Workflow, module: "operations" as AccessModule },
 ]
 
 export function DashboardSidebar() {
   const pathname = usePathname()
   const { data: session } = useSession()
   const navigation = [
-    ...baseNavigation,
+    ...baseNavigation.filter((item) => hasModuleAccess(session?.user || {}, item.module, "view")),
     ...(isAdmin(session?.user?.role) ? [{ name: "Admin", href: "/admin", icon: ShieldCheck }] : []),
   ]
 

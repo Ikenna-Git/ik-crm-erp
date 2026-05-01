@@ -1,24 +1,16 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
-import { getUserFromRequest, isRequestUserError } from "@/lib/request-user"
+import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { seedProjectData } from "@/lib/module-seeds"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable project data." }, { status: 503 })
 
-const handleError = (error: unknown, fallback: string) => {
-  console.error(fallback, error)
-  if (isRequestUserError(error)) {
-    return NextResponse.json({ error: error.message }, { status: error.status })
-  }
-  return NextResponse.json({ error: fallback }, { status: 500 })
-}
-
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await getUserFromRequest(request)
+    const { org } = await requireModuleAccess(request, "projects", "view")
     await seedProjectData(org.id)
     const projects = await prisma.project.findMany({
       where: { orgId: org.id },
@@ -27,14 +19,14 @@ export async function GET(request: Request) {
     })
     return NextResponse.json({ projects })
   } catch (error) {
-    return handleError(error, "Failed to load projects")
+    return handleAccessRouteError(error, "Failed to load projects")
   }
 }
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "projects", "manage")
     const body = await request.json()
     const { name, description, client, status, progress, team, budget, spent, startDate, endDate, priority } = body || {}
     if (!name) {
@@ -70,14 +62,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ project })
   } catch (error) {
-    return handleError(error, "Failed to create project")
+    return handleAccessRouteError(error, "Failed to create project")
   }
 }
 
 export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "projects", "manage")
     const body = await request.json()
     const { id, name, description, client, status, progress, team, budget, spent, startDate, endDate, priority } = body || {}
     if (!id) {
@@ -120,14 +112,14 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ project })
   } catch (error) {
-    return handleError(error, "Failed to update project")
+    return handleAccessRouteError(error, "Failed to update project")
   }
 }
 
 export async function DELETE(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireModuleAccess(request, "projects", "manage")
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) {
@@ -153,6 +145,6 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    return handleError(error, "Failed to delete project")
+    return handleAccessRouteError(error, "Failed to delete project")
   }
 }
