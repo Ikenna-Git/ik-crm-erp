@@ -38,7 +38,7 @@ export async function GET(request: Request) {
       }),
       prisma.user.count({
         where: {
-          role: { in: ["ADMIN", "SUPER_ADMIN"] },
+          role: { in: ["ORG_OWNER", "ADMIN", "SUPER_ADMIN"] },
           twoFactorEnabled: false,
         },
       }),

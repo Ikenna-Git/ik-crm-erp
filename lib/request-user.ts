@@ -16,7 +16,8 @@ type RequestIdentity = {
   role: Role
 }
 
-const isRole = (value?: string | null): value is Role => value === "SUPER_ADMIN" || value === "ADMIN" || value === "USER"
+const isRole = (value?: string | null): value is Role =>
+  value === "SUPER_ADMIN" || value === "ORG_OWNER" || value === "ADMIN" || value === "USER"
 
 const deriveRoleFromEmail = (email: string): Role => {
   return email.toLowerCase() === FOUNDER_SUPER_ADMIN_EMAIL ? "SUPER_ADMIN" : "USER"

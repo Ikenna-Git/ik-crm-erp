@@ -189,7 +189,8 @@ export const sendSignupInviteEmail = async ({
   role: Role
 }): Promise<SignupInviteDelivery> => {
   const expiresLabel = new Date(expiresAt).toLocaleString()
-  const roleLabel = role === "ADMIN" ? "workspace admin" : "workspace user"
+  const roleLabel =
+    role === "ORG_OWNER" ? "workspace owner" : role === "ADMIN" ? "workspace admin" : "workspace user"
   const safeName = name.trim() || to
 
   const subject = `You're invited to ${orgName} on Civis`

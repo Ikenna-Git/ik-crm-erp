@@ -60,15 +60,15 @@ export async function POST(request: Request) {
     const orgName = String(body?.name || "").trim()
     const theme = String(body?.theme || "light").trim()
     const notifyEmail = String(body?.notifyEmail || "").trim()
-    const adminName = String(body?.adminName || "").trim()
-    const adminEmail = String(body?.adminEmail || "").trim().toLowerCase()
+    const ownerName = String(body?.ownerName || body?.adminName || "").trim()
+    const ownerEmail = String(body?.ownerEmail || body?.adminEmail || "").trim().toLowerCase()
 
-    if (!orgName || !adminName || !adminEmail) {
-      return NextResponse.json({ error: "name, adminName, and adminEmail are required" }, { status: 400 })
+    if (!orgName || !ownerName || !ownerEmail) {
+      return NextResponse.json({ error: "name, ownerName, and ownerEmail are required" }, { status: 400 })
     }
 
     const existingAdmin = await prisma.user.findUnique({
-      where: { email: adminEmail },
+      where: { email: ownerEmail },
       select: {
         id: true,
         orgId: true,
@@ -88,13 +88,13 @@ export async function POST(request: Request) {
       data: {
         name: orgName,
         theme: theme || "light",
-        notifyEmail: notifyEmail || adminEmail,
+        notifyEmail: notifyEmail || ownerEmail,
         users: {
           create: {
-            name: adminName,
-            email: adminEmail,
-            role: "ADMIN",
-            title: "Workspace Admin",
+            name: ownerName,
+            email: ownerEmail,
+            role: "ORG_OWNER",
+            title: "Organization Owner",
           },
         },
       },
@@ -113,18 +113,18 @@ export async function POST(request: Request) {
 
     const invite = await issueSignupInvite({
       orgId: created.id,
-      email: adminEmail,
+      email: ownerEmail,
       origin: getPublicOrigin(request),
     })
     const initialAdmin = created.users[0]
     const delivery = await sendSignupInviteEmail({
-      to: adminEmail,
-      name: initialAdmin?.name || adminName,
+      to: ownerEmail,
+      name: initialAdmin?.name || ownerName,
       orgName: created.name,
       inviteUrl: invite.inviteUrl,
       expiresAt: invite.expiresAt,
       sentBy: user.name || user.email,
-      role: "ADMIN",
+      role: "ORG_OWNER",
     })
 
     await createAuditLog({
@@ -133,7 +133,7 @@ export async function POST(request: Request) {
       action: "admin.org.created",
       entity: "Org",
       entityId: created.id,
-      metadata: { name: created.name, adminEmail },
+      metadata: { name: created.name, ownerEmail },
     })
 
     return NextResponse.json({
@@ -141,10 +141,10 @@ export async function POST(request: Request) {
       invite,
       delivery,
       message: delivery.sent
-        ? "Workspace created and the initial admin invite email was sent."
+        ? "Workspace created and the initial owner invite email was sent."
         : delivery.skipped
-          ? "Workspace created. SMTP is not configured yet, so share the initial admin invite link manually."
-          : "Workspace created, but invite email delivery failed. Share the initial admin invite link manually.",
+          ? "Workspace created. SMTP is not configured yet, so share the initial owner invite link manually."
+          : "Workspace created, but invite email delivery failed. Share the initial owner invite link manually.",
     })
   } catch (error) {
     console.error("Org creation failed", error)

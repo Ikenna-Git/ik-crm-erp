@@ -77,13 +77,14 @@ export async function POST(request: Request) {
     const email = String(body?.email || "").trim().toLowerCase()
     const title = String(body?.title || "").trim()
     const normalized = String(body?.role || "USER").trim().toUpperCase() as Role
+    const assignableRoles = getAssignableRoles(actor.role)
 
     if (!name || !email) {
       return NextResponse.json({ error: "name and email required" }, { status: 400 })
     }
 
-    if (!["USER", "ADMIN"].includes(normalized)) {
-      return NextResponse.json({ error: "Only USER and ADMIN can be invited here" }, { status: 400 })
+    if (!assignableRoles.includes(normalized)) {
+      return NextResponse.json({ error: `Only ${assignableRoles.join(", ")} can be invited here` }, { status: 400 })
     }
 
     if (!canAssignRole({ actorRole: actor.role, actorEmail: actor.email, nextRole: normalized })) {
@@ -229,7 +230,7 @@ export async function PATCH(request: Request) {
     }
 
     const normalized = String(role).toUpperCase() as Role
-    if (!["USER", "ADMIN", "SUPER_ADMIN"].includes(normalized)) {
+    if (!["USER", "ADMIN", "ORG_OWNER", "SUPER_ADMIN"].includes(normalized)) {
       return NextResponse.json({ error: "Invalid role" }, { status: 400 })
     }
 

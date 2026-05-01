@@ -81,7 +81,7 @@ export default function AdminSecurityPage() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-semibold">{data.summary.privilegedUserCount}</p>
-            <p className="mt-2 text-sm text-slate-400">Admins and the founder super-admin are surfaced below.</p>
+            <p className="mt-2 text-sm text-slate-400">Organization owners, admins, and the founder super-admin are surfaced below.</p>
           </CardContent>
         </Card>
         <Card className="border-white/10 bg-white/5 text-slate-100">

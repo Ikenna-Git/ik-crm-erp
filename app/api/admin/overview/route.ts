@@ -42,7 +42,7 @@ export async function GET(request: Request) {
       recentOrgs,
     ] = await Promise.all([
       prisma.user.count({ where: { orgId: org.id } }),
-      prisma.user.count({ where: { orgId: org.id, role: { in: ["ADMIN", "SUPER_ADMIN"] } } }),
+      prisma.user.count({ where: { orgId: org.id, role: { in: ["ORG_OWNER", "ADMIN", "SUPER_ADMIN"] } } }),
       prisma.user.count({ where: { orgId: org.id, twoFactorEnabled: true } }),
       prisma.contact.count({ where: { orgId: org.id } }),
       prisma.employee.count({ where: { orgId: org.id } }),
@@ -193,7 +193,7 @@ export async function GET(request: Request) {
         id: "access",
         label: "Access control",
         status: twoFactorCoverage < 60 && userCount > 0 ? "warning" : "healthy",
-        detail: `Founder lock is active and ${adminCount} admin account${adminCount === 1 ? "" : "s"} currently manage this workspace.`,
+        detail: `Founder lock is active and ${adminCount} privileged account${adminCount === 1 ? "" : "s"} currently manage this workspace.`,
       },
       {
         id: "invites",

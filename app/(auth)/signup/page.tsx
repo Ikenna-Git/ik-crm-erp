@@ -15,7 +15,7 @@ type InviteDetails = {
   token: string
   email: string
   name: string
-  role: "USER" | "ADMIN" | "SUPER_ADMIN"
+  role: "USER" | "ADMIN" | "ORG_OWNER" | "SUPER_ADMIN"
   title?: string | null
   orgName: string
   expiresAt: string

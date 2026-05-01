@@ -220,7 +220,7 @@ export const authOptions: AuthOptions = {
         ;(token as any).role = (user as any).role
         ;(token as any).orgId = (user as any).orgId
         ;(token as any).twoFactorEnabled = (user as any).twoFactorEnabled
-      } else if (trigger === "update" && token.email && useAdapter) {
+      } else if (token.email && useAdapter) {
         try {
           const currentUser = await withPrismaRetry("auth.jwt.refreshUser", () =>
             prisma.user.findUnique({

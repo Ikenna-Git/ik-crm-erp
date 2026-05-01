@@ -257,7 +257,7 @@ const approvalStatusStyles: Record<string, string> = {
 export default function OperationsPage() {
   const { data: session } = useSession()
   const role = session?.user?.role
-  const canManage = role === "ADMIN" || role === "SUPER_ADMIN"
+  const canManage = role === "ORG_OWNER" || role === "ADMIN" || role === "SUPER_ADMIN"
   const [workflows, setWorkflows] = useState(workflowSeed)
   const [approvals, setApprovals] = useState<ApprovalRequest[]>(approvalsSeed)
   const [integrations, setIntegrations] = useState(integrationsSeed)

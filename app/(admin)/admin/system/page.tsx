@@ -80,8 +80,8 @@ export default function AdminSystemPage() {
     name: "",
     theme: "light",
     notifyEmail: "",
-    adminName: "",
-    adminEmail: "",
+    ownerName: "",
+    ownerEmail: "",
   })
 
   const load = async () => {
@@ -136,13 +136,13 @@ export default function AdminSystemPage() {
       setLastInvite(
         payload.invite
           ? {
-              email: form.adminEmail,
+              email: form.ownerEmail,
               inviteUrl: payload.invite.inviteUrl,
               expiresAt: payload.invite.expiresAt,
             }
           : null,
       )
-      setForm({ name: "", theme: "light", notifyEmail: "", adminName: "", adminEmail: "" })
+      setForm({ name: "", theme: "light", notifyEmail: "", ownerName: "", ownerEmail: "" })
       await Promise.all([load(), loadStatus()])
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create workspace")
@@ -279,7 +279,7 @@ export default function AdminSystemPage() {
             <div>
               <CardTitle>Create stakeholder workspace</CardTitle>
               <CardDescription className="text-slate-400">
-                Stand up a new org and seed the first workspace admin without surrendering founder control.
+                Stand up a new org and seed the first organization owner without surrendering founder control.
               </CardDescription>
             </div>
             <Badge className="bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15">Provisioning</Badge>
@@ -300,19 +300,19 @@ export default function AdminSystemPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Initial admin name</Label>
+              <Label>Initial owner name</Label>
               <Input
-                value={form.adminName}
-                onChange={(event) => setForm((current) => ({ ...current, adminName: event.target.value }))}
-                placeholder="Workspace owner"
+                value={form.ownerName}
+                onChange={(event) => setForm((current) => ({ ...current, ownerName: event.target.value }))}
+                placeholder="Company owner"
               />
             </div>
             <div className="space-y-2">
-              <Label>Initial admin email</Label>
+              <Label>Initial owner email</Label>
               <Input
-                value={form.adminEmail}
-                onChange={(event) => setForm((current) => ({ ...current, adminEmail: event.target.value }))}
-                placeholder="admin@workspace.com"
+                value={form.ownerEmail}
+                onChange={(event) => setForm((current) => ({ ...current, ownerEmail: event.target.value }))}
+                placeholder="ceo@workspace.com"
               />
             </div>
             <div className="space-y-2 md:col-span-2">
@@ -336,8 +336,8 @@ export default function AdminSystemPage() {
               <p className="font-medium text-slate-100">Provisioning note</p>
             </div>
             <p>
-              Civis creates the workspace, seeds the first admin, and returns a real invite link for that stakeholder
-              admin to activate the workspace account.
+              Civis creates the workspace, seeds the first organization owner, and returns a real invite link for that stakeholder
+              owner to activate the workspace account.
             </p>
             <Button className="mt-4 w-full" onClick={handleCreateWorkspace} disabled={saving}>
               {saving ? "Creating workspace..." : "Create workspace"}
@@ -351,7 +351,7 @@ export default function AdminSystemPage() {
       {lastInvite ? (
         <Card className="border-white/10 bg-white/5 text-slate-100">
           <CardHeader>
-            <CardTitle className="text-base">Initial admin invite</CardTitle>
+            <CardTitle className="text-base">Initial owner invite</CardTitle>
             <CardDescription className="text-slate-400">
               Share this link with {lastInvite.email}. It expires on {new Date(lastInvite.expiresAt).toLocaleString()}.
             </CardDescription>

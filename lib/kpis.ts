@@ -62,6 +62,7 @@ export const KPI_CATALOG: KpiDefinition[] = [
 
 const DEFAULT_KPIS: Record<string, string[]> = {
   SUPER_ADMIN: ["revenueMtd", "expensesMtd", "pipelineValue", "overdueInvoices"],
+  ORG_OWNER: ["revenueMtd", "pipelineValue", "overdueInvoices", "pendingExpenses"],
   ADMIN: ["openDeals", "pipelineValue", "overdueInvoices", "pendingExpenses"],
   USER: ["contacts", "openDeals", "pendingExpenses", "overdueInvoices"],
 }

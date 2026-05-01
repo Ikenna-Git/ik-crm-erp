@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
 import { getUserFromRequest } from "@/lib/request-user"
-import { isAdmin } from "@/lib/authz"
+import { canManageWorkspaceSettings, isAdmin } from "@/lib/authz"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable workspace settings." }, { status: 503 })
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 
     const [userCount, adminCount, crmFieldCount] = await Promise.all([
       prisma.user.count({ where: { orgId: org.id } }),
-      prisma.user.count({ where: { orgId: org.id, role: { in: ["ADMIN", "SUPER_ADMIN"] } } }),
+      prisma.user.count({ where: { orgId: org.id, role: { in: ["ORG_OWNER", "ADMIN", "SUPER_ADMIN"] } } }),
       prisma.crmField.count({ where: { orgId: org.id, archived: false } }),
     ])
 
@@ -41,8 +41,8 @@ export async function PATCH(request: Request) {
 
   try {
     const { org, user } = await getUserFromRequest(request)
-    if (!isAdmin(user.role)) {
-      return NextResponse.json({ error: "Not authorized" }, { status: 403 })
+    if (!canManageWorkspaceSettings(user.role)) {
+      return NextResponse.json({ error: "Organization owner access required" }, { status: 403 })
     }
 
     const body = await request.json()

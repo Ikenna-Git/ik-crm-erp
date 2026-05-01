@@ -12,11 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { FOUNDER_SUPER_ADMIN_EMAIL } from "@/lib/authz"
 
+type AssignableRole = "USER" | "ADMIN" | "ORG_OWNER"
+
 type AdminUser = {
   id: string
   name: string
   email: string
-  role: "USER" | "ADMIN" | "SUPER_ADMIN"
+  role: "USER" | "ADMIN" | "ORG_OWNER" | "SUPER_ADMIN"
   title?: string | null
   twoFactorEnabled?: boolean
   invitePending?: boolean
@@ -25,7 +27,7 @@ type AdminUser = {
 
 type UsersResponse = {
   users: AdminUser[]
-  assignableRoles: Array<"USER" | "ADMIN">
+  assignableRoles: AssignableRole[]
 }
 
 type InvitePayload = {
@@ -42,7 +44,7 @@ export default function AdminUsersPage() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [lastInvite, setLastInvite] = useState<InvitePayload | null>(null)
-  const [form, setForm] = useState({ name: "", email: "", title: "", role: "USER" as "USER" | "ADMIN" })
+  const [form, setForm] = useState({ name: "", email: "", title: "", role: "USER" as AssignableRole })
 
   const founderEmail = useMemo(() => FOUNDER_SUPER_ADMIN_EMAIL, [])
 
@@ -195,7 +197,7 @@ export default function AdminUsersPage() {
         <CardHeader>
           <CardTitle>User management</CardTitle>
           <CardDescription className="text-slate-400">
-            Invite teammates, promote workspace admins, and keep founder access immutable.
+            Invite teammates, assign organization owners or admins, and keep founder access immutable.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
@@ -226,12 +228,12 @@ export default function AdminUsersPage() {
             </div>
             <div className="space-y-2">
               <Label>Role</Label>
-              <Select value={form.role} onValueChange={(value: "USER" | "ADMIN") => setForm((current) => ({ ...current, role: value }))}>
+              <Select value={form.role} onValueChange={(value: AssignableRole) => setForm((current) => ({ ...current, role: value }))}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(data?.assignableRoles || ["USER", "ADMIN"]).map((role) => (
+                  {(data?.assignableRoles || ["USER"]).map((role) => (
                     <SelectItem key={role} value={role}>
                       {role}
                     </SelectItem>
@@ -304,6 +306,7 @@ export default function AdminUsersPage() {
                 {(data?.users || []).map((member) => {
                   const isFounder = member.email.toLowerCase() === founderEmail
                   const isSelf = member.email.toLowerCase() === session?.user?.email?.toLowerCase()
+                  const canEditMemberRole = !isFounder && member.role !== "SUPER_ADMIN" && data?.assignableRoles.includes(member.role as AssignableRole)
                   return (
                     <TableRow key={member.id} className="border-white/10 hover:bg-white/5">
                       <TableCell>
@@ -314,20 +317,20 @@ export default function AdminUsersPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {isFounder ? (
+                        {isFounder || !canEditMemberRole ? (
                           <Badge className="bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15">
-                            SUPER_ADMIN
+                            {member.role}
                           </Badge>
                         ) : (
                           <Select
                             value={member.role}
-                            onValueChange={(value: AdminUser["role"]) => handleRoleChange(member.id, value)}
+                            onValueChange={(value: AssignableRole) => handleRoleChange(member.id, value)}
                           >
                             <SelectTrigger className="w-36 border-white/10 bg-slate-950/50">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {(data?.assignableRoles || ["USER", "ADMIN"]).map((role) => (
+                              {(data?.assignableRoles || ["USER"]).map((role) => (
                                 <SelectItem key={role} value={role}>
                                   {role}
                                 </SelectItem>

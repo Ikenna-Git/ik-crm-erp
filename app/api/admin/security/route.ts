@@ -36,7 +36,9 @@ export async function GET(request: Request) {
       }),
     ])
 
-    const privilegedUsers = users.filter((member) => member.role === "ADMIN" || member.role === "SUPER_ADMIN")
+    const privilegedUsers = users.filter(
+      (member) => member.role === "ORG_OWNER" || member.role === "ADMIN" || member.role === "SUPER_ADMIN",
+    )
     const twoFactorCoverage = users.length ? Math.round((users.filter((member) => member.twoFactorEnabled).length / users.length) * 100) : 0
 
     return NextResponse.json({

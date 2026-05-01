@@ -25,7 +25,6 @@ import {
 const timezones = ["Africa/Lagos", "UTC", "Europe/London", "America/New_York"]
 const currencies = ["NGN", "USD", "EUR", "GBP"]
 const industries = ["Technology", "Finance", "Retail", "Manufacturing", "Healthcare"]
-const roles = ["user", "admin"]
 const digestDays = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
 const aiProviders = [
   { value: "auto", label: "Auto (use AI_PROVIDER env)" },
@@ -36,6 +35,15 @@ const aiProviders = [
 
 export default function SettingsPage() {
   const { data: session } = useSession()
+  const actorRole = session?.user?.role
+  const inviteRoles =
+    actorRole === "SUPER_ADMIN" ? ["user", "admin", "org_owner"] : actorRole === "ORG_OWNER" ? ["user", "admin"] : ["user"]
+  const manageableRoles =
+    actorRole === "SUPER_ADMIN"
+      ? ["USER", "ADMIN", "ORG_OWNER", "SUPER_ADMIN"]
+      : actorRole === "ORG_OWNER"
+        ? ["USER", "ADMIN"]
+        : ["USER"]
   const [profile, setProfile] = useState(() => seedProfileFromUser(session?.user))
 
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES)
@@ -141,7 +149,7 @@ export default function SettingsPage() {
     const loadTeam = async () => {
       if (!session?.user?.role) return
       const role = session.user.role
-      if (role !== "ADMIN" && role !== "SUPER_ADMIN") {
+      if (role !== "ORG_OWNER" && role !== "ADMIN" && role !== "SUPER_ADMIN") {
         setTeamError("Admin access required to manage roles.")
         return
       }
@@ -847,7 +855,7 @@ export default function SettingsPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {roles.map((r) => (
+                      {inviteRoles.map((r) => (
                         <SelectItem key={r} value={r}>
                           {r}
                         </SelectItem>
@@ -877,7 +885,8 @@ export default function SettingsPage() {
               )}
               {teamUsers.map((member) => {
                 const locked =
-                  member.role === "SUPER_ADMIN" && session?.user?.role !== "SUPER_ADMIN"
+                  (member.role === "SUPER_ADMIN" && session?.user?.role !== "SUPER_ADMIN") ||
+                  (member.role === "ORG_OWNER" && session?.user?.role !== "SUPER_ADMIN")
                 return (
                   <div
                     key={member.id}
@@ -888,9 +897,9 @@ export default function SettingsPage() {
                       <p className="text-sm text-muted-foreground">{member.email}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      {member.role === "SUPER_ADMIN" && (
+                      {(member.role === "SUPER_ADMIN" || member.role === "ORG_OWNER") && (
                         <Badge variant="outline" className="bg-transparent">
-                          Super Admin
+                          {member.role === "SUPER_ADMIN" ? "Super Admin" : "Org Owner"}
                         </Badge>
                       )}
                       <Select
@@ -902,9 +911,17 @@ export default function SettingsPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="USER">User</SelectItem>
-                          <SelectItem value="ADMIN">Admin</SelectItem>
-                          <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
+                          {manageableRoles.map((roleOption) => (
+                            <SelectItem key={roleOption} value={roleOption}>
+                              {roleOption === "SUPER_ADMIN"
+                                ? "Super Admin"
+                                : roleOption === "ORG_OWNER"
+                                  ? "Org Owner"
+                                  : roleOption === "ADMIN"
+                                    ? "Admin"
+                                    : "User"}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>

@@ -3,7 +3,7 @@ import { Role } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
 import { getUserFromRequest } from "@/lib/request-user"
-import { canAssignRole, isAdmin } from "@/lib/authz"
+import { canAssignRole, canManageWorkspaceSettings, getAssignableRoles, isAdmin } from "@/lib/authz"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable settings." }, { status: 503 })
@@ -12,8 +12,8 @@ export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org, user } = await getUserFromRequest(request)
-    if (!isAdmin(user.role)) {
-      return NextResponse.json({ error: "Admin access required" }, { status: 403 })
+    if (!canManageWorkspaceSettings(user.role)) {
+      return NextResponse.json({ error: "Organization owner access required" }, { status: 403 })
     }
     const users = await prisma.user.findMany({
       where: { orgId: org.id },
@@ -66,8 +66,9 @@ export async function POST(request: Request) {
     const { name, email, role } = body || {}
     if (!name || !email || !role) return NextResponse.json({ error: "name, email, role required" }, { status: 400 })
     const normalizedRole = String(role).trim().toUpperCase() as Role
-    if (!["USER", "ADMIN"].includes(normalizedRole)) {
-      return NextResponse.json({ error: "Only USER and ADMIN can be created here" }, { status: 400 })
+    const assignableRoles = getAssignableRoles(user.role)
+    if (!assignableRoles.includes(normalizedRole)) {
+      return NextResponse.json({ error: `Only ${assignableRoles.join(", ")} can be created here` }, { status: 400 })
     }
     if (!canAssignRole({ actorRole: user.role, actorEmail: user.email, nextRole: normalizedRole })) {
       return NextResponse.json({ error: "Not authorized to assign that role" }, { status: 403 })
