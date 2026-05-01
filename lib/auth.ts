@@ -1,11 +1,14 @@
 import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import type { AuthOptions } from "next-auth"
+import type { Adapter } from "next-auth/adapters"
+import { randomUUID } from "crypto"
 import GoogleProvider from "next-auth/providers/google"
 import CredentialsProvider from "next-auth/providers/credentials"
 import speakeasy from "speakeasy"
 import { prisma, withPrismaRetry } from "@/lib/prisma"
 import { FOUNDER_SUPER_ADMIN_EMAIL } from "@/lib/authz"
 import { completeCredentialsSignup } from "@/lib/credentials-signup"
+import { getDefaultOrg } from "@/lib/defaultOrg"
 import { verifyPassword } from "@/lib/password"
 
 const useAdapter = process.env.NODE_ENV === "production" || process.env.NEXTAUTH_USE_ADAPTER === "true"
@@ -145,8 +148,50 @@ const buildProviders = () => {
   return providers
 }
 
+const buildAdapter = (): Adapter | undefined => {
+  if (!useAdapter) return undefined
+
+  const base = PrismaAdapter(prisma)
+
+  return {
+    ...base,
+    async createUser(data) {
+      const org = await getDefaultOrg()
+      const email = data.email?.toLowerCase().trim()
+
+      const created = await prisma.user.create({
+        data: {
+          orgId: org.id,
+          email: email || `user-${randomUUID()}@civis.local`,
+          name: data.name?.trim() || email?.split("@")[0] || "User",
+          image: data.image,
+          emailVerified: data.emailVerified ?? null,
+          role: email === FOUNDER_SUPER_ADMIN_EMAIL ? "SUPER_ADMIN" : "USER",
+        },
+      })
+
+      return created as any
+    },
+    async updateUser(data) {
+      const email = data.email?.toLowerCase().trim()
+      const updated = await prisma.user.update({
+        where: { id: data.id },
+        data: {
+          email: email,
+          name: data.name?.trim() || undefined,
+          image: data.image,
+          emailVerified: data.emailVerified ?? undefined,
+          role: email === FOUNDER_SUPER_ADMIN_EMAIL ? "SUPER_ADMIN" : undefined,
+        },
+      })
+
+      return updated as any
+    },
+  }
+}
+
 export const authOptions: AuthOptions = {
-  adapter: useAdapter ? PrismaAdapter(prisma) : undefined,
+  adapter: buildAdapter(),
   providers: buildProviders(),
   session: { strategy: "jwt" },
   debug: process.env.NODE_ENV !== "production",
@@ -159,11 +204,13 @@ export const authOptions: AuthOptions = {
         const sessionUser = session.user as typeof session.user & {
           id?: string
           role?: string
+          orgId?: string
           twoFactorEnabled?: boolean
         }
-        const authUser = user as { id?: string; role?: string; twoFactorEnabled?: boolean } | undefined
+        const authUser = user as { id?: string; role?: string; orgId?: string; twoFactorEnabled?: boolean } | undefined
         sessionUser.id = authUser?.id || token.sub
         sessionUser.role = authUser?.role || (token as any)?.role
+        sessionUser.orgId = authUser?.orgId || (token as any)?.orgId
         sessionUser.twoFactorEnabled = authUser?.twoFactorEnabled || (token as any)?.twoFactorEnabled
       }
       return session
@@ -171,18 +218,20 @@ export const authOptions: AuthOptions = {
     async jwt({ token, user, trigger }) {
       if (user) {
         ;(token as any).role = (user as any).role
+        ;(token as any).orgId = (user as any).orgId
         ;(token as any).twoFactorEnabled = (user as any).twoFactorEnabled
       } else if (trigger === "update" && token.email && useAdapter) {
         try {
           const currentUser = await withPrismaRetry("auth.jwt.refreshUser", () =>
             prisma.user.findUnique({
               where: { email: token.email as string },
-              select: { role: true, twoFactorEnabled: true },
+              select: { role: true, orgId: true, twoFactorEnabled: true },
             }),
           )
 
           if (currentUser) {
             ;(token as any).role = currentUser.role
+            ;(token as any).orgId = currentUser.orgId
             ;(token as any).twoFactorEnabled = currentUser.twoFactorEnabled
           }
         } catch (error) {

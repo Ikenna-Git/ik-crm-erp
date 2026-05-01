@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { getUserFromRequest, isRequestUserError } from "@/lib/request-user"
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+    const { org } = await getUserFromRequest(request)
 
     const { searchParams } = new URL(request.url)
     const query = searchParams.get("q")?.toLowerCase() || ""
@@ -25,7 +21,7 @@ export async function GET(request: NextRequest) {
     if (!category || category === "crm" || category === "contacts") {
       const contacts = await prisma.contact.findMany({
         where: {
-          orgId: session.user.orgId,
+          orgId: org.id,
           OR: [
             { name: { contains: query, mode: "insensitive" } },
             { email: { contains: query, mode: "insensitive" } },
@@ -51,7 +47,7 @@ export async function GET(request: NextRequest) {
     if (!category || category === "crm" || category === "companies") {
       const companies = await prisma.company.findMany({
         where: {
-          orgId: session.user.orgId,
+          orgId: org.id,
           name: { contains: query, mode: "insensitive" }
         },
         take: limit
@@ -71,7 +67,7 @@ export async function GET(request: NextRequest) {
     if (!category || category === "crm" || category === "deals") {
       const deals = await prisma.deal.findMany({
         where: {
-          orgId: session.user.orgId,
+          orgId: org.id,
           OR: [
             { title: { contains: query, mode: "insensitive" } },
             { contact: { name: { contains: query, mode: "insensitive" } } }
@@ -95,7 +91,7 @@ export async function GET(request: NextRequest) {
     if (!category || category === "accounting" || category === "invoices") {
       const invoices = await prisma.invoice.findMany({
         where: {
-          orgId: session.user.orgId,
+          orgId: org.id,
           OR: [
             { number: { contains: query } },
             { contact: { name: { contains: query, mode: "insensitive" } } }
@@ -119,7 +115,7 @@ export async function GET(request: NextRequest) {
     if (!category || category === "tasks") {
       const tasks = await prisma.task.findMany({
         where: {
-          orgId: session.user.orgId,
+          orgId: org.id,
           title: { contains: query, mode: "insensitive" }
         },
         take: limit
@@ -137,6 +133,9 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ results: results.slice(0, limit) })
   } catch (error) {
+    if (isRequestUserError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
     console.error("Search error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }

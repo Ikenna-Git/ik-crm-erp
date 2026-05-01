@@ -5,6 +5,7 @@ declare module "next-auth" {
     user: {
       id?: string
       role?: string
+      orgId?: string
       twoFactorEnabled?: boolean
       name?: string | null
       email?: string | null
@@ -14,6 +15,7 @@ declare module "next-auth" {
 
   interface User {
     role?: string
+    orgId?: string
     twoFactorEnabled?: boolean
   }
 }
