@@ -5,6 +5,7 @@ import { getUserFromRequest } from "@/lib/request-user"
 import { createAuditLog } from "@/lib/audit"
 import { canAssignRole, canDeleteUser, getAssignableRoles, isAdmin } from "@/lib/authz"
 import { issueSignupInvite, sendSignupInviteEmail } from "@/lib/invitations"
+import { getPublicOrigin } from "@/lib/public-url"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable admin management." }, { status: 503 })
@@ -89,7 +90,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Not authorized to assign that role" }, { status: 403 })
     }
 
-    const origin = new URL(request.url).origin
+    const origin = getPublicOrigin(request)
     const existing = await prisma.user.findUnique({
       where: { email },
       select: {

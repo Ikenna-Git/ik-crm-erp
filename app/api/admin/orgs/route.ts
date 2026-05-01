@@ -4,6 +4,7 @@ import { createAuditLog } from "@/lib/audit"
 import { getUserFromRequest } from "@/lib/request-user"
 import { isSuperAdmin } from "@/lib/authz"
 import { issueSignupInvite, sendSignupInviteEmail } from "@/lib/invitations"
+import { getPublicOrigin } from "@/lib/public-url"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable org management." }, { status: 503 })
@@ -113,7 +114,7 @@ export async function POST(request: Request) {
     const invite = await issueSignupInvite({
       orgId: created.id,
       email: adminEmail,
-      origin: new URL(request.url).origin,
+      origin: getPublicOrigin(request),
     })
     const initialAdmin = created.users[0]
     const delivery = await sendSignupInviteEmail({
