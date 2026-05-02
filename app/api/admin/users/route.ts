@@ -375,7 +375,29 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Not authorized to remove this user" }, { status: 403 })
     }
 
-    await prisma.user.delete({ where: { id: target.id } })
+    await prisma.$transaction([
+      prisma.userSettings.deleteMany({ where: { userId: target.id } }),
+      prisma.session.deleteMany({ where: { userId: target.id } }),
+      prisma.account.deleteMany({ where: { userId: target.id } }),
+      prisma.notification.updateMany({ where: { orgId: org.id, userId: target.id }, data: { userId: null } }),
+      prisma.decisionTrail.updateMany({ where: { orgId: org.id, userId: target.id }, data: { userId: null } }),
+      prisma.playbookRun.updateMany({ where: { orgId: org.id, userId: target.id }, data: { userId: null } }),
+      prisma.clientPortalUpdate.updateMany({ where: { orgId: org.id, userId: target.id }, data: { userId: null } }),
+      prisma.automationWorkflow.updateMany({ where: { orgId: org.id, userId: target.id }, data: { userId: null } }),
+      prisma.auditLog.updateMany({ where: { orgId: org.id, userId: target.id }, data: { userId: null } }),
+      prisma.contact.updateMany({ where: { orgId: org.id, ownerId: target.id }, data: { ownerId: null } }),
+      prisma.company.updateMany({ where: { orgId: org.id, ownerId: target.id }, data: { ownerId: null } }),
+      prisma.deal.updateMany({ where: { orgId: org.id, ownerId: target.id }, data: { ownerId: null } }),
+      prisma.task.updateMany({ where: { orgId: org.id, ownerId: target.id }, data: { ownerId: null } }),
+      prisma.verificationToken.deleteMany({
+        where: {
+          identifier: {
+            startsWith: `invite:${org.id}:${target.email.toLowerCase()}`,
+          },
+        },
+      }),
+      prisma.user.delete({ where: { id: target.id } }),
+    ])
 
     await createAuditLog({
       orgId: org.id,

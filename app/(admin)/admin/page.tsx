@@ -25,7 +25,7 @@ type OverviewResponse = {
     name?: string | null
     email?: string | null
     role?: string | null
-    founderEmail: string
+    founderEmail?: string | null
   }
   workspace: {
     org: {
@@ -166,6 +166,7 @@ export default function AdminOverviewPage() {
   }
 
   const { actor, workspace, opsCenter, platform } = data
+  const showFounderControls = actor.role === "SUPER_ADMIN"
 
   return (
     <div className="space-y-6">
@@ -174,16 +175,24 @@ export default function AdminOverviewPage() {
           <div className="space-y-5 p-6 lg:p-8">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15">Admin ops center</Badge>
-              <Badge variant="outline" className="border-white/10 bg-white/5 text-slate-200">
-                Founder lock: {actor.founderEmail}
-              </Badge>
+              {showFounderControls ? (
+                <Badge variant="outline" className="border-white/10 bg-white/5 text-slate-200">
+                  Founder lock: {actor.founderEmail}
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="border-white/10 bg-white/5 text-slate-200">
+                  Workspace authority only
+                </Badge>
+              )}
             </div>
 
             <div className="space-y-3">
               <h1 className="text-3xl font-semibold text-white md:text-4xl">Run Civis like a platform, not a pile of pages.</h1>
               <p className="max-w-2xl text-sm leading-6 text-slate-300 md:text-base">
-                This is your control room for access, issues, workspace health, and what needs attention next. Keep
-                stakeholder admins inside their own lane while you stay above the whole system.
+                This is your control room for access, issues, workspace health, and what needs attention next.{" "}
+                {showFounderControls
+                  ? "Keep stakeholder admins inside their own lane while you stay above the whole system."
+                  : "Run your own company workspace cleanly without touching platform-owner controls."}
               </p>
             </div>
 

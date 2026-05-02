@@ -62,6 +62,7 @@ export default function AdminUsersPage() {
   })
 
   const founderEmail = useMemo(() => FOUNDER_SUPER_ADMIN_EMAIL, [])
+  const isPlatformSuperAdmin = session?.user?.role === "SUPER_ADMIN"
 
   const load = async () => {
     try {
@@ -325,7 +326,13 @@ export default function AdminUsersPage() {
               the workspace account you assigned here.
             </p>
             <p className="mt-3 text-xs text-slate-400">
-              Founder super-admin remains locked to <strong>{founderEmail}</strong>.
+              {isPlatformSuperAdmin ? (
+                <>
+                  Founder super-admin remains locked to <strong>{founderEmail}</strong>.
+                </>
+              ) : (
+                "Workspace owners and admins can manage people here, but platform-owner access stays outside this org."
+              )}
             </p>
             <Button className="mt-4 w-full justify-between" onClick={handleInvite} disabled={saving}>
               {saving ? "Creating user..." : "Create user"}

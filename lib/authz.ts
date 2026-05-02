@@ -10,6 +10,8 @@ export const isAdmin = (role?: string | null) => role === "ADMIN" || role === "O
 
 export const isSuperAdmin = (role?: string | null) => role === "SUPER_ADMIN"
 
+export const canViewFounderControls = (role?: string | null) => isSuperAdmin(role)
+
 export const canManageWorkspaceSettings = (role?: string | null) => role === "ORG_OWNER" || role === "SUPER_ADMIN"
 
 export const isFounderSuperAdminEmail = (email?: string | null) =>

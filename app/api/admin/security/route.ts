@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getUserFromRequest } from "@/lib/request-user"
-import { getFounderSuperAdminEmail, isAdmin } from "@/lib/authz"
+import { canViewFounderControls, getFounderSuperAdminEmail, isAdmin } from "@/lib/authz"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable admin security." }, { status: 503 })
@@ -14,6 +14,7 @@ export async function GET(request: Request) {
     if (!isAdmin(user.role)) {
       return NextResponse.json({ error: "Not authorized" }, { status: 403 })
     }
+    const showFounderControls = canViewFounderControls(user.role)
 
     const [users, recentAuditEvents] = await Promise.all([
       prisma.user.findMany({
@@ -46,7 +47,8 @@ export async function GET(request: Request) {
         userCount: users.length,
         privilegedUserCount: privilegedUsers.length,
         twoFactorCoverage,
-        founderEmail: getFounderSuperAdminEmail(),
+        founderEmail: showFounderControls ? getFounderSuperAdminEmail() : null,
+        showFounderControls,
       },
       privilegedUsers,
       recentAuditEvents,

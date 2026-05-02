@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getUserFromRequest } from "@/lib/request-user"
-import { getFounderSuperAdminEmail, isAdmin, isSuperAdmin } from "@/lib/authz"
+import { canViewFounderControls, getFounderSuperAdminEmail, isAdmin, isSuperAdmin } from "@/lib/authz"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable admin overview." }, { status: 503 })
@@ -23,6 +23,7 @@ export async function GET(request: Request) {
     if (!isAdmin(user.role)) {
       return NextResponse.json({ error: "Not authorized" }, { status: 403 })
     }
+    const showFounderControls = canViewFounderControls(user.role)
 
     const [
       userCount,
@@ -193,7 +194,9 @@ export async function GET(request: Request) {
         id: "access",
         label: "Access control",
         status: twoFactorCoverage < 60 && userCount > 0 ? "warning" : "healthy",
-        detail: `Founder lock is active and ${adminCount} privileged account${adminCount === 1 ? "" : "s"} currently manage this workspace.`,
+        detail: showFounderControls
+          ? `Founder lock is active and ${adminCount} privileged account${adminCount === 1 ? "" : "s"} currently manage this workspace.`
+          : `${adminCount} privileged account${adminCount === 1 ? "" : "s"} currently manage this workspace while platform-owner controls stay isolated above it.`,
       },
       {
         id: "invites",
@@ -264,7 +267,7 @@ export async function GET(request: Request) {
         name: user.name,
         email: user.email,
         role: user.role,
-        founderEmail: getFounderSuperAdminEmail(),
+        founderEmail: showFounderControls ? getFounderSuperAdminEmail() : null,
       },
       workspace: {
         org,

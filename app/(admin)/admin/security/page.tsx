@@ -11,7 +11,8 @@ type SecurityResponse = {
     userCount: number
     privilegedUserCount: number
     twoFactorCoverage: number
-    founderEmail: string
+    founderEmail?: string | null
+    showFounderControls: boolean
   }
   privilegedUsers: Array<{
     id: string
@@ -81,16 +82,31 @@ export default function AdminSecurityPage() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-semibold">{data.summary.privilegedUserCount}</p>
-            <p className="mt-2 text-sm text-slate-400">Organization owners, admins, and the founder super-admin are surfaced below.</p>
+            <p className="mt-2 text-sm text-slate-400">
+              {data.summary.showFounderControls
+                ? "Organization owners, admins, and the founder super-admin are surfaced below."
+                : "Organization owners and admins for this workspace are surfaced below."}
+            </p>
           </CardContent>
         </Card>
         <Card className="border-white/10 bg-white/5 text-slate-100">
           <CardHeader>
-            <CardTitle className="text-base">Founder lock</CardTitle>
+            <CardTitle className="text-base">{data.summary.showFounderControls ? "Founder lock" : "Platform boundary"}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-lg font-semibold">{data.summary.founderEmail}</p>
-            <p className="mt-2 text-sm text-slate-400">Only this email can ever retain the SUPER_ADMIN role.</p>
+            {data.summary.showFounderControls ? (
+              <>
+                <p className="text-lg font-semibold">{data.summary.founderEmail}</p>
+                <p className="mt-2 text-sm text-slate-400">Only this email can ever retain the SUPER_ADMIN role.</p>
+              </>
+            ) : (
+              <>
+                <p className="text-lg font-semibold">Workspace-scoped admin</p>
+                <p className="mt-2 text-sm text-slate-400">
+                  Your org owner and admins control this workspace only. Founder-level platform controls stay separate.
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
