@@ -202,42 +202,19 @@ const reportsSeed = [
   },
 ]
 
-const commandFallback = {
+const emptyCommand = {
   stats: {
-    contacts: 1240,
-    openDeals: 18,
-    pipelineValue: 4200000,
-    revenueMtd: 3250000,
-    expensesMtd: 1850000,
-    overdueInvoices: 4,
-    pendingExpenses: 6,
-    openTasks: 5,
+    contacts: 0,
+    openDeals: 0,
+    pipelineValue: 0,
+    revenueMtd: 0,
+    expensesMtd: 0,
+    overdueInvoices: 0,
+    pendingExpenses: 0,
+    openTasks: 0,
   },
-  decisions: [
-    {
-      id: "dec-overdue",
-      title: "Overdue invoices need attention",
-      detail: "4 invoices are overdue",
-      impact: "High",
-      action: "Review invoices",
-      href: "/dashboard/accounting",
-    },
-    {
-      id: "dec-expenses",
-      title: "Pending expenses awaiting approval",
-      detail: "6 expenses are pending",
-      impact: "Medium",
-      action: "Approve expenses",
-      href: "/dashboard/accounting",
-    },
-  ],
-  recentActivity: timelineSeed.map((item) => ({
-    id: item.id,
-    title: item.title,
-    detail: item.detail,
-    time: item.time,
-    status: "info",
-  })),
+  decisions: [],
+  recentActivity: [],
 }
 
 const STORAGE = {
@@ -258,27 +235,28 @@ export default function OperationsPage() {
   const { data: session } = useSession()
   const role = session?.user?.role
   const canManage = role === "ORG_OWNER" || role === "ADMIN" || role === "SUPER_ADMIN"
-  const [workflows, setWorkflows] = useState(workflowSeed)
-  const [approvals, setApprovals] = useState<ApprovalRequest[]>(approvalsSeed)
+  const [workflows, setWorkflows] = useState<typeof workflowSeed>([])
+  const [workflowError, setWorkflowError] = useState("")
+  const [approvals, setApprovals] = useState<ApprovalRequest[]>([])
   const [integrations, setIntegrations] = useState(integrationsSeed)
-  const [insights, setInsights] = useState(insightsSeed)
-  const [auditLogs, setAuditLogs] = useState(auditSeed)
+  const [insights, setInsights] = useState<typeof insightsSeed>([])
+  const [auditLogs, setAuditLogs] = useState<typeof auditSeed>([])
   const [auditLoading, setAuditLoading] = useState(false)
   const [auditError, setAuditError] = useState("")
   const [decisionTrails, setDecisionTrails] = useState<any[]>([])
   const [decisionLoading, setDecisionLoading] = useState(false)
   const [decisionError, setDecisionError] = useState("")
   const [rollbackBusy, setRollbackBusy] = useState("")
-  const [compliance, setCompliance] = useState(complianceSeed)
-  const [reports, setReports] = useState(reportsSeed)
-  const [webhooks, setWebhooks] = useState(webhookSeed)
+  const [compliance, setCompliance] = useState<typeof complianceSeed>([])
+  const [reports, setReports] = useState<typeof reportsSeed>([])
+  const [webhooks, setWebhooks] = useState<typeof webhookSeed>([])
   const [webhookError, setWebhookError] = useState("")
 
   const commandState = useCachedFetch(
-    "civis_ops_command",
+    "civis_ops_command_live",
     async () => {
       const res = await fetch("/api/ops/command", { headers: { ...getSessionHeaders() } })
-      if (res.status === 503) return commandFallback
+      if (res.status === 503) return emptyCommand
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || "Failed to load command center")
       return data
@@ -286,15 +264,13 @@ export default function OperationsPage() {
     1000 * 60 * 5,
   )
 
-  const commandData = commandState.data || commandFallback
+  const commandData = commandState.data || emptyCommand
   const commandHasSignal =
     commandData?.stats &&
     Object.values(commandData.stats).some((value) => typeof value === "number" && value > 0)
-  const command = commandHasSignal ? commandData : commandFallback
-  const timeline =
-    Array.isArray(command?.recentActivity) && command.recentActivity.length ? command.recentActivity : timelineSeed
-  const decisionItems =
-    Array.isArray(command?.decisions) && command.decisions.length ? command.decisions : commandFallback.decisions
+  const command = commandHasSignal ? commandData : emptyCommand
+  const timeline = Array.isArray(command?.recentActivity) ? command.recentActivity : []
+  const decisionItems = Array.isArray(command?.decisions) ? command.decisions : []
 
   const [workflowForm, setWorkflowForm] = useState({
     name: "",
@@ -319,6 +295,10 @@ export default function OperationsPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return
+    localStorage.removeItem(STORAGE.workflows)
+    localStorage.removeItem(STORAGE.reports)
+    localStorage.removeItem(STORAGE.webhooks)
+    localStorage.removeItem(STORAGE.approvals)
     const load = <T,>(key: string, fallback: T, setter: (value: T) => void) => {
       try {
         const stored = localStorage.getItem(key)
@@ -331,10 +311,10 @@ export default function OperationsPage() {
         setter(fallback)
       }
     }
-    load(STORAGE.workflows, workflowSeed, setWorkflows)
-    load(STORAGE.reports, reportsSeed, setReports)
-    load(STORAGE.webhooks, webhookSeed, setWebhooks)
-    setApprovals(getApprovals(approvalsSeed))
+    load(STORAGE.workflows, [], setWorkflows)
+    load(STORAGE.reports, [], setReports)
+    load(STORAGE.webhooks, [], setWebhooks)
+    setApprovals(getApprovals([]))
 
     try {
       const stored = localStorage.getItem(STORAGE.integrations)
@@ -359,18 +339,21 @@ export default function OperationsPage() {
   useEffect(() => {
     const loadWorkflows = async () => {
       try {
+        setWorkflowError("")
         const res = await fetch("/api/ops/workflows", { headers: { ...getSessionHeaders() } })
         if (res.status === 503) {
-          setWorkflows(workflowSeed)
+          setWorkflowError("Workflow automation is unavailable until the database is connected.")
+          setWorkflows([])
           return
         }
         const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data?.error || "Failed to load workflows")
         const loaded = Array.isArray(data.workflows) ? data.workflows : []
-        setWorkflows(loaded.length ? loaded : workflowSeed)
-      } catch (err) {
+        setWorkflows(loaded)
+      } catch (err: any) {
         console.warn("Workflow load failed", err)
-        setWorkflows(workflowSeed)
+        setWorkflowError(err?.message || "Failed to load workflows")
+        setWorkflows([])
       }
     }
     loadWorkflows()
@@ -382,17 +365,17 @@ export default function OperationsPage() {
         setWebhookError("")
         const res = await fetch("/api/webhooks", { headers: { ...getSessionHeaders() } })
         if (res.status === 503) {
-          setWebhooks(webhookSeed)
+          setWebhooks([])
           return
         }
         const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data?.error || "Failed to load webhooks")
         const loaded = Array.isArray(data.webhooks) ? data.webhooks : []
-        setWebhooks(loaded.length ? loaded : webhookSeed)
+        setWebhooks(loaded)
       } catch (err: any) {
         console.warn("Webhook load failed", err)
         setWebhookError(err?.message || "Failed to load webhooks")
-        setWebhooks(webhookSeed)
+        setWebhooks([])
       }
     }
     loadWebhooks()
@@ -407,13 +390,13 @@ export default function OperationsPage() {
           headers: { ...getSessionHeaders() },
         })
         if (res.status === 503) {
-          setAuditError("Database not configured — showing demo audit logs.")
-          setAuditLogs(auditSeed)
+          setAuditError("Database not configured.")
+          setAuditLogs([])
           return
         }
         if (res.status === 403) {
           setAuditError("Admin access required to view audit logs.")
-          setAuditLogs(auditSeed)
+          setAuditLogs([])
           return
         }
         const text = await res.text()
@@ -426,12 +409,12 @@ export default function OperationsPage() {
               action: log.action,
               time: new Date(log.createdAt).toLocaleString(),
             }))
-          : auditSeed
-        setAuditLogs(mapped.length ? mapped : auditSeed)
+          : []
+        setAuditLogs(mapped)
       } catch (err: any) {
         console.warn("Audit log fetch failed", err)
         setAuditError(err?.message || "Failed to load audit logs")
-        setAuditLogs(auditSeed)
+        setAuditLogs([])
       } finally {
         setAuditLoading(false)
       }
@@ -448,22 +431,22 @@ export default function OperationsPage() {
           headers: { ...getSessionHeaders() },
         })
         if (res.status === 503) {
-          setDecisionError("Database not configured — showing demo decisions.")
-          setDecisionTrails(decisionTrailSeed)
+          setDecisionError("Database not configured.")
+          setDecisionTrails([])
           return
         }
         const data = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data?.error || "Failed to load decision trails")
         const trails = Array.isArray(data.trails) ? data.trails : []
         if (!trails.length) {
-          setDecisionError("No decision trails yet — showing demo entries.")
-          setDecisionTrails(decisionTrailSeed)
+          setDecisionError("No decision trails yet.")
+          setDecisionTrails([])
           return
         }
         setDecisionTrails(trails)
       } catch (err: any) {
         setDecisionError(err?.message || "Failed to load decision trails")
-        setDecisionTrails(decisionTrailSeed)
+        setDecisionTrails([])
       } finally {
         setDecisionLoading(false)
       }
@@ -503,6 +486,7 @@ export default function OperationsPage() {
     const action = workflowForm.action.trim()
     if (!name || !trigger || !action) return
     try {
+      setWorkflowError("")
       const res = await fetch("/api/ops/workflows", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
@@ -512,10 +496,9 @@ export default function OperationsPage() {
       if (!res.ok) throw new Error(data?.error || "Failed to create workflow")
       setWorkflows((prev) => [data.workflow, ...prev])
       setWorkflowForm({ name: "", trigger: "", action: "" })
-    } catch (err) {
+    } catch (err: any) {
       console.warn("Workflow create failed", err)
-      setWorkflows((prev) => [{ id: `w-${Date.now()}`, name, trigger, action, active: true }, ...prev])
-      setWorkflowForm({ name: "", trigger: "", action: "" })
+      setWorkflowError(err?.message || "Failed to create workflow")
     }
   }
 
@@ -572,19 +555,6 @@ export default function OperationsPage() {
       setWebhookForm({ name: "", url: "", events: "" })
     } catch (err: any) {
       setWebhookError(err?.message || "Failed to create webhook")
-      setWebhooks((prev) => [
-        {
-          id: `wh-${Date.now()}`,
-          name,
-          url,
-          events,
-          active: true,
-          secret: "whsec_demo",
-          createdAt: new Date().toISOString(),
-        },
-        ...prev,
-      ])
-      setWebhookForm({ name: "", url: "", events: "" })
     }
   }
 
@@ -818,27 +788,36 @@ export default function OperationsPage() {
                 <Plus className="w-4 h-4 mr-2" />
                 Add Workflow
               </Button>
+              {workflowError ? <p className="md:col-span-3 text-xs text-destructive">{workflowError}</p> : null}
             </CardContent>
           </Card>
 
-          <div className="grid gap-4">
-            {workflows.map((wf) => (
-              <Card key={wf.id}>
-                <CardContent className="pt-6 flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{wf.name}</p>
-                    <p className="text-sm text-muted-foreground">{wf.trigger} → {wf.action}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant="outline" className={wf.active ? "text-green-600" : "text-muted-foreground"}>
-                      {wf.active ? "Active" : "Paused"}
-                    </Badge>
-                    <Switch checked={wf.active} onCheckedChange={() => toggleWorkflow(wf.id)} disabled={!canManage} />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          {workflows.length ? (
+            <div className="grid gap-4">
+              {workflows.map((wf) => (
+                <Card key={wf.id}>
+                  <CardContent className="pt-6 flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{wf.name}</p>
+                      <p className="text-sm text-muted-foreground">{wf.trigger} → {wf.action}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge variant="outline" className={wf.active ? "text-green-600" : "text-muted-foreground"}>
+                        {wf.active ? "Active" : "Paused"}
+                      </Badge>
+                      <Switch checked={wf.active} onCheckedChange={() => toggleWorkflow(wf.id)} disabled={!canManage} />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="pt-6 text-sm text-muted-foreground">
+                No workflows yet. Create your first automation for reminders, approvals, or inventory triggers.
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
@@ -846,18 +825,9 @@ export default function OperationsPage() {
               <CardDescription>Latest automation activity across modules.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {workflowRunsSeed.map((run) => (
-                <div key={run.id} className="flex items-center justify-between border-b border-border pb-3 last:border-0">
-                  <div>
-                    <p className="font-medium">{run.name}</p>
-                    <p className="text-sm text-muted-foreground">{run.owner}</p>
-                  </div>
-                  <div className="text-right text-sm">
-                    <p className="font-semibold">{run.status}</p>
-                    <p className="text-xs text-muted-foreground">{run.time}</p>
-                  </div>
-                </div>
-              ))}
+              <p className="text-sm text-muted-foreground">
+                Workflow run history will appear here after live automations execute.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1029,20 +999,9 @@ export default function OperationsPage() {
               <CardDescription>Recent webhook attempts and their status.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {webhookDeliveriesSeed.map((delivery) => (
-                <div key={delivery.id} className="flex items-center justify-between border-b border-border pb-3 last:border-0">
-                  <div>
-                    <p className="font-medium">{delivery.name}</p>
-                    <p className="text-sm text-muted-foreground">{delivery.target}</p>
-                  </div>
-                  <div className="text-right text-sm">
-                    <p className={`font-semibold ${delivery.status === "Failed" ? "text-destructive" : ""}`}>
-                      {delivery.status}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{delivery.time}</p>
-                  </div>
-                </div>
-              ))}
+              <p className="text-sm text-muted-foreground">
+                Webhook delivery history will appear after live webhooks are triggered.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>

@@ -78,7 +78,7 @@ export function ExpensesTable({
   onDeleteExpense,
   showAmounts = true,
 }: Props) {
-  const [expenses, setExpenses] = useState<Expense[]>(providedExpenses || mockExpenses)
+  const [expenses, setExpenses] = useState<Expense[]>(providedExpenses ?? [])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)

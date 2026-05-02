@@ -19,25 +19,11 @@ import {
 import { getSessionHeaders } from "@/lib/user-settings"
 import { formatNaira } from "@/lib/currency"
 
-const fallbackMonthlyData = [
-  { month: "Jan", revenue: 45000, expenses: 32000, profit: 13000 },
-  { month: "Feb", revenue: 52000, expenses: 35000, profit: 17000 },
-  { month: "Mar", revenue: 48000, expenses: 33000, profit: 15000 },
-  { month: "Apr", revenue: 61000, expenses: 38000, profit: 23000 },
-  { month: "May", revenue: 55000, expenses: 36000, profit: 19000 },
-  { month: "Jun", revenue: 67000, expenses: 40000, profit: 27000 },
-]
-
-const fallbackExpenseBreakdown = [
-  { name: "Salaries", value: 40, fill: "#0f766e" },
-  { name: "Operations", value: 25, fill: "#2d7c8a" },
-  { name: "Marketing", value: 20, fill: "#48b0f7" },
-  { name: "Other", value: 15, fill: "#a0d8f0" },
-]
+const expenseBreakdownColors = ["#0f766e", "#2d7c8a", "#48b0f7", "#a0d8f0"]
 
 export function FinancialReports() {
-  const [monthlyData, setMonthlyData] = useState(fallbackMonthlyData)
-  const [expenseBreakdown, setExpenseBreakdown] = useState(fallbackExpenseBreakdown)
+  const [monthlyData, setMonthlyData] = useState<any[]>([])
+  const [expenseBreakdown, setExpenseBreakdown] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [info, setInfo] = useState("")
@@ -68,7 +54,8 @@ export function FinancialReports() {
           )
           setInfo("")
         } else {
-          setInfo("No accounting data yet. Showing demo insights for now.")
+          setMonthlyData([])
+          setInfo("No accounting data yet. Live reports will appear after invoices and expenses are recorded.")
         }
         const breakdown = Array.isArray(data.summary?.expenseBreakdown) ? data.summary.expenseBreakdown : []
         const hasBreakdown = breakdown.some((entry: any) => Number(entry.value || 0) > 0)
@@ -77,9 +64,11 @@ export function FinancialReports() {
             breakdown.map((entry: any, idx: number) => ({
               name: entry.name,
               value: entry.value,
-              fill: fallbackExpenseBreakdown[idx % fallbackExpenseBreakdown.length].fill,
+              fill: expenseBreakdownColors[idx % expenseBreakdownColors.length],
             })),
           )
+        } else {
+          setExpenseBreakdown([])
         }
       } catch (err: any) {
         setError(err?.message || "Failed to load reports")
@@ -93,6 +82,9 @@ export function FinancialReports() {
   const totalRevenue = monthlyData.reduce((sum, m) => sum + m.revenue, 0)
   const totalExpenses = monthlyData.reduce((sum, m) => sum + m.expenses, 0)
   const totalProfit = monthlyData.reduce((sum, m) => sum + m.profit, 0)
+  const periodCount = monthlyData.length || 1
+  const profitMargin = totalRevenue ? (totalProfit / totalRevenue) * 100 : 0
+  const expenseRatio = totalRevenue ? (totalExpenses / totalRevenue) * 100 : 0
 
   return (
     <div className="space-y-6">
@@ -145,17 +137,23 @@ export function FinancialReports() {
               Profit
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="month" stroke="#9ca3af" />
-              <YAxis stroke="#9ca3af" />
-              <Tooltip />
-              <Line type="monotone" dataKey="revenue" stroke="#0f766e" strokeWidth={2} />
-              <Line type="monotone" dataKey="expenses" stroke="#f87171" strokeWidth={2} />
-              <Line type="monotone" dataKey="profit" stroke="#22c55e" strokeWidth={2} />
-            </LineChart>
-          </ResponsiveContainer>
+          {monthlyData.length ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={monthlyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="month" stroke="#9ca3af" />
+                <YAxis stroke="#9ca3af" />
+                <Tooltip />
+                <Line type="monotone" dataKey="revenue" stroke="#0f766e" strokeWidth={2} />
+                <Line type="monotone" dataKey="expenses" stroke="#f87171" strokeWidth={2} />
+                <Line type="monotone" dataKey="profit" stroke="#22c55e" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex h-[300px] items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
+              No monthly accounting trend yet.
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -170,15 +168,21 @@ export function FinancialReports() {
             <span className="h-2 w-2 rounded-full bg-[#0f766e]" />
             Profit
           </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="month" stroke="#9ca3af" />
-              <YAxis stroke="#9ca3af" />
-              <Tooltip />
-              <Bar dataKey="profit" fill="#0f766e" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          {monthlyData.length ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={monthlyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="month" stroke="#9ca3af" />
+                <YAxis stroke="#9ca3af" />
+                <Tooltip />
+                <Bar dataKey="profit" fill="#0f766e" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex h-[300px] items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
+              Profit bars will appear once revenue and expense entries exist.
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -190,32 +194,40 @@ export function FinancialReports() {
             <CardDescription>Distribution by category</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie
-                  data={expenseBreakdown}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={2}
-                  dataKey="value"
-                >
-                  {expenseBreakdown.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
+            {expenseBreakdown.length ? (
+              <>
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={expenseBreakdown}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {expenseBreakdown.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="mt-4 space-y-2">
+                  {expenseBreakdown.map((item) => (
+                    <div key={item.name} className="flex justify-between text-sm">
+                      <span>{item.name}</span>
+                      <span className="font-medium">{item.value}%</span>
+                    </div>
                   ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="mt-4 space-y-2">
-              {expenseBreakdown.map((item) => (
-                <div key={item.name} className="flex justify-between text-sm">
-                  <span>{item.name}</span>
-                  <span className="font-medium">{item.value}%</span>
                 </div>
-              ))}
-            </div>
+              </>
+            ) : (
+              <div className="flex h-[250px] items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
+                No expense categories yet.
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -228,19 +240,19 @@ export function FinancialReports() {
           <CardContent className="space-y-4">
             <div className="flex justify-between pb-3 border-b border-border">
               <span className="text-muted-foreground">Profit Margin</span>
-              <span className="font-semibold">{((totalProfit / totalRevenue) * 100).toFixed(1)}%</span>
+              <span className="font-semibold">{profitMargin.toFixed(1)}%</span>
             </div>
             <div className="flex justify-between pb-3 border-b border-border">
               <span className="text-muted-foreground">Expense Ratio</span>
-              <span className="font-semibold">{((totalExpenses / totalRevenue) * 100).toFixed(1)}%</span>
+              <span className="font-semibold">{expenseRatio.toFixed(1)}%</span>
             </div>
             <div className="flex justify-between pb-3 border-b border-border">
               <span className="text-muted-foreground">Avg Monthly Revenue</span>
-              <span className="font-semibold">{formatNaira(totalRevenue / 6)}</span>
+              <span className="font-semibold">{formatNaira(totalRevenue / periodCount)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Avg Monthly Expenses</span>
-              <span className="font-semibold">{formatNaira(totalExpenses / 6)}</span>
+              <span className="font-semibold">{formatNaira(totalExpenses / periodCount)}</span>
             </div>
           </CardContent>
         </Card>

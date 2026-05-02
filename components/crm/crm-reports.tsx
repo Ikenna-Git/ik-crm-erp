@@ -18,25 +18,11 @@ import {
 import { getSessionHeaders } from "@/lib/user-settings"
 import { formatNaira } from "@/lib/currency"
 
-const fallbackPipeline = [
-  { stage: "PROSPECT", count: 6, value: 900000 },
-  { stage: "QUALIFIED", count: 4, value: 650000 },
-  { stage: "PROPOSAL", count: 3, value: 520000 },
-  { stage: "NEGOTIATION", count: 2, value: 420000 },
-  { stage: "WON", count: 1, value: 210000 },
-]
-
-const fallbackContacts = [
-  { status: "LEAD", count: 18, fill: "#0f766e" },
-  { status: "PROSPECT", count: 11, fill: "#2d7c8a" },
-  { status: "CUSTOMER", count: 7, fill: "#48b0f7" },
-]
-
 const stageColors = ["#0f766e", "#2d7c8a", "#48b0f7", "#a0d8f0", "#7c3aed", "#f97316"]
 
 export function CrmReports() {
-  const [pipeline, setPipeline] = useState(fallbackPipeline)
-  const [contactStatus, setContactStatus] = useState(fallbackContacts)
+  const [pipeline, setPipeline] = useState<any[]>([])
+  const [contactStatus, setContactStatus] = useState<any[]>([])
   const [topDeals, setTopDeals] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -68,7 +54,8 @@ export function CrmReports() {
           )
           setInfo("")
         } else {
-          setInfo("No CRM activity yet. Showing demo insights for now.")
+          setPipeline([])
+          setInfo("No CRM activity yet. Live pipeline insights will appear after deals and contacts are added.")
         }
         const contactData = Array.isArray(data.summary?.contactStatus) ? data.summary.contactStatus : []
         const hasContacts = contactData.some((entry: any) => Number(entry.count || 0) > 0)
@@ -80,6 +67,8 @@ export function CrmReports() {
               fill: stageColors[idx % stageColors.length],
             })),
           )
+        } else {
+          setContactStatus([])
         }
         if (Array.isArray(data.summary?.topDeals)) {
           setTopDeals(data.summary.topDeals)
@@ -132,19 +121,25 @@ export function CrmReports() {
             <CardDescription>Value distribution across stages.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={pipeline}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="stage" stroke="#9ca3af" />
-                <YAxis stroke="#9ca3af" />
-                <Tooltip />
-                <Bar dataKey="value" radius={[6, 6, 0, 0]}>
-                  {pipeline.map((entry, idx) => (
-                    <Cell key={entry.stage} fill={entry.fill || stageColors[idx % stageColors.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            {pipeline.length ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={pipeline}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="stage" stroke="#9ca3af" />
+                  <YAxis stroke="#9ca3af" />
+                  <Tooltip />
+                  <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                    {pipeline.map((entry, idx) => (
+                      <Cell key={entry.stage} fill={entry.fill || stageColors[idx % stageColors.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-[280px] items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
+                No live pipeline data yet.
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -154,24 +149,32 @@ export function CrmReports() {
             <CardDescription>Distribution of contacts by status.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie data={contactStatus} dataKey="count" nameKey="status" innerRadius={60} outerRadius={100}>
-                  {contactStatus.map((entry, idx) => (
-                    <Cell key={entry.status} fill={entry.fill || stageColors[idx % stageColors.length]} />
+            {contactStatus.length ? (
+              <>
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart>
+                    <Pie data={contactStatus} dataKey="count" nameKey="status" innerRadius={60} outerRadius={100}>
+                      {contactStatus.map((entry, idx) => (
+                        <Cell key={entry.status} fill={entry.fill || stageColors[idx % stageColors.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="mt-4 space-y-2">
+                  {contactStatus.map((item) => (
+                    <div key={item.status} className="flex items-center justify-between text-sm">
+                      <span>{item.status}</span>
+                      <span className="font-medium">{item.count}</span>
+                    </div>
                   ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="mt-4 space-y-2">
-              {contactStatus.map((item) => (
-                <div key={item.status} className="flex items-center justify-between text-sm">
-                  <span>{item.status}</span>
-                  <span className="font-medium">{item.count}</span>
                 </div>
-              ))}
-            </div>
+              </>
+            ) : (
+              <div className="flex h-[280px] items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
+                No contact health data yet.
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

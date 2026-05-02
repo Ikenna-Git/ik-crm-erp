@@ -38,51 +38,6 @@ type GalleryItem = {
   mediaType: "image" | "video" | "other"
 }
 
-const galleryTitles = [
-  "Team Meeting",
-  "Product Launch",
-  "Office Workspace",
-  "Dashboard Interface",
-  "Team Collaboration",
-  "Conference Presentation",
-  "Product Walkthrough",
-  "Client Workshop",
-]
-
-const galleryDescriptions = [
-  "Q4 Planning Session",
-  "Civis ERP Platform Launch Event",
-  "New Office Layout Design",
-  "Civis Dashboard UI Preview",
-  "Cross-functional Team Workshop",
-  "ERP Solutions Presentation",
-  "Short overview demo for the marketing site",
-  "Implementation strategy review",
-]
-
-const galleryUrls = [
-  "/team-meeting-office.png",
-  "/product-launch-event.png",
-  "/modern-office.png",
-  "/dashboard-analytics-interface.png",
-  "/team-collaboration.png",
-  "/business-conference-presentation.jpg",
-  "/getting-started-dashboard.jpg",
-]
-
-const buildMockGallery = (count: number): GalleryItem[] =>
-  Array.from({ length: count }, (_, idx) => ({
-    id: `GAL-${(idx + 1).toString().padStart(3, "0")}`,
-    title: galleryTitles[idx % galleryTitles.length],
-    description: galleryDescriptions[idx % galleryDescriptions.length],
-    url: galleryUrls[idx % galleryUrls.length],
-    size: Math.round((1.5 + (idx % 5) * 0.4) * 1024 * 1024),
-    uploadedDate: new Date(2025, (idx % 10) + 1, (idx % 27) + 1).toISOString(),
-    mediaType: idx % 6 === 0 ? "video" : "image",
-  }))
-
-const mockImages: GalleryItem[] = buildMockGallery(70)
-
 const formatFileSize = (bytes?: number | null) => {
   if (bytes === null || bytes === undefined) return "—"
   const mb = bytes / (1024 * 1024)
@@ -96,7 +51,7 @@ const toMediaType = (value?: string) => {
 }
 
 export default function GalleryPage() {
-  const [images, setImages] = useState<GalleryItem[]>(mockImages)
+  const [images, setImages] = useState<GalleryItem[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -156,18 +111,18 @@ export default function GalleryPage() {
         headers: { ...getSessionHeaders() },
       })
       if (res.status === 503) {
-        setApiError("Database not configured — showing demo gallery.")
-        setImages(mockImages)
+        setApiError("Database not configured.")
+        setImages([])
         return
       }
       const data = await parseJsonSafe(res)
       if (!res.ok) throw new Error(data?.error || "Failed to load gallery")
       const items = Array.isArray(data.items) ? data.items.map(mapItem) : []
-      setImages(items.length ? items : mockImages)
+      setImages(items)
     } catch (err: any) {
       console.error("Failed to load gallery", err)
       setApiError(err?.message || "Failed to load gallery")
-      setImages(mockImages)
+      setImages([])
     } finally {
       setLoading(false)
     }
@@ -201,9 +156,9 @@ export default function GalleryPage() {
         throw new Error(data?.error || "Failed to delete")
       }
       setImages((prev) => prev.filter((img) => img.id !== id))
-    } catch (err) {
+    } catch (err: any) {
       console.warn("Failed to delete gallery item", err)
-      setImages((prev) => prev.filter((img) => img.id !== id))
+      setApiError(err?.message || "Failed to delete media")
     } finally {
       setDeleteId(null)
     }

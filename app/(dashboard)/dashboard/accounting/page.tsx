@@ -236,6 +236,7 @@ export default function AccountingPage() {
   const loadData = async () => {
     try {
       setLoading(true)
+      setImportNotice("")
       const [invRes, expRes] = await Promise.all([
         fetch("/api/accounting/invoices", { headers: { ...getSessionHeaders() } }),
         fetch("/api/accounting/expenses", { headers: { ...getSessionHeaders() } }),
@@ -243,18 +244,21 @@ export default function AccountingPage() {
       const invJson = invRes.ok ? await parseJsonSafe(invRes) : null
       const expJson = expRes.ok ? await parseJsonSafe(expRes) : null
 
-      const mappedInvoices =
-        invJson?.invoices?.length > 0 ? invJson.invoices.map(mapInvoice) : fallbackInvoices
+      if (!invRes.ok || !expRes.ok) {
+        throw new Error(invJson?.error || expJson?.error || "Failed to load accounting data")
+      }
 
-      const mappedExpenses =
-        expJson?.expenses?.length > 0 ? expJson.expenses.map(mapExpense) : fallbackExpenses
+      const mappedInvoices = Array.isArray(invJson?.invoices) ? invJson.invoices.map(mapInvoice) : []
+
+      const mappedExpenses = Array.isArray(expJson?.expenses) ? expJson.expenses.map(mapExpense) : []
 
       setInvoices(mappedInvoices)
       setExpenses(mappedExpenses)
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to load accounting data", err)
-      setInvoices(fallbackInvoices)
-      setExpenses(fallbackExpenses)
+      setError(err?.message || "Failed to load accounting data")
+      setInvoices([])
+      setExpenses([])
     } finally {
       setLoading(false)
     }
@@ -301,6 +305,7 @@ export default function AccountingPage() {
 
   const createInvoice = async (payload: Omit<Invoice, "id">) => {
     try {
+      setError("")
       const res = await fetch("/api/accounting/invoices", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
@@ -318,23 +323,15 @@ export default function AccountingPage() {
       const mapped = mapInvoice(data.invoice)
       setInvoices((prev) => [mapped, ...prev])
       return mapped
-    } catch (err) {
-      const localInvoice: Invoice = {
-        id: `INV-${Date.now()}`,
-        number: payload.number,
-        client: payload.client || "Draft Client",
-        amount: payload.amount,
-        status: payload.status,
-        dueDate: payload.dueDate || new Date().toISOString().slice(0, 10),
-        date: payload.date || new Date().toISOString().slice(0, 10),
-      }
-      setInvoices((prev) => [localInvoice, ...prev])
-      return localInvoice
+    } catch (err: any) {
+      setError(err?.message || "Failed to add invoice")
+      return null
     }
   }
 
   const createExpense = async (payload: Omit<Expense, "id">) => {
     try {
+      setError("")
       const res = await fetch("/api/accounting/expenses", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
@@ -352,18 +349,9 @@ export default function AccountingPage() {
       const mapped = mapExpense(data.expense)
       setExpenses((prev) => [mapped, ...prev])
       return mapped
-    } catch (err) {
-      const localExpense: Expense = {
-        id: `EXP-${Date.now()}`,
-        description: payload.description,
-        category: payload.category,
-        amount: payload.amount,
-        date: payload.date || new Date().toISOString().slice(0, 10),
-        status: payload.status || "pending",
-        submittedBy: payload.submittedBy || "You",
-      }
-      setExpenses((prev) => [localExpense, ...prev])
-      return localExpense
+    } catch (err: any) {
+      setError(err?.message || "Failed to add expense")
+      return null
     }
   }
 
@@ -397,6 +385,7 @@ export default function AccountingPage() {
 
   const handleUpdateInvoice = async (id: string, data: Partial<Invoice>) => {
     try {
+      setError("")
       const res = await fetch("/api/accounting/invoices", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
@@ -414,15 +403,14 @@ export default function AccountingPage() {
       if (!res.ok) throw new Error(json.error || "Failed to update invoice")
       const updated = mapInvoice(json.invoice)
       setInvoices((prev) => prev.map((inv) => (inv.id === id ? updated : inv)))
-    } catch (err) {
-      setInvoices((prev) =>
-        prev.map((inv) => (inv.id === id ? { ...inv, ...data, date: data.date || inv.date } : inv)),
-      )
+    } catch (err: any) {
+      setError(err?.message || "Failed to update invoice")
     }
   }
 
   const handleDeleteInvoice = async (id: string) => {
     try {
+      setError("")
       const res = await fetch(`/api/accounting/invoices?id=${id}`, {
         method: "DELETE",
         headers: { ...getSessionHeaders() },
@@ -431,15 +419,16 @@ export default function AccountingPage() {
         const json = await parseJsonSafe(res)
         throw new Error(json.error || "Failed to delete invoice")
       }
-    } catch (err) {
-      console.warn("Failed to delete invoice", err)
-    } finally {
       setInvoices((prev) => prev.filter((inv) => inv.id !== id))
+    } catch (err: any) {
+      console.warn("Failed to delete invoice", err)
+      setError(err?.message || "Failed to delete invoice")
     }
   }
 
   const handleUpdateExpense = async (id: string, data: Partial<Expense>) => {
     try {
+      setError("")
       const res = await fetch("/api/accounting/expenses", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
@@ -457,13 +446,14 @@ export default function AccountingPage() {
       if (!res.ok) throw new Error(json.error || "Failed to update expense")
       const updated = mapExpense(json.expense)
       setExpenses((prev) => prev.map((exp) => (exp.id === id ? updated : exp)))
-    } catch (err) {
-      setExpenses((prev) => prev.map((exp) => (exp.id === id ? { ...exp, ...data } : exp)))
+    } catch (err: any) {
+      setError(err?.message || "Failed to update expense")
     }
   }
 
   const handleDeleteExpense = async (id: string) => {
     try {
+      setError("")
       const res = await fetch(`/api/accounting/expenses?id=${id}`, {
         method: "DELETE",
         headers: { ...getSessionHeaders() },
@@ -472,10 +462,10 @@ export default function AccountingPage() {
         const json = await parseJsonSafe(res)
         throw new Error(json.error || "Failed to delete expense")
       }
-    } catch (err) {
-      console.warn("Failed to delete expense", err)
-    } finally {
       setExpenses((prev) => prev.filter((exp) => exp.id !== id))
+    } catch (err: any) {
+      console.warn("Failed to delete expense", err)
+      setError(err?.message || "Failed to delete expense")
     }
   }
 
@@ -566,6 +556,7 @@ export default function AccountingPage() {
           </h1>
           <p className="text-muted-foreground mt-1">Manage invoices, expenses, and financial reports</p>
           {loading && <p className="text-xs text-muted-foreground">Loading...</p>}
+          {error ? <p className="text-xs text-destructive mt-1">{error}</p> : null}
         </div>
         <div className="flex gap-2 flex-wrap justify-end">
           <Dialog>
@@ -600,7 +591,7 @@ export default function AccountingPage() {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Demo only—wire to backend to generate and send real exports.
+                  Exports are generated from your live accounting data.
                 </p>
               </div>
             </DialogContent>

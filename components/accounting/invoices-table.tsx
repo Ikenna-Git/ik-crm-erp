@@ -69,7 +69,7 @@ export function InvoicesTable({
   onDeleteInvoice,
   showAmounts = true,
 }: Props) {
-  const [invoices, setInvoices] = useState<Invoice[]>(providedInvoices || mockInvoices)
+  const [invoices, setInvoices] = useState<Invoice[]>(providedInvoices ?? [])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)

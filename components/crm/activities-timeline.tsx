@@ -30,28 +30,15 @@ const activityColors = {
   note: "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-200 dark:border-yellow-500/40",
 }
 
-const activityTitles = ["Product Demo Call", "Follow-up Email", "Board Meeting", "Implementation Notes", "Kickoff Call"]
-const activityContacts = ["Sarah Johnson", "Michael Chen", "Emma Davis", "Global Industries", "Acme Corp", "Northwind"]
-const activityTypes: Activity["type"][] = ["call", "email", "meeting", "note"]
+type ActivitiesTimelineProps = {
+  activities?: Activity[]
+}
 
-const buildMockActivities = (count: number): Activity[] =>
-  Array.from({ length: count }, (_, idx) => ({
-    id: `ACT-${(idx + 1).toString().padStart(3, "0")}`,
-    type: activityTypes[idx % activityTypes.length],
-    title: activityTitles[idx % activityTitles.length],
-    contact: activityContacts[idx % activityContacts.length],
-    date: `${(idx % 7) + 1} days ago`,
-    time: `${(idx % 12) + 1}:00 PM`,
-    description: "Captured notes and next steps for the account.",
-  }))
-
-const mockActivities: Activity[] = buildMockActivities(70)
-
-export function ActivitiesTimeline() {
+export function ActivitiesTimeline({ activities = [] }: ActivitiesTimelineProps) {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const totalPages = Math.max(1, Math.ceil(mockActivities.length / pageSize))
-  const pagedActivities = mockActivities.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const totalPages = Math.max(1, Math.ceil(activities.length / pageSize))
+  const pagedActivities = activities.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   useEffect(() => {
     setCurrentPage(1)
@@ -68,47 +55,55 @@ export function ActivitiesTimeline() {
         <CardDescription>Recent activities and interactions</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-6">
-          {pagedActivities.map((activity, idx) => {
-            const Icon = activityIcons[activity.type]
-            return (
-              <div key={activity.id} className="flex gap-4">
-                <div className="flex flex-col items-center">
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center ${activityColors[activity.type]} border`}
-                  >
-                    <Icon className="w-5 h-5" />
-                  </div>
-                  {idx < mockActivities.length - 1 && <div className="w-1 h-12 bg-border my-2" />}
-                </div>
-                <div className="flex-1 pt-1">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-semibold text-sm">{activity.title}</p>
-                      <p className="text-sm text-muted-foreground mt-1">{activity.contact}</p>
+        {pagedActivities.length ? (
+          <>
+            <div className="space-y-6">
+              {pagedActivities.map((activity, idx) => {
+                const Icon = activityIcons[activity.type]
+                return (
+                  <div key={activity.id} className="flex gap-4">
+                    <div className="flex flex-col items-center">
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center ${activityColors[activity.type]} border`}
+                      >
+                        <Icon className="w-5 h-5" />
+                      </div>
+                      {idx < pagedActivities.length - 1 && <div className="w-1 h-12 bg-border my-2" />}
                     </div>
-                    <Badge variant="outline" className="text-xs">
-                      {activity.type}
-                    </Badge>
+                    <div className="flex-1 pt-1">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="font-semibold text-sm">{activity.title}</p>
+                          <p className="text-sm text-muted-foreground mt-1">{activity.contact}</p>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {activity.type}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">{activity.description}</p>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {activity.date} at {activity.time}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-2">{activity.description}</p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    {activity.date} at {activity.time}
-                  </p>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-        <div className="pt-6">
-          <PaginationControls
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-            pageSize={pageSize}
-            onPageSizeChange={setPageSize}
-          />
-        </div>
+                )
+              })}
+            </div>
+            <div className="pt-6">
+              <PaginationControls
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                pageSize={pageSize}
+                onPageSizeChange={setPageSize}
+              />
+            </div>
+          </>
+        ) : (
+          <div className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
+            No CRM activity yet. Calls, emails, notes, and meetings will appear here once your team starts using the workspace.
+          </div>
+        )}
       </CardContent>
     </Card>
   )

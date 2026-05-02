@@ -212,7 +212,7 @@ export function ContactsTable({
   crmView,
   onViewChange,
 }: ContactsTableProps) {
-  const [contacts, setContacts] = useState<Contact[]>(providedContacts || mockContacts)
+  const [contacts, setContacts] = useState<Contact[]>(providedContacts ?? [])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)

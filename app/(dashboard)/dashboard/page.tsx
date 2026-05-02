@@ -1,18 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from "recharts"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -27,106 +16,18 @@ import { Progress } from "@/components/ui/progress"
 import { useSession } from "next-auth/react"
 import { DEFAULT_ONBOARDING_TASKS, type OnboardingTask } from "@/lib/user-settings"
 
-const revenueData = [
-  { month: "Jan", revenue: 4000, expenses: 2400 },
-  { month: "Feb", revenue: 3000, expenses: 1398 },
-  { month: "Mar", revenue: 2000, expenses: 9800 },
-  { month: "Apr", revenue: 2780, expenses: 3908 },
-  { month: "May", revenue: 1890, expenses: 4800 },
-  { month: "Jun", revenue: 2390, expenses: 3800 },
-]
-
-const salesData = [
-  { name: "Online", value: 400, fill: "#48b0f7" },
-  { name: "Retail", value: 300, fill: "#0f766e" },
-  { name: "B2B", value: 300, fill: "#2d7c8a" },
-]
-
-const fallbackRecentActivity = [
-  {
-    id: "act-1",
-    title: "Invoice INV-2025-014 marked as paid",
-    detail: "Acme Corp • ₦1,250,000",
-    time: "2 hours ago",
-    status: "success",
-  },
-  {
-    id: "act-2",
-    title: "New lead added to CRM",
-    detail: "Northwind Trading • Adaeze Okafor",
-    time: "5 hours ago",
-    status: "info",
-  },
-  {
-    id: "act-3",
-    title: "Payroll batch processed",
-    detail: "January payroll • 18 employees",
-    time: "Yesterday",
-    status: "success",
-  },
-  {
-    id: "act-4",
-    title: "Stock alert: Low inventory",
-    detail: "Wireless Mouse • Reorder 50 units",
-    time: "Yesterday",
-    status: "warning",
-  },
-  {
-    id: "act-5",
-    title: "Project milestone completed",
-    detail: "Website Redesign • Phase 2",
-    time: "2 days ago",
-    status: "info",
-  },
-]
-
-const fallbackDecisionFeed = [
-  {
-    id: "dec-1",
-    title: "Overdue invoice needs a follow-up",
-    detail: "INV-2025-014 • ₦1,250,000 • 9 days overdue",
-    impact: "High",
-    action: "Review invoices",
-    href: "/dashboard/accounting",
-  },
-  {
-    id: "dec-2",
-    title: "Stock reorder recommended",
-    detail: "Wireless Mouse • Reorder 50 units",
-    impact: "Medium",
-    action: "Open inventory",
-    href: "/dashboard/inventory",
-  },
-  {
-    id: "dec-3",
-    title: "Stalled deal in negotiation",
-    detail: "Civis Suite • Northwind • 14 days idle",
-    impact: "High",
-    action: "Jump to CRM",
-    href: "/dashboard/crm",
-  },
-  {
-    id: "dec-4",
-    title: "Payroll batch pending approval",
-    detail: "January payroll • 18 employees",
-    impact: "Medium",
-    action: "Review approvals",
-    href: "/dashboard/operations",
-  },
-]
-
-const commandFallback = {
+const emptyCommand = {
   stats: {
-    contacts: 1234,
-    openDeals: 18,
-    pipelineValue: 3250000,
-    revenueMtd: 13256871,
-    expensesMtd: 7800000,
-    overdueInvoices: 4,
-    pendingExpenses: 6,
+    contacts: 0,
+    openDeals: 0,
+    pipelineValue: 0,
+    revenueMtd: 0,
+    expensesMtd: 0,
+    overdueInvoices: 0,
+    pendingExpenses: 0,
   },
-  decisions: fallbackDecisionFeed,
-  recentActivity: fallbackRecentActivity,
+  decisions: [],
+  recentActivity: [],
 }
 
 const impactStyles = {
@@ -163,10 +64,10 @@ export default function DashboardPage() {
   const [onboardingError, setOnboardingError] = useState("")
 
   const commandState = useCachedFetch(
-    "civis_dashboard_command",
+    "civis_dashboard_command_live",
     async () => {
       const res = await fetch("/api/ops/command", { headers: { ...getSessionHeaders() } })
-      if (res.status === 503) return commandFallback
+      if (res.status === 503) return emptyCommand
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || "Failed to load dashboard insights")
       return data
@@ -174,11 +75,19 @@ export default function DashboardPage() {
     1000 * 60 * 5,
   )
 
-  const commandData = commandState.data || commandFallback
+  const commandData = commandState.data || emptyCommand
   const commandHasSignal =
     commandData?.stats &&
     Object.values(commandData.stats).some((value) => typeof value === "number" && value > 0)
-  const command = commandHasSignal ? commandData : commandFallback
+  const command = commandHasSignal ? commandData : emptyCommand
+  const performanceData = commandHasSignal
+    ? [{ month: "MTD", revenue: command.stats.revenueMtd, expenses: command.stats.expensesMtd }]
+    : []
+  const operationalMix = [
+    { name: "Open Deals", value: Number(command.stats.openDeals || 0), fill: "#48b0f7" },
+    { name: "Overdue Invoices", value: Number(command.stats.overdueInvoices || 0), fill: "#0f766e" },
+    { name: "Pending Expenses", value: Number(command.stats.pendingExpenses || 0), fill: "#2d7c8a" },
+  ].filter((item) => item.value > 0)
 
   useEffect(() => {
     const loadKpis = async () => {
@@ -231,8 +140,8 @@ export default function DashboardPage() {
     return { ...kpi, value: display }
   })
 
-  const decisionFeed = command.decisions?.length ? command.decisions : fallbackDecisionFeed
-  const recentActivity = command.recentActivity?.length ? command.recentActivity : fallbackRecentActivity
+  const decisionFeed = Array.isArray(command.decisions) ? command.decisions : []
+  const recentActivity = Array.isArray(command.recentActivity) ? command.recentActivity : []
 
   const toggleKpi = (id: string) => {
     setKpiDraft((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]))
@@ -399,56 +308,70 @@ export default function DashboardPage() {
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Revenue vs Expenses</CardTitle>
-            <CardDescription>Monthly performance</CardDescription>
+            <CardDescription>Live month-to-date performance</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="mb-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-[#0f766e]" />
-                Revenue
+            {performanceData.length ? (
+              <>
+                <div className="mb-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-[#0f766e]" />
+                    Revenue
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-[#d1d5db]" />
+                    Expenses
+                  </div>
+                </div>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={performanceData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="month" stroke="#9ca3af" />
+                    <YAxis stroke="#9ca3af" />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="revenue" stroke="#0f766e" strokeWidth={2} />
+                    <Line type="monotone" dataKey="expenses" stroke="#d1d5db" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </>
+            ) : (
+              <div className="flex h-[300px] items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
+                No financial performance data yet.
               </div>
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-[#d1d5db]" />
-                Expenses
-              </div>
-            </div>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={revenueData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="month" stroke="#9ca3af" />
-                <YAxis stroke="#9ca3af" />
-                <Tooltip />
-                <Line type="monotone" dataKey="revenue" stroke="#0f766e" strokeWidth={2} />
-                <Line type="monotone" dataKey="expenses" stroke="#d1d5db" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Sales by Channel</CardTitle>
-            <CardDescription>Distribution</CardDescription>
+            <CardTitle>Operational Mix</CardTitle>
+            <CardDescription>Current live workload distribution</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={salesData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={2}
-                  dataKey="value"
-                >
-                  {salesData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+            {operationalMix.length ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={operationalMix}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={2}
+                    dataKey="value"
+                  >
+                    {operationalMix.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-[300px] items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
+                No operational mix data yet.
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -463,30 +386,36 @@ export default function DashboardPage() {
           <CardDescription>Priority actions that keep revenue and operations moving.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {decisionFeed.map((item) => (
-              <div
-                key={item.id}
-                className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border border-border rounded-lg p-4 bg-background/60"
-              >
-                <div>
-                  <p className="font-medium">{item.title}</p>
-                  <p className="text-sm text-muted-foreground">{item.detail}</p>
+          {decisionFeed.length ? (
+            <div className="space-y-4">
+              {decisionFeed.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border border-border rounded-lg p-4 bg-background/60"
+                >
+                  <div>
+                    <p className="font-medium">{item.title}</p>
+                    <p className="text-sm text-muted-foreground">{item.detail}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs px-2 py-1 rounded-full ${impactStyles[item.impact]}`}>
+                      {item.impact} impact
+                    </span>
+                    <Button size="sm" asChild>
+                      <Link href={item.href} className="flex items-center gap-1">
+                        {item.action}
+                        <ArrowUpRight className="w-4 h-4" />
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-1 rounded-full ${impactStyles[item.impact]}`}>
-                    {item.impact} impact
-                  </span>
-                  <Button size="sm" asChild>
-                    <Link href={item.href} className="flex items-center gap-1">
-                      {item.action}
-                      <ArrowUpRight className="w-4 h-4" />
-                    </Link>
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
+              No urgent decisions right now. This feed will populate as your org creates invoices, deals, tasks, and approvals.
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -497,25 +426,31 @@ export default function DashboardPage() {
           <CardDescription>Latest transactions and updates</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {recentActivity.map((activity) => (
-              <div
-                key={activity.id}
-                className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 pb-4 border-b border-border last:border-0"
-              >
-                <div>
-                  <p className="font-medium">{activity.title}</p>
-                  <p className="text-sm text-muted-foreground">{activity.detail}</p>
+          {recentActivity.length ? (
+            <div className="space-y-4">
+              {recentActivity.map((activity) => (
+                <div
+                  key={activity.id}
+                  className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 pb-4 border-b border-border last:border-0"
+                >
+                  <div>
+                    <p className="font-medium">{activity.title}</p>
+                    <p className="text-sm text-muted-foreground">{activity.detail}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{formatActivityTime(activity.time)}</span>
+                    <span className={`text-xs px-2 py-1 rounded-full ${activityStatusStyles[activity.status]}`}>
+                      {activity.status}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted-foreground">{formatActivityTime(activity.time)}</span>
-                  <span className={`text-xs px-2 py-1 rounded-full ${activityStatusStyles[activity.status]}`}>
-                    {activity.status}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
+              No activity yet. Recent transactions and updates will appear here after the workspace starts being used.
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

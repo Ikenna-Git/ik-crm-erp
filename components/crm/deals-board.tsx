@@ -46,45 +46,6 @@ const stages = [
   { id: "lost", title: "Lost", color: "bg-red-50 dark:bg-red-950/30" },
 ]
 
-const mockDeals: Deal[] = [
-  {
-    id: "1",
-    title: "Enterprise License",
-    company: "Tech Solutions Inc",
-    value: 150000,
-    stage: "proposal",
-    owner: "John Smith",
-    expectedClose: "2025-12-15",
-  },
-  {
-    id: "2",
-    title: "Service Agreement",
-    company: "StartUp Labs",
-    value: 75000,
-    stage: "negotiation",
-    owner: "Jane Doe",
-    expectedClose: "2025-11-30",
-  },
-  {
-    id: "3",
-    title: "Implementation",
-    company: "Enterprise Corp",
-    value: 250000,
-    stage: "qualified",
-    owner: "John Smith",
-    expectedClose: "2025-12-31",
-  },
-  {
-    id: "4",
-    title: "Renewal",
-    company: "Global Industries",
-    value: 125000,
-    stage: "won",
-    owner: "Jane Doe",
-    expectedClose: "2025-10-15",
-  },
-]
-
 const recommendedDealFields: Array<{ name: string; type: CrmFieldType; options?: string[] }> = [
   { name: "Probability", type: "NUMBER" },
   { name: "Forecast Category", type: "SELECT", options: ["Best Case", "Commit", "Pipeline", "Omitted"] },
@@ -103,7 +64,7 @@ type DealsBoardProps = {
 }
 
 export function DealsBoard({ deals, onAddDeal, onUpdateDeal }: DealsBoardProps) {
-  const [dealList, setDealList] = useState<Deal[]>(deals && deals.length ? deals : mockDeals)
+  const [dealList, setDealList] = useState<Deal[]>(deals || [])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
@@ -147,7 +108,7 @@ export function DealsBoard({ deals, onAddDeal, onUpdateDeal }: DealsBoardProps) 
 
   useEffect(() => {
     if (deals) {
-      setDealList(deals.length ? deals : mockDeals)
+      setDealList(deals)
     }
   }, [deals])
 

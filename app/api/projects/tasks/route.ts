@@ -2,7 +2,6 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
 import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
-import { seedProjectData } from "@/lib/module-seeds"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable project tasks." }, { status: 503 })
@@ -11,7 +10,6 @@ export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org } = await requireModuleAccess(request, "projects", "view")
-    await seedProjectData(org.id)
     const tasks = await prisma.projectTask.findMany({
       where: { orgId: org.id },
       include: { project: true },

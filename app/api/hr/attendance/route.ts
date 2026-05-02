@@ -2,7 +2,6 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
 import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
-import { seedHrData } from "@/lib/module-seeds"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable attendance data." }, { status: 503 })
@@ -11,7 +10,6 @@ export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org } = await requireModuleAccess(request, "hr", "view")
-    await seedHrData(org.id)
     const attendance = await prisma.attendanceRecord.findMany({
       where: { orgId: org.id },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],

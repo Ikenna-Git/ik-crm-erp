@@ -87,6 +87,7 @@ const fallbackCompanies = buildFallbackCompanies(50)
 export default function CRMPage() {
   const searchQuery = ""
   const [loading, setLoading] = useState(false)
+  const [crmError, setCrmError] = useState("")
   const [contacts, setContacts] = useState<any[]>([])
   const [companies, setCompanies] = useState<any[]>([])
   const [deals, setDeals] = useState<any[]>([])
@@ -295,6 +296,7 @@ export default function CRMPage() {
   const loadData = async () => {
     try {
       setLoading(true)
+      setCrmError("")
       const [contactsRes, dealsRes, companiesRes] = await Promise.all([
         fetch("/api/crm/contacts", { headers: { ...getSessionHeaders() } }),
         fetch("/api/crm/deals", { headers: { ...getSessionHeaders() } }),
@@ -304,21 +306,28 @@ export default function CRMPage() {
       const dealsJson = dealsRes.ok ? await parseJsonSafe(dealsRes) : null
       const companiesJson = companiesRes.ok ? await parseJsonSafe(companiesRes) : null
 
-      const loadedContacts =
-        contactsJson?.contacts?.length > 0 ? contactsJson.contacts.map(mapContact) : fallbackContacts
+      if (!contactsRes.ok || !dealsRes.ok || !companiesRes.ok) {
+        throw new Error(
+          contactsJson?.error ||
+            dealsJson?.error ||
+            companiesJson?.error ||
+            "Failed to load CRM data",
+        )
+      }
 
-      const loadedDeals = dealsJson?.deals?.length ? dealsJson.deals.map(mapDeal) : fallbackDeals
-      const loadedCompanies =
-        companiesJson?.companies?.length > 0 ? companiesJson.companies.map(mapCompany) : fallbackCompanies
+      const loadedContacts = Array.isArray(contactsJson?.contacts) ? contactsJson.contacts.map(mapContact) : []
+      const loadedDeals = Array.isArray(dealsJson?.deals) ? dealsJson.deals.map(mapDeal) : []
+      const loadedCompanies = Array.isArray(companiesJson?.companies) ? companiesJson.companies.map(mapCompany) : []
 
       setContacts(loadedContacts)
       setDeals(loadedDeals)
       setCompanies(loadedCompanies)
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to load CRM data", err)
-      setContacts(fallbackContacts)
-      setDeals(fallbackDeals)
-      setCompanies(fallbackCompanies)
+      setCrmError(err?.message || "Failed to load CRM data")
+      setContacts([])
+      setDeals([])
+      setCompanies([])
     } finally {
       setLoading(false)
     }
@@ -333,6 +342,7 @@ export default function CRMPage() {
     customFields?: Record<string, any>
   }) => {
     try {
+      setCrmError("")
       const res = await fetch("/api/crm/contacts", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
@@ -351,22 +361,16 @@ export default function CRMPage() {
       const contact = mapContact(data.contact)
       setContacts((prev) => [...prev, contact])
       return contact
-    } catch (err) {
-      console.warn("Failed to add contact via API, falling back to local data", err)
-      const fallback = {
-        id: `C${Date.now()}`,
-        ...payload,
-        revenue: 0,
-        lastContact: "Just now",
-        customFields: payload.customFields || {},
-      }
-      setContacts((prev) => [...prev, fallback])
-      return fallback
+    } catch (err: any) {
+      console.warn("Failed to add contact via API", err)
+      setCrmError(err?.message || "Failed to add contact")
+      return null
     }
   }
 
   const handleDeleteContact = async (id: string) => {
     try {
+      setCrmError("")
       const res = await fetch(`/api/crm/contacts?id=${id}`, {
         method: "DELETE",
         headers: { ...getSessionHeaders() },
@@ -375,10 +379,10 @@ export default function CRMPage() {
         const data = await parseJsonSafe(res)
         throw new Error(data?.error || "Failed to delete contact")
       }
-    } catch (err) {
-      console.warn("Failed to delete contact", err)
-    } finally {
       setContacts((prev) => prev.filter((c) => c.id !== id))
+    } catch (err: any) {
+      console.warn("Failed to delete contact", err)
+      setCrmError(err?.message || "Failed to delete contact")
     }
   }
 
@@ -427,6 +431,7 @@ export default function CRMPage() {
 
   const handleUpdateContact = async (id: string, data: any) => {
     try {
+      setCrmError("")
       const res = await fetch("/api/crm/contacts", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
@@ -436,11 +441,9 @@ export default function CRMPage() {
       if (!res.ok) throw new Error(payload?.error || "Failed to update contact")
       const updated = mapContact(payload.contact)
       setContacts((prev) => prev.map((c) => (c.id === id ? updated : c)))
-    } catch (err) {
+    } catch (err: any) {
       console.warn("Failed to update contact", err)
-      setContacts((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, ...data, lastContact: "Updated just now" } : c)),
-      )
+      setCrmError(err?.message || "Failed to update contact")
     }
   }
 
@@ -451,6 +454,7 @@ export default function CRMPage() {
     customFields?: Record<string, any>
   }) => {
     try {
+      setCrmError("")
       const res = await fetch("/api/crm/companies", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
@@ -466,21 +470,16 @@ export default function CRMPage() {
       const company = mapCompany(data.company)
       setCompanies((prev) => [...prev, company])
       return company
-    } catch (err) {
-      console.warn("Failed to add company via API, falling back to local data", err)
-      const fallback = {
-        id: `CO-${Date.now()}`,
-        ...payload,
-        owner: "—",
-        updatedAt: new Date().toISOString().slice(0, 10),
-      }
-      setCompanies((prev) => [...prev, fallback])
-      return fallback
+    } catch (err: any) {
+      console.warn("Failed to add company via API", err)
+      setCrmError(err?.message || "Failed to add company")
+      return null
     }
   }
 
   const handleUpdateCompany = async (id: string, data: any) => {
     try {
+      setCrmError("")
       const res = await fetch("/api/crm/companies", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
@@ -490,14 +489,15 @@ export default function CRMPage() {
       if (!res.ok) throw new Error(payload?.error || "Failed to update company")
       const updated = mapCompany(payload.company)
       setCompanies((prev) => prev.map((c) => (c.id === id ? updated : c)))
-    } catch (err) {
+    } catch (err: any) {
       console.warn("Failed to update company", err)
-      setCompanies((prev) => prev.map((c) => (c.id === id ? { ...c, ...data } : c)))
+      setCrmError(err?.message || "Failed to update company")
     }
   }
 
   const handleDeleteCompany = async (id: string) => {
     try {
+      setCrmError("")
       const res = await fetch(`/api/crm/companies?id=${id}`, {
         method: "DELETE",
         headers: { ...getSessionHeaders() },
@@ -506,10 +506,10 @@ export default function CRMPage() {
         const data = await parseJsonSafe(res)
         throw new Error(data?.error || "Failed to delete company")
       }
-    } catch (err) {
-      console.warn("Failed to delete company", err)
-    } finally {
       setCompanies((prev) => prev.filter((c) => c.id !== id))
+    } catch (err: any) {
+      console.warn("Failed to delete company", err)
+      setCrmError(err?.message || "Failed to delete company")
     }
   }
 
@@ -522,6 +522,7 @@ export default function CRMPage() {
     customFields?: Record<string, any>
   }) => {
     try {
+      setCrmError("")
       const res = await fetch("/api/crm/deals", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
@@ -539,20 +540,16 @@ export default function CRMPage() {
       const deal = mapDeal(data.deal)
       setDeals((prev) => [...prev, deal])
       return deal
-    } catch (err) {
-      console.warn("Failed to add deal via API, falling back to local data", err)
-      const fallback = {
-        id: `D-${Date.now()}`,
-        ...payload,
-        owner: "—",
-      }
-      setDeals((prev) => [...prev, fallback])
-      return fallback
+    } catch (err: any) {
+      console.warn("Failed to add deal via API", err)
+      setCrmError(err?.message || "Failed to add deal")
+      return null
     }
   }
 
   const handleUpdateDeal = async (id: string, data: any) => {
     try {
+      setCrmError("")
       const res = await fetch("/api/crm/deals", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
@@ -562,9 +559,9 @@ export default function CRMPage() {
       if (!res.ok) throw new Error(payload?.error || "Failed to update deal")
       const updated = mapDeal(payload.deal)
       setDeals((prev) => prev.map((d) => (d.id === id ? updated : d)))
-    } catch (err) {
+    } catch (err: any) {
       console.warn("Failed to update deal", err)
-      setDeals((prev) => prev.map((d) => (d.id === id ? { ...d, ...data } : d)))
+      setCrmError(err?.message || "Failed to update deal")
     }
   }
 
@@ -613,6 +610,7 @@ export default function CRMPage() {
           </h1>
           <p className="text-muted-foreground mt-1">Manage contacts, deals, and sales activities</p>
           {loading && <p className="text-xs text-muted-foreground">Loading...</p>}
+          {crmError ? <p className="text-xs text-destructive mt-1">{crmError}</p> : null}
         </div>
         <div className="flex gap-2 flex-wrap justify-end">
           <Dialog open={openExportDialog} onOpenChange={setOpenExportDialog}>
@@ -726,7 +724,7 @@ export default function CRMPage() {
 
         {/* Activities Tab */}
         <TabsContent value="activities" className="space-y-4">
-          <ActivitiesTimeline />
+          <ActivitiesTimeline activities={[]} />
         </TabsContent>
 
         <TabsContent value="reports" className="space-y-4">
