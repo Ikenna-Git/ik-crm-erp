@@ -15,6 +15,9 @@ import { isSuperAdmin } from "@/lib/authz"
 type OrgRecord = {
   id: string
   name: string
+  status: string
+  statusReason?: string | null
+  statusChangedAt?: string | null
   theme?: string | null
   notifyEmail?: string | null
   createdAt: string
@@ -78,6 +81,7 @@ export default function AdminSystemPage() {
   const [loading, setLoading] = useState(true)
   const [statusLoading, setStatusLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [lifecycleSavingId, setLifecycleSavingId] = useState<string | null>(null)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [lastInvite, setLastInvite] = useState<InvitePayload | null>(null)
@@ -162,6 +166,44 @@ export default function AdminSystemPage() {
       setSuccess("Invite link copied.")
     } catch {
       setError("Failed to copy invite link.")
+    }
+  }
+
+  const handleStatusChange = async (org: OrgRecord, status: "active" | "suspended" | "archived") => {
+    const statusReason =
+      status === "active"
+        ? ""
+        : window.prompt(
+            status === "suspended"
+              ? `Why are you suspending ${org.name}?`
+              : `Why are you archiving ${org.name}?`,
+            org.statusReason || "",
+          ) || ""
+
+    try {
+      setLifecycleSavingId(org.id)
+      setError("")
+      setSuccess("")
+      const response = await fetch("/api/admin/orgs", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: org.id, status, statusReason }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload?.error || "Failed to update workspace status")
+      setOrgs((current) => current.map((item) => (item.id === org.id ? payload.org : item)))
+      setSuccess(
+        status === "active"
+          ? `${org.name} was restored.`
+          : status === "suspended"
+            ? `${org.name} was suspended.`
+            : `${org.name} was archived.`,
+      )
+      await loadStatus()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update workspace status")
+    } finally {
+      setLifecycleSavingId(null)
     }
   }
 
@@ -413,14 +455,64 @@ export default function AdminSystemPage() {
                         <div>
                           <p className="font-medium">{org.name}</p>
                           <p className="text-xs text-slate-400">{org.notifyEmail || "No notify email"}</p>
+                          {org.statusReason ? <p className="text-xs text-amber-300">{org.statusReason}</p> : null}
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>{org._count.users}</TableCell>
                     <TableCell>
-                      <div className="text-xs text-slate-300">
+                      <div className="space-y-2">
+                        <div>{org._count.users}</div>
+                        <Badge
+                          className={
+                            org.status === "active"
+                              ? "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15"
+                              : org.status === "suspended"
+                                ? "bg-amber-500/15 text-amber-300 hover:bg-amber-500/15"
+                                : "bg-slate-500/15 text-slate-300 hover:bg-slate-500/15"
+                          }
+                        >
+                          {org.status}
+                        </Badge>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-2 text-xs text-slate-300">
                         <div>Employees: {org._count.employees}</div>
                         <div>Workflows: {org._count.automationWorkflows}</div>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {org.status !== "active" ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-white/10 bg-transparent text-slate-100"
+                              disabled={lifecycleSavingId === org.id}
+                              onClick={() => handleStatusChange(org, "active")}
+                            >
+                              Restore
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-white/10 bg-transparent text-amber-200"
+                              disabled={lifecycleSavingId === org.id}
+                              onClick={() => handleStatusChange(org, "suspended")}
+                            >
+                              Suspend
+                            </Button>
+                          )}
+                          {org.status !== "archived" ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-white/10 bg-transparent text-slate-200"
+                              disabled={lifecycleSavingId === org.id}
+                              onClick={() => handleStatusChange(org, "archived")}
+                            >
+                              Archive
+                            </Button>
+                          ) : null}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -428,6 +520,9 @@ export default function AdminSystemPage() {
                         <Cpu className="h-4 w-4 text-emerald-300" />
                         Updated {new Date(org.updatedAt).toLocaleDateString()}
                       </div>
+                      {org.statusChangedAt ? (
+                        <p className="mt-1 text-xs text-slate-500">Status changed {new Date(org.statusChangedAt).toLocaleDateString()}</p>
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}

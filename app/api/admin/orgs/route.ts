@@ -6,6 +6,7 @@ import { getUserFromRequest } from "@/lib/request-user"
 import { isSuperAdmin } from "@/lib/authz"
 import { getDefaultTrialEndsAt } from "@/lib/billing"
 import { issueSignupInvite, sendSignupInviteEmail } from "@/lib/invitations"
+import { normalizeOrgStatus } from "@/lib/org-status"
 import { getPublicOrigin } from "@/lib/public-url"
 
 const dbUnavailable = () =>
@@ -25,6 +26,9 @@ export async function GET(request: Request) {
       select: {
         id: true,
         name: true,
+        status: true,
+        statusReason: true,
+        statusChangedAt: true,
         theme: true,
         notifyEmail: true,
         createdAt: true,
@@ -89,6 +93,7 @@ export async function POST(request: Request) {
     const created = await prisma.org.create({
       data: {
         name: orgName,
+        status: "active",
         theme: theme || "light",
         notifyEmail: notifyEmail || ownerEmail,
         billingEmail: ownerEmail,
@@ -158,5 +163,69 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Org creation failed", error)
     return NextResponse.json({ error: "Failed to create workspace" }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: Request) {
+  if (!process.env.DATABASE_URL) return dbUnavailable()
+
+  try {
+    const { user } = await getUserFromRequest(request)
+    if (!isSuperAdmin(user.role)) {
+      return NextResponse.json({ error: "Super admin access required" }, { status: 403 })
+    }
+
+    const body = await request.json()
+    const orgId = String(body?.id || "").trim()
+    const status = normalizeOrgStatus(body?.status)
+    const statusReason = String(body?.statusReason || "").trim()
+
+    if (!orgId) {
+      return NextResponse.json({ error: "id is required" }, { status: 400 })
+    }
+
+    const updated = await prisma.org.update({
+      where: { id: orgId },
+      data: {
+        status,
+        statusReason: statusReason || null,
+        statusChangedAt: new Date(),
+      },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        statusReason: true,
+        statusChangedAt: true,
+        theme: true,
+        notifyEmail: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: {
+          select: {
+            users: true,
+            contacts: true,
+            employees: true,
+            deals: true,
+            invoices: true,
+            automationWorkflows: true,
+          },
+        },
+      },
+    })
+
+    await createAuditLog({
+      orgId: updated.id,
+      userId: user.id,
+      action: "admin.org.status_updated",
+      entity: "Org",
+      entityId: updated.id,
+      metadata: { name: updated.name, status: updated.status, statusReason: updated.statusReason },
+    })
+
+    return NextResponse.json({ org: updated })
+  } catch (error) {
+    console.error("Org status update failed", error)
+    return NextResponse.json({ error: "Failed to update workspace status" }, { status: 500 })
   }
 }

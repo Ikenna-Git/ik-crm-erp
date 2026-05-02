@@ -99,6 +99,9 @@ enum PortalStatus {
 model Org {
   id           String         @id @default(uuid())
   name         String
+  status       String         @default("active")
+  statusReason String?
+  statusChangedAt DateTime?
   theme        String?        @default("light")
   notifyEmail  String?
   billingPlan  String         @default("trial")

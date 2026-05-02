@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 
     const startedAt = Date.now()
 
-    const [inviteCount, missingNotifyCount, orgWorkflowSummary, privilegedWithout2FA, pendingUserActivations] = await Promise.all([
+    const [inviteCount, missingNotifyCount, suspendedOrgCount, archivedOrgCount, orgWorkflowSummary, privilegedWithout2FA, pendingUserActivations] = await Promise.all([
       prisma.verificationToken.count({
         where: {
           identifier: { startsWith: "invite:" },
@@ -30,6 +30,8 @@ export async function GET(request: Request) {
           OR: [{ notifyEmail: null }, { notifyEmail: "" }],
         },
       }),
+      prisma.org.count({ where: { status: "suspended" } }),
+      prisma.org.count({ where: { status: "archived" } }),
       prisma.org.findMany({
         select: {
           id: true,
@@ -150,6 +152,18 @@ export async function GET(request: Request) {
         title: "Workspaces with no alert inbox",
         metric: `${missingNotifyCount} workspace${missingNotifyCount === 1 ? "" : "s"}`,
         detail: "Critical notices do not have a shared destination in these organizations.",
+      },
+      {
+        id: "suspended-orgs",
+        title: "Suspended workspaces",
+        metric: `${suspendedOrgCount} workspace${suspendedOrgCount === 1 ? "" : "s"}`,
+        detail: "These workspaces are locked out from day-to-day usage until you restore them.",
+      },
+      {
+        id: "archived-orgs",
+        title: "Archived workspaces",
+        metric: `${archivedOrgCount} workspace${archivedOrgCount === 1 ? "" : "s"}`,
+        detail: "Archived workspaces remain recorded, but should not be operating live.",
       },
       {
         id: "automation-gaps",

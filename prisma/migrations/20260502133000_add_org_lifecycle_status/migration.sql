@@ -1,0 +1,4 @@
+ALTER TABLE "Org"
+ADD COLUMN "status" TEXT NOT NULL DEFAULT 'active',
+ADD COLUMN "statusReason" TEXT,
+ADD COLUMN "statusChangedAt" TIMESTAMP(3);

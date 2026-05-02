@@ -4,7 +4,8 @@ import { prisma, withPrismaRetry } from "@/lib/prisma"
 import { buildModuleAccessForUser, getDefaultAccessProfileForRole } from "@/lib/access-control"
 import { getDefaultOrg } from "@/lib/defaultOrg"
 import { authOptions } from "@/lib/auth"
-import { FOUNDER_SUPER_ADMIN_EMAIL } from "@/lib/authz"
+import { FOUNDER_SUPER_ADMIN_EMAIL, isSuperAdmin } from "@/lib/authz"
+import { getOrgStatusMessage } from "@/lib/org-status"
 
 const fallbackEmail = FOUNDER_SUPER_ADMIN_EMAIL
 const isDev = process.env.NODE_ENV !== "production"
@@ -118,6 +119,13 @@ export const getUserFromRequest = async (request: Request) => {
           )
         : existingUser
 
+    if (!isSuperAdmin(nextRole)) {
+      const orgStatusMessage = getOrgStatusMessage(user.org.status, user.org.statusReason)
+      if (orgStatusMessage) {
+        throw new RequestUserError(orgStatusMessage, 403)
+      }
+    }
+
     return { org: user.org, user }
   }
 
@@ -140,6 +148,13 @@ export const getUserFromRequest = async (request: Request) => {
       },
     }),
   )
+
+  if (!isSuperAdmin(user.role)) {
+    const orgStatusMessage = getOrgStatusMessage(org.status, org.statusReason)
+    if (orgStatusMessage) {
+      throw new RequestUserError(orgStatusMessage, 403)
+    }
+  }
 
   return { org, user }
 }
