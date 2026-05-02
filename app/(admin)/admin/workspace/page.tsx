@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
-import { ArrowRight, Building2, Palette, ShieldCheck } from "lucide-react"
+import { ArrowRight, Building2, CreditCard, Palette, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -176,12 +176,20 @@ export default function AdminWorkspacePage() {
                 <ShieldCheck className="h-5 w-5 text-emerald-300" />
                 <p className="font-medium">Next step</p>
               </div>
-              <Button variant="outline" className="w-full justify-between border-white/10 bg-transparent text-slate-100" asChild>
-                <Link href="/admin/users">
-                  Open team, roles, and job access
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
+              <div className="space-y-3">
+                <Button variant="outline" className="w-full justify-between border-white/10 bg-transparent text-slate-100" asChild>
+                  <Link href="/admin/users">
+                    Open team, roles, and job access
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+                <Button variant="outline" className="w-full justify-between border-white/10 bg-transparent text-slate-100" asChild>
+                  <Link href="/admin/billing">
+                    Review billing and seats
+                    <CreditCard className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </div>
             </div>
           </div>
         </CardContent>

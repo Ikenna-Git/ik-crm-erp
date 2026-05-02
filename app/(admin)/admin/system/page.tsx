@@ -53,6 +53,11 @@ type PlatformStatusResponse = {
     anthropic: boolean
     gemini: boolean
   }
+  billingProviders: {
+    paystack: boolean
+    flutterwave: boolean
+    stripe: boolean
+  }
   meta: {
     inviteCount: number
     largestWorkspace: { name: string; users: number } | null
@@ -246,6 +251,17 @@ export default function AdminSystemPage() {
               <p>
                 {status?.meta.inviteCount || 0} live invite link{status?.meta.inviteCount === 1 ? "" : "s"} are active
                 right now across the platform.
+              </p>
+            </div>
+            <div className="rounded-3xl border border-white/10 bg-slate-950/55 p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-emerald-300" />
+                <p className="font-medium text-white">Billing providers</p>
+              </div>
+              <p>
+                Paystack: {status?.billingProviders.paystack ? "ready" : "missing"} • Flutterwave:{" "}
+                {status?.billingProviders.flutterwave ? "ready" : "missing"} • Stripe:{" "}
+                {status?.billingProviders.stripe ? "ready" : "missing"}
               </p>
             </div>
             <div className="rounded-3xl border border-white/10 bg-slate-950/55 p-4">

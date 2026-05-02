@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma, withPrismaRetry } from "@/lib/prisma"
 import { getUserFromRequest } from "@/lib/request-user"
 import { isSuperAdmin } from "@/lib/authz"
+import { getBillingProviderReadiness } from "@/lib/billing"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable founder status." }, { status: 503 })
@@ -62,6 +63,8 @@ export async function GET(request: Request) {
       process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET,
     )
     const googleOauthConfigured = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
+    const billingProviderReadiness = getBillingProviderReadiness()
+    const billingReadyCount = Object.values(billingProviderReadiness).filter(Boolean).length
     const aiProviders = {
       openai: Boolean(process.env.OPENAI_API_KEY),
       anthropic: Boolean(process.env.ANTHROPIC_API_KEY),
@@ -100,6 +103,15 @@ export async function GET(request: Request) {
         detail: cloudinaryConfigured
           ? "Cloudinary is configured for portal and document uploads."
           : "Cloudinary is not fully configured. File-sharing flows will not feel production-ready.",
+      },
+      {
+        id: "billing",
+        label: "Billing provider readiness",
+        status: billingReadyCount > 0 ? "healthy" : "warning",
+        detail:
+          billingReadyCount > 0
+            ? `${billingReadyCount} billing provider${billingReadyCount === 1 ? "" : "s"} configured for future charging flows.`
+            : "No billing provider credentials detected yet. Org-owner billing controls are live, but payments are not wired.",
       },
       {
         id: "ai",
@@ -151,6 +163,7 @@ export async function GET(request: Request) {
       readiness,
       watchlist,
       aiProviders,
+      billingProviders: billingProviderReadiness,
       meta: {
         inviteCount,
         largestWorkspace: largestWorkspace

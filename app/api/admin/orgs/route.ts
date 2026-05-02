@@ -4,6 +4,7 @@ import { createAuditLog } from "@/lib/audit"
 import { buildModuleAccessForUser, getDefaultAccessProfileForRole } from "@/lib/access-control"
 import { getUserFromRequest } from "@/lib/request-user"
 import { isSuperAdmin } from "@/lib/authz"
+import { getDefaultTrialEndsAt } from "@/lib/billing"
 import { issueSignupInvite, sendSignupInviteEmail } from "@/lib/invitations"
 import { getPublicOrigin } from "@/lib/public-url"
 
@@ -90,6 +91,8 @@ export async function POST(request: Request) {
         name: orgName,
         theme: theme || "light",
         notifyEmail: notifyEmail || ownerEmail,
+        billingEmail: ownerEmail,
+        trialEndsAt: getDefaultTrialEndsAt(),
         users: {
           create: {
             name: ownerName,

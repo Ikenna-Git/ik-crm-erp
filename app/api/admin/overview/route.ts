@@ -154,6 +154,18 @@ export async function GET(request: Request) {
       })
     }
 
+    if (!org.billingEmail) {
+      issues.push({
+        id: "billing-email",
+        severity: "warning",
+        title: "Billing contact is still missing",
+        detail: "Your workspace does not yet have a clean billing destination for invoices, subscription notices, or plan changes.",
+        metric: "Billing contact missing",
+        href: "/admin/billing",
+        cta: "Set billing contact",
+      })
+    }
+
     if (workflowCount === 0) {
       issues.push({
         id: "workflow-coverage",
@@ -216,6 +228,14 @@ export async function GET(request: Request) {
         detail: org.notifyEmail ? `Critical notices route to ${org.notifyEmail}.` : "No shared notify email is configured yet.",
       },
       {
+        id: "billing",
+        label: "Billing ownership",
+        status: org.billingEmail ? "healthy" : "warning",
+        detail: org.billingEmail
+          ? `Subscription notices route to ${org.billingEmail}.`
+          : "No billing email is configured for this workspace yet.",
+      },
+      {
         id: "ai",
         label: "AI assistant",
         status: aiConfigured ? "healthy" : "warning",
@@ -258,6 +278,13 @@ export async function GET(request: Request) {
         detail: "Set the workspace identity, notify inbox, and basic control settings your team will actually use.",
         href: "/admin/workspace",
         cta: "Edit workspace",
+      },
+      {
+        id: "billing",
+        title: "Make billing ownership explicit",
+        detail: "Set the billing contact, seat visibility, and subscription posture before handing the workspace to leadership.",
+        href: "/admin/billing",
+        cta: "Open billing",
       },
     ]
 
