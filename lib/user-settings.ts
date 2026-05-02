@@ -157,24 +157,8 @@ export const userUpdatedEventName = "civis-user-updated"
 export const themeUpdatedEventName = "civis-theme-updated"
 
 export const getSessionHeaders = (userOverride?: { email?: string | null; name?: string | null }) => {
-  if (userOverride?.email || userOverride?.name) {
-    const headers: Record<string, string> = {}
-    if (userOverride.email) headers["x-user-email"] = userOverride.email
-    if (userOverride.name) headers["x-user-name"] = userOverride.name
-    return headers
-  }
-  if (typeof window === "undefined") return {}
-  try {
-    const raw = localStorage.getItem("user")
-    if (!raw) return {}
-    const user = JSON.parse(raw)
-    const headers: Record<string, string> = {}
-    if (user?.email) headers["x-user-email"] = user.email
-    if (user?.name) headers["x-user-name"] = user.name
-    return headers
-  } catch {
-    return {}
-  }
+  void userOverride
+  return {}
 }
 
 export const syncLocalUser = (profile: UserProfile) => {

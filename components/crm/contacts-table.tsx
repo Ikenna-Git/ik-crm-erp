@@ -67,6 +67,15 @@ interface Contact {
   customFields?: Record<string, any>
 }
 
+type ContactFormState = {
+  name: string
+  email: string
+  phone: string
+  company: string
+  status: Contact["status"]
+  customFields: Record<string, any>
+}
+
 const contactFirstNames = ["Sarah", "Michael", "Emma", "John", "Lisa", "Ava", "Noah", "Grace", "Daniel", "Olivia"]
 const contactLastNames = ["Johnson", "Chen", "Davis", "Smith", "Anderson", "Okafor", "Umeh", "Martins", "Williams", "Brown"]
 const contactCompanies = [
@@ -234,12 +243,12 @@ export function ContactsTable({
     required: false,
   })
   const [view, setView] = useState<CrmViewSettings>(crmView || DEFAULT_CRM_VIEWS.contacts)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ContactFormState>({
     name: "",
     email: "",
     phone: "",
     company: "",
-    status: "lead" as const,
+    status: "lead",
     customFields: {} as Record<string, any>,
   })
 

@@ -94,18 +94,17 @@ export async function GET(request: NextRequest) {
         where: {
           orgId: org.id,
           OR: [
-            { number: { contains: query } },
-            { contact: { name: { contains: query, mode: "insensitive" } } }
-          ]
+            { invoiceNumber: { contains: query, mode: "insensitive" } },
+            { clientName: { contains: query, mode: "insensitive" } },
+          ],
         },
-        include: { contact: true },
         take: limit
       })
 
       results.push(...invoices.map(invoice => ({
         id: `invoice-${invoice.id}`,
-        title: `Invoice ${invoice.number}`,
-        subtitle: `Invoice • ${invoice.status} • ₦${invoice.total?.toLocaleString() || '0'}`,
+        title: `Invoice ${invoice.invoiceNumber}`,
+        subtitle: `Invoice • ${invoice.status} • ₦${invoice.amount?.toLocaleString() || '0'}`,
         category: "Accounting",
         href: "/dashboard/accounting",
         type: "invoice"

@@ -5,7 +5,6 @@ import { createAuditLog } from "@/lib/audit"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable follow-ups." }, { status: 503 })
-const isDev = process.env.NODE_ENV !== "production"
 
 const CONTACT_INACTIVITY_DAYS = 21
 const DEAL_STALL_DAYS = 10
@@ -183,33 +182,8 @@ const formatCreateError = (prefix: string, error: unknown) => {
   return `${prefix}: ${detail}`
 }
 
-const buildSimulatedSummary = () => {
-  const now = new Date().toISOString()
-  return {
-    inactiveContacts: {
-      count: 4,
-      items: [
-        { id: "sim-c-1", label: "Northwind Procurement", meta: "34 days idle", daysIdle: 34, priority: "high" as const },
-        { id: "sim-c-2", label: "Acme Holdings", meta: "52 days idle", daysIdle: 52, priority: "critical" as const },
-        { id: "sim-c-3", label: "Blue Ridge Retail", meta: "24 days idle", daysIdle: 24, priority: "normal" as const },
-        { id: "sim-c-4", label: "Zenith Logistics", meta: "46 days idle", daysIdle: 46, priority: "critical" as const },
-      ],
-    },
-    stalledDeals: {
-      count: 3,
-      items: [
-        { id: "sim-d-1", label: "Civis ERP rollout - Northwind", meta: "negotiation • 16 days", daysIdle: 16, priority: "high" as const },
-        { id: "sim-d-2", label: "Payroll revamp - NovaWorks", meta: "proposal • 23 days", daysIdle: 23, priority: "critical" as const },
-        { id: "sim-d-3", label: "CRM migration - Acme", meta: "qualified • 11 days", daysIdle: 11, priority: "normal" as const },
-      ],
-    },
-    generatedAt: now,
-  }
-}
-
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) {
-    if (isDev) return NextResponse.json({ summary: buildSimulatedSummary(), simulated: true })
     return dbUnavailable()
   }
   try {
@@ -218,7 +192,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ summary })
   } catch (error) {
     if (isTransientPrismaError(error)) {
-      if (isDev) return NextResponse.json({ summary: buildSimulatedSummary(), simulated: true })
       return NextResponse.json(
         { error: "Database connection is temporarily unavailable. Please retry in a moment." },
         { status: 503 },
@@ -230,14 +203,6 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) {
-    if (isDev) {
-      return NextResponse.json({
-        created: { contacts: 4, deals: 3 },
-        skipped: 0,
-        summary: buildSimulatedSummary(),
-        simulated: true,
-      })
-    }
     return dbUnavailable()
   }
   try {
@@ -355,14 +320,6 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     if (isTransientPrismaError(error)) {
-      if (isDev) {
-        return NextResponse.json({
-          created: { contacts: 4, deals: 3 },
-          skipped: 0,
-          summary: buildSimulatedSummary(),
-          simulated: true,
-        })
-      }
       return NextResponse.json(
         { error: "Database connection is temporarily unavailable. Please retry in a moment." },
         { status: 503 },

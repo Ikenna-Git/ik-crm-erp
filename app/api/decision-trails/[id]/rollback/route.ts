@@ -1,8 +1,9 @@
 import { POST as legacyRollbackPost } from "@/app/api/decision-trails/rollback/route"
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const body = await request.json().catch(() => ({}))
-  const payload = { ...(body as Record<string, unknown>), id: params.id }
+  const payload = { ...(body as Record<string, unknown>), id }
   const headers = new Headers(request.headers)
   headers.set("content-type", "application/json")
 

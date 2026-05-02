@@ -2,8 +2,9 @@ import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import PortalClient from "./portal-client"
 
-export default async function PortalView({ params }: { params: { code: string } }) {
-  if (!params?.code) {
+export default async function PortalView({ params }: { params: Promise<{ code: string }> }) {
+  const { code } = await params
+  if (!code) {
     notFound()
   }
   if (!process.env.DATABASE_URL) {
@@ -15,7 +16,7 @@ export default async function PortalView({ params }: { params: { code: string } 
   }
 
   const portal = await prisma.clientPortal.findUnique({
-    where: { accessCode: params.code },
+    where: { accessCode: code },
     include: {
       updates: { orderBy: { createdAt: "desc" }, take: 12 },
       documents: { orderBy: { createdAt: "desc" }, take: 12 },

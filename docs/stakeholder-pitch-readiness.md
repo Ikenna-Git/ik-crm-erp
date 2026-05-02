@@ -1,6 +1,6 @@
 # Civis Stakeholder Pitch Readiness
 
-Updated: 2026-04-30
+Updated: 2026-05-02
 
 This document is the practical gate for deciding when Civis is ready to be shown to serious stakeholders with their own admin access.
 
@@ -15,6 +15,8 @@ Civis is no longer just a demo shell. It now has:
 - a growing backend/API layer
 - a live admin control-plane foundation
 - security architecture and API documentation
+- centralized route protection for dashboard/admin/private API access
+- production-side reduction of demo/fallback identity and fake business-data leakage
 
 But it is not yet fully stakeholder-ready across platform governance, operational reliability, commercial controls, and supportability.
 
@@ -50,7 +52,9 @@ These are the minimum conditions before giving a stakeholder their own admin log
 - production auth secrets are correct
 - session behavior is stable
 - role boundaries are enforced in real routes, not only UI
+- private routes are protected centrally, not only through page-level checks
 - audit logs capture admin-critical actions
+- demo/fallback business data does not leak in production paths
 
 ### Product Stability
 
@@ -89,6 +93,7 @@ These are the next layer. The product can be pitched without every single item h
 - NDPA/VAPT backlog has started in implementation, not only documentation
 - retention and deletion approach is defined
 - high-risk actions are visible in audit history
+- destructive actions are rate-limited and scope-validated
 
 ## Gate 3: Pitch-Ready But Can Follow Immediately After
 
@@ -142,10 +147,10 @@ For Civis right now, the next correct sequence is:
 
 1. stabilize the database connection
 2. apply migrations
-3. validate the admin control plane on live data
-4. validate HR, projects, and inventory on live data
-5. deploy a clean batch
-6. add monitoring/recovery basics
+3. validate centralized auth and admin control-plane behavior on live data
+4. validate HR, projects, and inventory on live data without seeded demo leakage
+5. add monitoring/recovery basics
+6. choose and implement billing/provider flow honestly
 7. complete the first stakeholder pitch gate review
 
 This document should be treated as a release gate, not just as notes.

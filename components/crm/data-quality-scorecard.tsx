@@ -80,7 +80,7 @@ export function CrmQualityScorecard({
     lowValueDeals
       ? { icon: AlertTriangle, label: `Update values for ${lowValueDeals} zero-value deals` }
       : null,
-  ].filter(Boolean)
+  ].filter((item): item is { icon: typeof AlertTriangle; label: string } | { icon: typeof Phone; label: string } | { icon: typeof Users; label: string } | { icon: typeof Merge; label: string } => Boolean(item))
 
   const qualityScore = totalContacts
     ? Math.max(0, 100 - Math.min(60, Math.round((missingPhone + missingCompany + duplicateCount) / totalContacts) * 20))

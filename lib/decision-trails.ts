@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma"
-import type { Contact, Deal, Expense, Invoice } from "@prisma/client"
+import { Prisma, type Contact, type Deal, type Expense, type Invoice } from "@prisma/client"
 
 export type DecisionSnapshot = Record<string, any>
+
+const toNullableJson = (value?: DecisionSnapshot | null) =>
+  value === null ? Prisma.JsonNull : ((value ?? undefined) as Prisma.InputJsonValue | undefined)
 
 export const createDecisionTrail = async (payload: {
   orgId: string
@@ -20,9 +23,9 @@ export const createDecisionTrail = async (payload: {
       action: payload.action,
       entity: payload.entity,
       entityId: payload.entityId || null,
-      before: payload.before ?? null,
-      after: payload.after ?? null,
-      metadata: payload.metadata ?? null,
+      before: toNullableJson(payload.before),
+      after: toNullableJson(payload.after),
+      metadata: toNullableJson(payload.metadata),
     },
   })
 }

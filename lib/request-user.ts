@@ -6,11 +6,9 @@ import { getDefaultOrg } from "@/lib/defaultOrg"
 import { authOptions } from "@/lib/auth"
 import { FOUNDER_SUPER_ADMIN_EMAIL, isSuperAdmin } from "@/lib/authz"
 import { getOrgStatusMessage } from "@/lib/org-status"
+import { allowDevDefaultIdentity, allowDevHeaderIdentity } from "@/lib/runtime-flags"
 
 const fallbackEmail = FOUNDER_SUPER_ADMIN_EMAIL
-const isDev = process.env.NODE_ENV !== "production"
-const allowDevHeaderIdentity = isDev && process.env.ALLOW_DEV_HEADER_IDENTITY === "true"
-const allowDevDefaultIdentity = isDev && process.env.ALLOW_DEV_DEFAULT_IDENTITY === "true"
 
 type RequestIdentity = {
   email: string
@@ -127,6 +125,10 @@ export const getUserFromRequest = async (request: Request) => {
     }
 
     return { org: user.org, user }
+  }
+
+  if (!allowDevDefaultIdentity) {
+    throw new RequestUserError("No workspace membership found for this account", 403)
   }
 
   const org = await getDefaultOrg()

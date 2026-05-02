@@ -1,12 +1,12 @@
 # Civis CRM & ERP
 
-Modern Next.js 16 app with CRM, ERP, analytics, and premium dark theme.
+Modern Next.js 16 app for multi-workspace CRM, ERP, client portal, and admin operations.
 
 ## Tech Stack
 - Next.js 16 (App Router) + React 19
 - TailwindCSS + custom UI components
 - Prisma ORM with PostgreSQL
-- API routes for CRM, tasks, accounting, settings, reports
+- API routes for CRM, tasks, accounting, settings, reports, admin, portal, and AI
 - Nodemailer for report email exports (SMTP required)
 
 ## Quick Start
@@ -38,8 +38,11 @@ CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=
 CLOUDINARY_API_SECRET=
 
-# Admin defaults (demo fallback)
-DEFAULT_SUPER_ADMIN_EMAIL="ikchils@gmail.com"
+# Optional local-development flags only
+ALLOW_DEV_HEADER_IDENTITY="false"
+ALLOW_DEV_DEFAULT_IDENTITY="false"
+NEXTAUTH_ALLOW_DEV_FALLBACK="false"
+NEXT_PUBLIC_ENABLE_DEMO_MODE="false"
 ```
 
 Initialize Prisma and DB:
@@ -56,23 +59,30 @@ npm run dev
 Open `http://localhost:3000`.
 
 ## Features (current)
+- Multi-workspace admin control plane with `SUPER_ADMIN`, `ORG_OWNER`, `ADMIN`, and `USER`
 - Ops command center with decision feed + audit/decision trails
 - CRM: contacts, companies, deals, activities, CRM reports
 - Accounting: invoices, expenses, financial reports, CSV/email exports
 - Playbooks with AI suggestions and run history
 - Client portal with shareable access codes
 - Settings: profile/preferences, notifications, team roles
-- Dark/light toggle; marketing site with pricing preview
+- HR, projects, and inventory modules backed by Postgres routes
+- Marketing site with pricing preview and public portal access
 
 ## Notes
-- Data is Postgres-backed; demo fallbacks render if DB is missing.
+- Production and staging require a real database, real auth sessions, and real workspace membership. Demo or fallback identity/data paths are explicitly quarantined to local development flags only.
 - Email exports + notifications require SMTP envs; otherwise use desktop CSV download.
 - OAuth providers are optional; credentials login works with JWT sessions.
+- Founder-only `SUPER_ADMIN` is currently enforced in `lib/authz.ts` for `ikchils@gmail.com`. Treat that as a platform ownership control, not as a normal admin role.
+- Pricing is public marketing UI. Billing metadata and admin billing settings exist, but live subscription checkout/webhook automation is not implemented yet.
 
 ## Scripts
 - `npm run dev` — start dev server
 - `npm run build` — production build
-- `npm run lint` — lint
+- `npm run lint` — TypeScript no-emit check
+- `npm run typecheck` — TypeScript no-emit check
+- `npm run audit:deps` — dependency audit
+- `npm run fake-data:review -- --org <orgId>` — dry-run fake/demo data review for a single org
 
 ## Documentation
 - Project dossier: `docs/project-dossier.md`

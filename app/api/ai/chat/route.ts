@@ -2,7 +2,8 @@ import { NextResponse } from "next/server"
 import { resolveProvider, callProvider, type AiMessage } from "@/lib/ai/providers"
 import { buildFallbackResponse } from "@/lib/ai/fallback"
 import { findKnowledge } from "@/lib/ai/knowledge"
-import { getUserFromRequest, isRequestUserError } from "@/lib/request-user"
+import { requireModuleAccess } from "@/lib/access-route"
+import { isRequestUserError } from "@/lib/request-user"
 import { createAuditLog } from "@/lib/audit"
 import { prisma } from "@/lib/prisma"
 import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
@@ -36,21 +37,9 @@ type DataResolution = {
   action?: AiAction
 }
 
-const isDev = process.env.NODE_ENV !== "production"
 // Keep model-first behavior by default. Local rule-based QnA is opt-in only.
 const fastLocalQna = process.env.AI_FAST_LOCAL_QNA === "true"
 const aiRateLimitPerMinute = Number(process.env.AI_RATE_LIMIT_PER_MIN || "300")
-
-const demoSnapshot = {
-  employees: 24,
-  contacts: 134,
-  openDeals: 18,
-  overdueInvoices: 4,
-  pendingExpenses: 6,
-  revenue: 13256871,
-  expenses: 7800000,
-  activePortals: 5,
-}
 
 const normalizeMessages = (messages: any[]): AiMessage[] =>
   messages
@@ -380,7 +369,6 @@ const resolveConversationFollowup = async (
   orgId: string,
   prompt: string,
   previousAssistant: string,
-  enabled: boolean,
 ): Promise<DataResolution | null> => {
   if (!previousAssistant.trim()) return null
 
@@ -416,13 +404,6 @@ const resolveConversationFollowup = async (
   if (!isAffirmativePrompt(prompt)) return null
 
   if (askedForFollowupOrEmail) {
-    if (!enabled) {
-      return {
-        message:
-          "Great. I can proceed. Choose one: 1) generate follow-up tasks, 2) draft an update email. (Connect DB first for live task generation.)",
-      }
-    }
-
     const [inactiveContacts, stalledDeals] = await Promise.all([
       prisma.contact.count({ where: { orgId, lastContact: null } }),
       prisma.deal.count({ where: { orgId, stage: { in: ["PROPOSAL", "NEGOTIATION"] } } }),
@@ -464,7 +445,6 @@ const resolveConversationFollowup = async (
 const resolveDataQuery = async (
   orgId: string,
   prompt: string,
-  enabled: boolean,
   lockState: { hrUnlocked: boolean; financeUnlocked: boolean },
 ): Promise<DataResolution | null> => {
   const value = prompt.toLowerCase()
@@ -473,56 +453,6 @@ const resolveDataQuery = async (
     /(employees|contacts|deals|invoices|expenses|revenue|profit|payroll|headcount|portal)/.test(value)
 
   if (!looksLikeDataQuery) return null
-  if (!enabled) {
-    if (/(employee|employees|headcount|staff)/.test(value)) {
-      return {
-        message: `Live DB is currently offline. Based on your working snapshot, you have about ${demoSnapshot.employees} employees.`,
-        action: moduleActions.hr,
-      }
-    }
-
-    if (/(contact|contacts)/.test(value)) {
-      return {
-        message: `Live DB is offline. Snapshot shows about ${demoSnapshot.contacts} contacts in CRM.`,
-        action: moduleActions.crm,
-      }
-    }
-
-    if (/(deal|pipeline)/.test(value)) {
-      return {
-        message: `Live DB is offline. Snapshot shows about ${demoSnapshot.openDeals} open deals in pipeline.`,
-        action: moduleActions.crm,
-      }
-    }
-
-    if (/(invoice|invoices|overdue)/.test(value)) {
-      return {
-        message: `Live DB is offline. Snapshot shows about ${demoSnapshot.overdueInvoices} overdue invoices.`,
-        action: moduleActions.accounting,
-      }
-    }
-
-    if (/(expense|expenses)/.test(value)) {
-      return {
-        message: `Live DB is offline. Snapshot shows about ${demoSnapshot.pendingExpenses} pending expenses.`,
-        action: moduleActions.accounting,
-      }
-    }
-
-    if (/(revenue|profit|cashflow|financial|vat|margin|expense total|total expenses)/.test(value)) {
-      const profit = demoSnapshot.revenue - demoSnapshot.expenses
-      return {
-        message: `Live DB is offline. Snapshot finance: revenue ${formatNaira(demoSnapshot.revenue)}, expenses ${formatNaira(demoSnapshot.expenses)}, net ${formatNaira(profit)}.`,
-        action: moduleActions.accounting,
-      }
-    }
-
-    return {
-      message: `Live DB is offline right now. Snapshot: employees ${demoSnapshot.employees}, contacts ${demoSnapshot.contacts}, open deals ${demoSnapshot.openDeals}, overdue invoices ${demoSnapshot.overdueInvoices}, pending expenses ${demoSnapshot.pendingExpenses}.`,
-      action: moduleActions.overview,
-    }
-  }
-
   const asksPayrollSensitive = /(payroll|salary|net pay|deduction|bonus|compensation|paye|pension)/.test(value)
   if (asksPayrollSensitive && !lockState.hrUnlocked) {
     return {
@@ -627,8 +557,13 @@ const resolveDataQuery = async (
 
 export async function POST(request: Request) {
   try {
+    const { org, user } = await requireModuleAccess(request, "ai", "view")
+
     if (Number.isFinite(aiRateLimitPerMinute) && aiRateLimitPerMinute > 0) {
-      const limit = rateLimit(getRateLimitKey(request, "ai"), { limit: aiRateLimitPerMinute, windowMs: 60_000 })
+      const limit = rateLimit(getRateLimitKey(request, "ai", { orgId: org.id, userId: user.id }), {
+        limit: aiRateLimitPerMinute,
+        windowMs: 60_000,
+      })
       if (!limit.ok) {
         return NextResponse.json(
           { error: "Rate limit exceeded. Please wait a moment and try again." },
@@ -636,37 +571,7 @@ export async function POST(request: Request) {
         )
       }
     }
-    const fallbackEmail = process.env.DEFAULT_USER_EMAIL || "ikchils@gmail.com"
-    const fallbackName = fallbackEmail.split("@")[0] || "there"
-    let org: { id: string; name: string } = { id: "org-default", name: "Civis" }
-    let user: { id: string; name: string; email: string } = {
-      id: "user-local",
-      name: fallbackName,
-      email: fallbackEmail,
-    }
-    let hasDbUser = false
 
-    try {
-      const resolved = await getUserFromRequest(request)
-      org = { id: resolved.org.id, name: resolved.org.name }
-      user = { id: resolved.user.id, name: resolved.user.name || fallbackName, email: resolved.user.email }
-      hasDbUser = true
-    } catch (error) {
-      if (isRequestUserError(error)) {
-        if (error.status === 401) {
-          return NextResponse.json({ error: error.message }, { status: 401 })
-        }
-        if (error.status === 503 && isDev) {
-          console.warn("AI chat user resolution failed because DB is unavailable; using local fallback user.")
-        } else {
-          return NextResponse.json({ error: error.message }, { status: error.status })
-        }
-      } else if (!isDev) {
-        return NextResponse.json({ error: "Failed to resolve authenticated user" }, { status: 500 })
-      } else {
-        console.warn("AI chat user resolution failed, using local fallback user", error)
-      }
-    }
     const body = await request.json().catch(() => ({}))
     const requestedMode = (body?.mode || "qna") as AiMode
     const incoming = Array.isArray(body?.messages) ? normalizeMessages(body.messages) : []
@@ -674,16 +579,12 @@ export async function POST(request: Request) {
     const previousAssistantMessage = [...incoming].reverse().find((msg) => msg.role === "assistant")?.content || ""
     const hrUnlocked = request.headers.get("x-hr-sensitive-unlocked") === "true"
     const financeUnlocked = request.headers.get("x-finance-sensitive-unlocked") === "true"
+    const userName = user.name || user.email.split("@")[0] || "there"
 
     if (requestedMode === "qna") {
       let followupResolution: DataResolution | null = null
       try {
-        followupResolution = await resolveConversationFollowup(
-          org.id,
-          lastUserMessage,
-          previousAssistantMessage,
-          hasDbUser,
-        )
+        followupResolution = await resolveConversationFollowup(org.id, lastUserMessage, previousAssistantMessage)
       } catch (error) {
         console.warn("Follow-up resolution failed, continuing with model response", error)
       }
@@ -696,7 +597,7 @@ export async function POST(request: Request) {
         })
       }
 
-      const greeting = resolveGreetingPrompt(lastUserMessage, user?.name || "there")
+      const greeting = resolveGreetingPrompt(lastUserMessage, userName)
       if (greeting) {
         return NextResponse.json({
           message: greeting.message,
@@ -746,7 +647,7 @@ export async function POST(request: Request) {
         })
       }
 
-      const creativePrompt = resolveCreativePrompt(lastUserMessage, user?.name || "there")
+      const creativePrompt = resolveCreativePrompt(lastUserMessage, userName)
       if (creativePrompt) {
         return NextResponse.json({
           message: creativePrompt.message,
@@ -768,7 +669,7 @@ export async function POST(request: Request) {
 
       let dataResolution: DataResolution | null = null
       try {
-        dataResolution = await resolveDataQuery(org.id, lastUserMessage, hasDbUser, {
+        dataResolution = await resolveDataQuery(org.id, lastUserMessage, {
           hrUnlocked,
           financeUnlocked,
         })
@@ -785,7 +686,7 @@ export async function POST(request: Request) {
       }
 
       if (fastLocalQna) {
-        const localReply = buildFallbackResponse("qna", lastUserMessage, body?.context, user?.name || "there")
+        const localReply = buildFallbackResponse("qna", lastUserMessage, body?.context, userName)
         return NextResponse.json({
           message: localReply,
           provider: "civis-local-qna",
@@ -796,7 +697,7 @@ export async function POST(request: Request) {
     }
 
     const mode = inferModeFromPrompt(requestedMode, lastUserMessage)
-    const tourContext = mode === "tour" ? await loadTourContext(org.id, lastUserMessage, hasDbUser) : null
+    const tourContext = mode === "tour" ? await loadTourContext(org.id, lastUserMessage, true) : null
     let providerPreference =
       typeof body?.provider === "string" && body.provider.trim() ? body.provider.trim() : undefined
     const knowledge = lastUserMessage ? findKnowledge(lastUserMessage)?.content : undefined
@@ -804,12 +705,12 @@ export async function POST(request: Request) {
       mode === "tour" && tourContext
         ? `\nLive org snapshot: contacts ${tourContext.stats.contacts}, open deals ${tourContext.stats.openDeals}, overdue invoices ${tourContext.stats.overdueInvoices}, pending expenses ${tourContext.stats.pendingExpenses}, employees ${tourContext.stats.employees}, active workflows ${tourContext.stats.activeAutomations}, active portals ${tourContext.stats.activePortals}.`
         : ""
-    const systemPrompt = `${buildSystemPrompt(mode, user?.name || "there", org?.name || "", knowledge)}${tourSnapshot}`
+    const systemPrompt = `${buildSystemPrompt(mode, userName, org.name || "", knowledge)}${tourSnapshot}`
     const messages: AiMessage[] = [{ role: "system", content: systemPrompt }, ...incoming]
     const mergedContext =
       mode === "tour" ? { ...(body?.context || {}), ...(tourContext || {}) } : body?.context
 
-    if (!providerPreference && process.env.DATABASE_URL && hasDbUser) {
+    if (!providerPreference) {
       try {
         const settings = await prisma.userSettings.findUnique({
           where: { userId: user.id },
@@ -827,7 +728,7 @@ export async function POST(request: Request) {
 
     if (mode === "tour") {
       // Keep tours deterministic and high quality even when upstream models respond generically.
-      reply = buildFallbackResponse(mode, lastUserMessage, mergedContext, user?.name || "there")
+      reply = buildFallbackResponse(mode, lastUserMessage, mergedContext, userName)
       resolvedProvider = "civis-tour-engine"
     } else {
       try {
@@ -835,32 +736,30 @@ export async function POST(request: Request) {
           reply = await callProvider(provider, messages)
           resolvedProvider = provider.provider
         } else {
-          reply = buildFallbackResponse(mode, lastUserMessage, mergedContext, user?.name || "there")
+          reply = buildFallbackResponse(mode, lastUserMessage, mergedContext, userName)
           resolvedProvider = "fallback"
         }
       } catch (error: any) {
         console.error("AI provider failed, using fallback.", error)
-        reply = buildFallbackResponse(mode, lastUserMessage, mergedContext, user?.name || "there")
+        reply = buildFallbackResponse(mode, lastUserMessage, mergedContext, userName)
         resolvedProvider = "fallback"
       }
 
       if (provider && shouldFallbackFromWeakProviderReply(mode, lastUserMessage, reply)) {
-        reply = buildFallbackResponse(mode, lastUserMessage, mergedContext, user?.name || "there")
+        reply = buildFallbackResponse(mode, lastUserMessage, mergedContext, userName)
         resolvedProvider = "fallback"
       }
     }
 
     try {
-      if (hasDbUser) {
-        await createAuditLog({
-          orgId: org.id,
-          userId: user.id,
-          action: "Civis AI request",
-          entity: "AI",
-          entityId: `${mode}-${Date.now()}`,
-          metadata: { mode },
-        })
-      }
+      await createAuditLog({
+        orgId: org.id,
+        userId: user.id,
+        action: "Civis AI request",
+        entity: "AI",
+        entityId: `${mode}-${Date.now()}`,
+        metadata: { mode, provider: resolvedProvider },
+      })
     } catch (auditError) {
       console.warn("Failed to write AI audit log", auditError)
     }
@@ -874,6 +773,9 @@ export async function POST(request: Request) {
       actions: [] as AiAction[],
     })
   } catch (error) {
+    if (isRequestUserError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
     console.error("AI chat failed", error)
     const detail = error instanceof Error ? error.message : "Unknown error"
     const message =

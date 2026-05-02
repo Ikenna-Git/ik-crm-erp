@@ -217,6 +217,13 @@ const emptyCommand = {
   recentActivity: [],
 }
 
+type TimelineItem = {
+  id: string
+  title: string
+  detail: string
+  time: string
+}
+
 const STORAGE = {
   workflows: "civis_ops_workflows",
   integrations: "civis_ops_integrations",
@@ -230,6 +237,7 @@ const approvalStatusStyles: Record<string, string> = {
   approved: "bg-green-100 text-green-800 border-green-200 dark:bg-green-500/20 dark:text-green-200 dark:border-green-500/40",
   rejected: "bg-red-100 text-red-800 border-red-200 dark:bg-red-500/20 dark:text-red-200 dark:border-red-500/40",
 }
+const demoMode = process.env.NEXT_PUBLIC_ENABLE_DEMO_MODE === "true"
 
 export default function OperationsPage() {
   const { data: session } = useSession()
@@ -269,7 +277,7 @@ export default function OperationsPage() {
     commandData?.stats &&
     Object.values(commandData.stats).some((value) => typeof value === "number" && value > 0)
   const command = commandHasSignal ? commandData : emptyCommand
-  const timeline = Array.isArray(command?.recentActivity) ? command.recentActivity : []
+  const timeline: TimelineItem[] = Array.isArray(command?.recentActivity) ? (command.recentActivity as TimelineItem[]) : []
   const decisionItems = Array.isArray(command?.decisions) ? command.decisions : []
 
   const [workflowForm, setWorkflowForm] = useState({
@@ -295,6 +303,11 @@ export default function OperationsPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return
+    if (!demoMode) {
+      setApprovals([])
+      setIntegrations(integrationsSeed)
+      return
+    }
     localStorage.removeItem(STORAGE.workflows)
     localStorage.removeItem(STORAGE.reports)
     localStorage.removeItem(STORAGE.webhooks)
@@ -455,27 +468,27 @@ export default function OperationsPage() {
   }, [])
 
   useEffect(() => {
-    if (typeof window === "undefined") return
+    if (!demoMode || typeof window === "undefined") return
     localStorage.setItem(STORAGE.workflows, JSON.stringify(workflows))
   }, [workflows])
 
   useEffect(() => {
-    if (typeof window === "undefined") return
+    if (!demoMode || typeof window === "undefined") return
     localStorage.setItem(STORAGE.integrations, JSON.stringify(integrations))
   }, [integrations])
 
   useEffect(() => {
-    if (typeof window === "undefined") return
+    if (!demoMode || typeof window === "undefined") return
     localStorage.setItem(STORAGE.reports, JSON.stringify(reports))
   }, [reports])
 
   useEffect(() => {
-    if (typeof window === "undefined") return
+    if (!demoMode || typeof window === "undefined") return
     localStorage.setItem(STORAGE.approvals, JSON.stringify(approvals))
   }, [approvals])
 
   useEffect(() => {
-    if (typeof window === "undefined") return
+    if (!demoMode || typeof window === "undefined") return
     localStorage.setItem(STORAGE.webhooks, JSON.stringify(webhooks))
   }, [webhooks])
 

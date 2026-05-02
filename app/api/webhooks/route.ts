@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server"
 import crypto from "crypto"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest, isRequestUserError } from "@/lib/request-user"
+import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
-import { isAdmin } from "@/lib/authz"
+import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable webhooks." }, { status: 503 })
@@ -24,10 +24,7 @@ const isValidWebhookUrl = (value?: string) => {
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
-    if (!isAdmin(user.role)) {
-      return NextResponse.json({ error: "Admin access required" }, { status: 403 })
-    }
+    const { org } = await requireAdminRequest(request)
 
     const webhooks = await prisma.webhookEndpoint.findMany({
       where: { orgId: org.id },
@@ -44,9 +41,8 @@ export async function GET(request: Request) {
     })
     return NextResponse.json({ webhooks })
   } catch (error) {
-    if (isRequestUserError(error)) {
-      return NextResponse.json({ error: error.message }, { status: error.status })
-    }
+    const accessResponse = handleAccessRouteError(error)
+    if (accessResponse) return accessResponse
     console.error("Webhook fetch failed", error)
     return NextResponse.json({ error: "Failed to load webhooks" }, { status: 500 })
   }
@@ -55,9 +51,16 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
-    if (!isAdmin(user.role)) {
-      return NextResponse.json({ error: "Admin access required" }, { status: 403 })
+    const { org, user } = await requireAdminRequest(request)
+    const limit = rateLimit(getRateLimitKey(request, "webhook-create", { orgId: org.id, userId: user.id }), {
+      limit: 20,
+      windowMs: 60_000,
+    })
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Please wait and try again." },
+        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
+      )
     }
 
     const body = await request.json()
@@ -91,9 +94,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ webhook })
   } catch (error) {
-    if (isRequestUserError(error)) {
-      return NextResponse.json({ error: error.message }, { status: error.status })
-    }
+    const accessResponse = handleAccessRouteError(error)
+    if (accessResponse) return accessResponse
     console.error("Webhook create failed", error)
     return NextResponse.json({ error: "Failed to create webhook" }, { status: 500 })
   }
@@ -102,9 +104,16 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
-    if (!isAdmin(user.role)) {
-      return NextResponse.json({ error: "Admin access required" }, { status: 403 })
+    const { org, user } = await requireAdminRequest(request)
+    const limit = rateLimit(getRateLimitKey(request, "webhook-update", { orgId: org.id, userId: user.id }), {
+      limit: 20,
+      windowMs: 60_000,
+    })
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Please wait and try again." },
+        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
+      )
     }
 
     const body = await request.json()
@@ -140,9 +149,8 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ webhook })
   } catch (error) {
-    if (isRequestUserError(error)) {
-      return NextResponse.json({ error: error.message }, { status: error.status })
-    }
+    const accessResponse = handleAccessRouteError(error)
+    if (accessResponse) return accessResponse
     console.error("Webhook update failed", error)
     return NextResponse.json({ error: "Failed to update webhook" }, { status: 500 })
   }

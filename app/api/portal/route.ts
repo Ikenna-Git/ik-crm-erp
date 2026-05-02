@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { PortalStatus } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
@@ -82,7 +83,9 @@ export async function PATCH(request: Request) {
 
     const normalizedStatus = typeof status === "string" ? status.toUpperCase() : undefined
     const safeStatus =
-      normalizedStatus && ["ACTIVE", "PAUSED", "ARCHIVED"].includes(normalizedStatus) ? normalizedStatus : undefined
+      normalizedStatus && ["ACTIVE", "PAUSED", "ARCHIVED"].includes(normalizedStatus)
+        ? (normalizedStatus as PortalStatus)
+        : undefined
     const existingPortal = await prisma.clientPortal.findFirst({
       where: { id, orgId: org.id },
     })
