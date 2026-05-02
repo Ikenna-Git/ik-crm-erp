@@ -62,8 +62,14 @@ export async function PATCH(request: Request) {
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 })
     }
+    const existingDoc = await prisma.doc.findFirst({
+      where: { id, orgId: org.id },
+    })
+    if (!existingDoc) {
+      return NextResponse.json({ error: "Document not found" }, { status: 404 })
+    }
     const doc = await prisma.doc.update({
-      where: { id },
+      where: { id: existingDoc.id },
       data: {
         title,
         content,
@@ -93,7 +99,13 @@ export async function DELETE(request: Request) {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
-    const deleted = await prisma.doc.delete({ where: { id } })
+    const existingDoc = await prisma.doc.findFirst({
+      where: { id, orgId: org.id },
+    })
+    if (!existingDoc) {
+      return NextResponse.json({ error: "Document not found" }, { status: 404 })
+    }
+    const deleted = await prisma.doc.delete({ where: { id: existingDoc.id } })
     await createAuditLog({
       orgId: org.id,
       userId: user.id,

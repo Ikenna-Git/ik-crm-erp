@@ -83,9 +83,15 @@ export async function PATCH(request: Request) {
     const normalizedStatus = typeof status === "string" ? status.toUpperCase() : undefined
     const safeStatus =
       normalizedStatus && ["ACTIVE", "PAUSED", "ARCHIVED"].includes(normalizedStatus) ? normalizedStatus : undefined
+    const existingPortal = await prisma.clientPortal.findFirst({
+      where: { id, orgId: org.id },
+    })
+    if (!existingPortal) {
+      return NextResponse.json({ error: "Client portal not found" }, { status: 404 })
+    }
 
     const portal = await prisma.clientPortal.update({
-      where: { id },
+      where: { id: existingPortal.id },
       data: {
         status: safeStatus,
         summary: summary ?? undefined,

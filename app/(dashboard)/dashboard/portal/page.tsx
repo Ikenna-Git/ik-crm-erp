@@ -42,57 +42,6 @@ type PortalItem = {
   documents?: PortalDocument[]
 }
 
-const portalSeed: PortalItem[] = [
-  {
-    id: "portal-1",
-    name: "Northwind Trading",
-    contactName: "Adaeze Okafor",
-    contactEmail: "adaeze@northwind.com",
-    status: "ACTIVE",
-    accessCode: "northwind",
-    summary: "Weekly rollout updates and invoice access.",
-    updatedAt: new Date().toISOString(),
-    updates: [
-      {
-        id: "up-1",
-        title: "Kickoff completed",
-        message: "Onboarding finished and access granted to the client.",
-        status: "ACTIVE",
-        createdAt: new Date().toISOString(),
-      },
-    ],
-    documents: [
-      {
-        id: "doc-1",
-        title: "Implementation plan",
-        url: "https://example.com/plan.pdf",
-        fileType: "pdf",
-        createdAt: new Date().toISOString(),
-      },
-    ],
-  },
-  {
-    id: "portal-2",
-    name: "Globex Corp",
-    contactName: "Emeka Umeh",
-    contactEmail: "emeka@globex.com",
-    status: "PAUSED",
-    accessCode: "globex",
-    summary: "Implementation paused pending contract review.",
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    updates: [
-      {
-        id: "up-2",
-        title: "Contract review",
-        message: "Waiting on procurement sign-off.",
-        status: "PAUSED",
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-      },
-    ],
-    documents: [],
-  },
-]
-
 const statusStyles: Record<PortalItem["status"], string> = {
   ACTIVE: "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-200",
   PAUSED: "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-200",
@@ -128,14 +77,6 @@ export default function ClientPortalPage() {
   const [uploading, setUploading] = useState(false)
 
   const MAX_FILE_SIZE = 5 * 1024 * 1024
-  const createLocalId = () => `local-${Date.now()}-${Math.random().toString(16).slice(2, 6)}`
-  const fileToDataUrl = (file: File) =>
-    new Promise<string>((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "")
-      reader.onerror = () => reject(new Error("Failed to read file"))
-      reader.readAsDataURL(file)
-    })
 
   const loadPortals = async () => {
     try {
@@ -143,16 +84,16 @@ export default function ClientPortalPage() {
       setError("")
       const res = await fetch("/api/portal", { headers: { ...getSessionHeaders() } })
       if (res.status === 503) {
-        setPortals(portalSeed)
+        setError("Client portal service is unavailable.")
+        setPortals([])
         return
       }
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || "Failed to load portals")
-      const loaded = Array.isArray(data.portals) ? data.portals : []
-      setPortals(loaded.length ? loaded : portalSeed)
+      setPortals(Array.isArray(data.portals) ? data.portals : [])
     } catch (err: any) {
       setError(err?.message || "Failed to load portals")
-      setPortals(portalSeed)
+      setPortals([])
     } finally {
       setLoading(false)
     }
@@ -214,28 +155,6 @@ export default function ClientPortalPage() {
           status: updateForm.status,
         }),
       })
-      if (res.status === 503) {
-        const localUpdate: PortalUpdate = {
-          id: createLocalId(),
-          title: updateForm.title,
-          message: updateForm.message,
-          status: updateForm.status,
-          createdAt: new Date().toISOString(),
-        }
-        setPortals((prev) =>
-          prev.map((portal) =>
-            portal.id === activePortal.id
-              ? {
-                  ...portal,
-                  updates: [localUpdate, ...(portal.updates || [])],
-                  updatedAt: new Date().toISOString(),
-                }
-              : portal,
-          ),
-        )
-        setUpdateDialogOpen(false)
-        return
-      }
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || "Failed to add update")
       setPortals((prev) =>
@@ -274,15 +193,8 @@ export default function ClientPortalPage() {
           url = uploaded.url
           bytes = uploaded.bytes || 0
           fileType = uploaded.resourceType || documentForm.fileType
-        } catch (uploadErr: any) {
-          if (uploadErr?.message?.includes("Missing Cloudinary configuration")) {
-            url = await fileToDataUrl(selectedFile)
-            bytes = selectedFile.size
-            fileType = selectedFile.type || documentForm.fileType
-            setUploadError("Cloudinary not configured. Saved as a local demo file.")
-          } else {
-            throw uploadErr
-          }
+        } catch (uploadErr) {
+          throw uploadErr
         }
       }
 
@@ -302,29 +214,6 @@ export default function ClientPortalPage() {
           bytes,
         }),
       })
-      if (res.status === 503) {
-        const localDoc: PortalDocument = {
-          id: createLocalId(),
-          title: documentForm.title || "Shared document",
-          url,
-          fileType,
-          bytes,
-          createdAt: new Date().toISOString(),
-        }
-        setPortals((prev) =>
-          prev.map((portal) =>
-            portal.id === activePortal.id
-              ? {
-                  ...portal,
-                  documents: [localDoc, ...(portal.documents || [])],
-                  updatedAt: new Date().toISOString(),
-                }
-              : portal,
-          ),
-        )
-        setDocumentDialogOpen(false)
-        return
-      }
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || "Failed to add document")
       setPortals((prev) =>
@@ -353,24 +242,6 @@ export default function ClientPortalPage() {
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
         body: JSON.stringify(form),
       })
-      if (res.status === 503) {
-        const localPortal: PortalItem = {
-          id: createLocalId(),
-          name: form.name,
-          contactName: form.contactName,
-          contactEmail: form.contactEmail,
-          status: "ACTIVE",
-          accessCode: form.name.toLowerCase().replace(/\s+/g, "-") || "portal",
-          summary: form.summary,
-          updatedAt: new Date().toISOString(),
-          updates: [],
-          documents: [],
-        }
-        setPortals((prev) => [localPortal, ...prev])
-        setForm({ name: "", contactName: "", contactEmail: "", summary: "" })
-        setOpenDialog(false)
-        return
-      }
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || "Failed to create portal")
       setPortals((prev) => [data.portal, ...prev])
@@ -395,10 +266,6 @@ export default function ClientPortalPage() {
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
         body: JSON.stringify({ id, status }),
       })
-      if (res.status === 503) {
-        setError("Portal status updates are running in demo mode until the database is configured.")
-        return
-      }
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || "Failed to update portal")
       setPortals((prev) => prev.map((item) => (item.id === id ? data.portal : item)))
@@ -524,85 +391,93 @@ export default function ClientPortalPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {portals.map((portal) => (
-          <Card key={portal.id}>
-            <CardHeader>
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <CardTitle>{portal.name}</CardTitle>
-                  <CardDescription>
-                    {portal.contactName || "No contact"} • {portal.contactEmail || "No email"}
-                  </CardDescription>
-                </div>
-                <Badge className={statusStyles[portal.status]}>{portal.status}</Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">{portal.summary || "No summary yet."}</p>
-              <div className="rounded-lg border border-border bg-background/50 p-3">
-                <p className="text-xs uppercase text-muted-foreground mb-2">Latest update</p>
-                {portal.updates && portal.updates.length ? (
-                  <div>
-                    <p className="text-sm font-medium">{portal.updates[0].title}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{portal.updates[0].message || "—"}</p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {new Date(portal.updates[0].createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-xs text-muted-foreground">No updates yet.</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <p className="text-xs uppercase text-muted-foreground">Shared documents</p>
-                {portal.documents && portal.documents.length ? (
-                  portal.documents.slice(0, 2).map((doc) => (
-                    <a
-                      key={doc.id}
-                      href={doc.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-xs hover:bg-muted/40 transition"
-                    >
-                      <span className="font-medium">{doc.title}</span>
-                      <span className="text-muted-foreground">{doc.fileType || "file"}</span>
-                    </a>
-                  ))
-                ) : (
-                  <p className="text-xs text-muted-foreground">No documents shared yet.</p>
-                )}
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <Button variant="outline" size="sm" onClick={() => copyLink(portal.accessCode)}>
-                  <Copy className="w-4 h-4 mr-2" />
-                  Copy link
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => openUpdateDialogFor(portal)}>
-                  Add update
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => openDocumentDialogFor(portal)}>
-                  Share doc
-                </Button>
-                <Select
-                  value={portal.status}
-                  onValueChange={(value) => handleStatusUpdate(portal.id, value as PortalItem["status"])}
-                >
-                  <SelectTrigger className="w-[160px]">
-                    <SelectValue placeholder="Update status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ACTIVE">Active</SelectItem>
-                    <SelectItem value="PAUSED">Paused</SelectItem>
-                    <SelectItem value="ARCHIVED">Archived</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Last updated {new Date(portal.updatedAt).toLocaleDateString()}
-              </p>
+        {portals.length === 0 ? (
+          <Card className="lg:col-span-2">
+            <CardContent className="py-10 text-center text-muted-foreground">
+              No client portals have been created for this workspace yet.
             </CardContent>
           </Card>
-        ))}
+        ) : (
+          portals.map((portal) => (
+            <Card key={portal.id}>
+              <CardHeader>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <CardTitle>{portal.name}</CardTitle>
+                    <CardDescription>
+                      {portal.contactName || "No contact"} • {portal.contactEmail || "No email"}
+                    </CardDescription>
+                  </div>
+                  <Badge className={statusStyles[portal.status]}>{portal.status}</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">{portal.summary || "No summary yet."}</p>
+                <div className="rounded-lg border border-border bg-background/50 p-3">
+                  <p className="text-xs uppercase text-muted-foreground mb-2">Latest update</p>
+                  {portal.updates && portal.updates.length ? (
+                    <div>
+                      <p className="text-sm font-medium">{portal.updates[0].title}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{portal.updates[0].message || "—"}</p>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {new Date(portal.updates[0].createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No updates yet.</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs uppercase text-muted-foreground">Shared documents</p>
+                  {portal.documents && portal.documents.length ? (
+                    portal.documents.slice(0, 2).map((doc) => (
+                      <a
+                        key={doc.id}
+                        href={doc.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-xs hover:bg-muted/40 transition"
+                      >
+                        <span className="font-medium">{doc.title}</span>
+                        <span className="text-muted-foreground">{doc.fileType || "file"}</span>
+                      </a>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No documents shared yet.</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button variant="outline" size="sm" onClick={() => copyLink(portal.accessCode)}>
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy link
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => openUpdateDialogFor(portal)}>
+                    Add update
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => openDocumentDialogFor(portal)}>
+                    Share doc
+                  </Button>
+                  <Select
+                    value={portal.status}
+                    onValueChange={(value) => handleStatusUpdate(portal.id, value as PortalItem["status"])}
+                  >
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue placeholder="Update status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ACTIVE">Active</SelectItem>
+                      <SelectItem value="PAUSED">Paused</SelectItem>
+                      <SelectItem value="ARCHIVED">Archived</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Last updated {new Date(portal.updatedAt).toLocaleDateString()}
+                </p>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
       <Dialog open={updateDialogOpen} onOpenChange={setUpdateDialogOpen}>

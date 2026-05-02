@@ -129,7 +129,7 @@ export function AttendanceTracker({
   onAddRecord,
   onUpdateRecord,
 }: AttendanceTrackerProps) {
-  const [records, setRecords] = useState<AttendanceRecord[]>(providedRecords || mockAttendance)
+  const [records, setRecords] = useState<AttendanceRecord[]>(providedRecords ?? [])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -149,7 +149,7 @@ export function AttendanceTracker({
   })
 
   useEffect(() => {
-    if (providedRecords) setRecords(providedRecords)
+    setRecords(providedRecords ?? [])
   }, [providedRecords])
 
   const filteredAttendance = records.filter((record) =>

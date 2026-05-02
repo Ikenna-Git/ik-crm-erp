@@ -211,7 +211,10 @@ export async function PATCH(request: Request) {
     } else if (markAll) {
       await prisma.notification.updateMany({ where: { orgId: org.id, userId: user.id }, data: { read: true } })
     } else if (id) {
-      await prisma.notification.update({ where: { id }, data: { read: true } })
+      await prisma.notification.updateMany({
+        where: { id, orgId: org.id, userId: user.id },
+        data: { read: true },
+      })
     }
 
     const notifications = await prisma.notification.findMany({

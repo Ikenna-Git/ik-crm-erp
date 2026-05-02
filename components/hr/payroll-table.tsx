@@ -94,7 +94,7 @@ export function PayrollTable({
   onUpdatePayroll,
   onDeletePayroll,
 }: PayrollTableProps) {
-  const [payroll, setPayroll] = useState<PayrollRecord[]>(providedPayroll || mockPayroll)
+  const [payroll, setPayroll] = useState<PayrollRecord[]>(providedPayroll ?? [])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [showAmounts, setShowAmounts] = useState(true)
@@ -156,7 +156,7 @@ export function PayrollTable({
   }, [searchQuery, pageSize])
 
   useEffect(() => {
-    if (providedPayroll) setPayroll(providedPayroll)
+    setPayroll(providedPayroll ?? [])
   }, [providedPayroll])
 
   useEffect(() => {

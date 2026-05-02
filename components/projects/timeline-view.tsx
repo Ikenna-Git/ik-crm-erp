@@ -53,7 +53,7 @@ type TimelineViewProps = {
 export function TimelineView({ searchQuery, items }: TimelineViewProps) {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const sourceItems = items || mockTimeline
+  const sourceItems = items ?? []
   const filteredItems = sourceItems.filter((item) => item.project.toLowerCase().includes(searchQuery.toLowerCase()))
 
   const sortedItems = [...filteredItems].sort((a, b) => b.startDate.localeCompare(a.startDate))

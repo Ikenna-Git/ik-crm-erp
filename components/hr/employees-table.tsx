@@ -103,7 +103,7 @@ export function EmployeesTable({
   onUpdateEmployee,
   onDeleteEmployee,
 }: EmployeesTableProps) {
-  const [employees, setEmployees] = useState<Employee[]>(providedEmployees || mockEmployees)
+  const [employees, setEmployees] = useState<Employee[]>(providedEmployees ?? [])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
@@ -128,7 +128,7 @@ export function EmployeesTable({
   })
 
   useEffect(() => {
-    if (providedEmployees) setEmployees(providedEmployees)
+    setEmployees(providedEmployees ?? [])
   }, [providedEmployees])
 
   useEffect(() => {

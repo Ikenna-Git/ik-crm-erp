@@ -56,9 +56,6 @@ const buildMockOrders = (count: number): PurchaseOrder[] =>
 
 const mockOrders: PurchaseOrder[] = buildMockOrders(70)
 
-const STORAGE_KEY = "civis_inventory_orders"
-const IMPORT_EVENT = "civis-inventory-import"
-
 const formatNaira = (amount: number) => {
   return new Intl.NumberFormat("en-NG", {
     style: "currency",
@@ -82,7 +79,7 @@ export function OrdersTable({
   onUpdateOrder,
   onDeleteOrder,
 }: OrdersTableProps) {
-  const [orders, setOrders] = useState<PurchaseOrder[]>(providedOrders || mockOrders)
+  const [orders, setOrders] = useState<PurchaseOrder[]>(providedOrders ?? [])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
@@ -97,51 +94,8 @@ export function OrdersTable({
   })
 
   useEffect(() => {
-    if (providedOrders) {
-      setOrders(providedOrders)
-      return
-    }
-    if (typeof window === "undefined") return
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed)) {
-          const merged = [
-            ...parsed,
-            ...mockOrders.filter((seed) => !parsed.some((item: PurchaseOrder) => item.id === seed.id)),
-          ]
-          setOrders(merged)
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
-          return
-        }
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(mockOrders))
-    } catch (err) {
-      console.warn("Failed to load orders", err)
-    }
+    setOrders(providedOrders ?? [])
   }, [providedOrders])
-
-  useEffect(() => {
-    if (providedOrders || typeof window === "undefined") return
-    const handler = (event: Event) => {
-      const custom = event as CustomEvent<{ type?: string; items?: PurchaseOrder[] }>
-      if (custom.detail?.type === "orders" && Array.isArray(custom.detail.items)) {
-        setOrders(custom.detail.items)
-      }
-    }
-    window.addEventListener(IMPORT_EVENT, handler)
-    return () => window.removeEventListener(IMPORT_EVENT, handler)
-  }, [providedOrders])
-
-  useEffect(() => {
-    if (providedOrders || typeof window === "undefined") return
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(orders))
-    } catch (err) {
-      console.warn("Failed to persist orders", err)
-    }
-  }, [orders, providedOrders])
 
   const filteredOrders = orders.filter(
     (order) =>

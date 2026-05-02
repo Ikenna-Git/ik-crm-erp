@@ -43,9 +43,6 @@ const buildMockStock = (count: number): StockItem[] =>
 
 const mockStockLevels: StockItem[] = buildMockStock(70)
 
-const STORAGE_KEY = "civis_inventory_stock_levels"
-const IMPORT_EVENT = "civis-inventory-import"
-
 const statusConfig = {
   ok: { badge: "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-200", icon: "✓" },
   low: { badge: "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-200", icon: "!" },
@@ -67,7 +64,7 @@ export function StockLevels({
   onUpdateItem,
   onDeleteItem,
 }: StockLevelsProps) {
-  const [items, setItems] = useState<StockItem[]>(providedItems || mockStockLevels)
+  const [items, setItems] = useState<StockItem[]>(providedItems ?? [])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -83,51 +80,8 @@ export function StockLevels({
   })
 
   useEffect(() => {
-    if (providedItems) {
-      setItems(providedItems)
-      return
-    }
-    if (typeof window === "undefined") return
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed)) {
-          const merged = [
-            ...parsed,
-            ...mockStockLevels.filter((seed) => !parsed.some((item: StockItem) => item.id === seed.id)),
-          ]
-          setItems(merged)
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
-          return
-        }
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(mockStockLevels))
-    } catch (err) {
-      console.warn("Failed to load stock levels", err)
-    }
+    setItems(providedItems ?? [])
   }, [providedItems])
-
-  useEffect(() => {
-    if (providedItems || typeof window === "undefined") return
-    const handler = (event: Event) => {
-      const custom = event as CustomEvent<{ type?: string; items?: StockItem[] }>
-      if (custom.detail?.type === "stock" && Array.isArray(custom.detail.items)) {
-        setItems(custom.detail.items)
-      }
-    }
-    window.addEventListener(IMPORT_EVENT, handler)
-    return () => window.removeEventListener(IMPORT_EVENT, handler)
-  }, [providedItems])
-
-  useEffect(() => {
-    if (providedItems || typeof window === "undefined") return
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
-    } catch (err) {
-      console.warn("Failed to persist stock levels", err)
-    }
-  }, [items, providedItems])
 
   const filteredItems = items.filter(
     (item) =>

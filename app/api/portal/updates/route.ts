@@ -34,11 +34,18 @@ export async function POST(request: Request) {
     if (!portalId || !title) {
       return NextResponse.json({ error: "portalId and title are required" }, { status: 400 })
     }
+    const portal = await prisma.clientPortal.findFirst({
+      where: { id: portalId, orgId: org.id },
+      select: { id: true },
+    })
+    if (!portal) {
+      return NextResponse.json({ error: "Client portal not found" }, { status: 404 })
+    }
 
     const update = await prisma.clientPortalUpdate.create({
       data: {
         orgId: org.id,
-        portalId,
+        portalId: portal.id,
         userId: user.id,
         title,
         message: message || null,
@@ -48,12 +55,12 @@ export async function POST(request: Request) {
 
     if (status) {
       await prisma.clientPortal.update({
-        where: { id: portalId },
+        where: { id: portal.id },
         data: { status },
       })
     } else {
       await prisma.clientPortal.update({
-        where: { id: portalId },
+        where: { id: portal.id },
         data: { updatedAt: new Date() },
       })
     }
@@ -64,7 +71,7 @@ export async function POST(request: Request) {
       action: "Added portal update",
       entity: "ClientPortalUpdate",
       entityId: update.id,
-      metadata: { portalId },
+      metadata: { portalId: portal.id },
     })
 
     return NextResponse.json({ update })

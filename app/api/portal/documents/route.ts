@@ -34,11 +34,18 @@ export async function POST(request: Request) {
     if (!portalId || !title || !url) {
       return NextResponse.json({ error: "portalId, title, and url are required" }, { status: 400 })
     }
+    const portal = await prisma.clientPortal.findFirst({
+      where: { id: portalId, orgId: org.id },
+      select: { id: true },
+    })
+    if (!portal) {
+      return NextResponse.json({ error: "Client portal not found" }, { status: 404 })
+    }
 
     const document = await prisma.clientPortalDocument.create({
       data: {
         orgId: org.id,
-        portalId,
+        portalId: portal.id,
         title,
         url,
         fileType: fileType || null,
@@ -47,7 +54,7 @@ export async function POST(request: Request) {
     })
 
     await prisma.clientPortal.update({
-      where: { id: portalId },
+      where: { id: portal.id },
       data: { updatedAt: new Date() },
     })
 
@@ -57,7 +64,7 @@ export async function POST(request: Request) {
       action: "Added portal document",
       entity: "ClientPortalDocument",
       entityId: document.id,
-      metadata: { portalId, title },
+      metadata: { portalId: portal.id, title },
     })
 
     return NextResponse.json({ document })

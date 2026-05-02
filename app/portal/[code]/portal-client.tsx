@@ -70,10 +70,6 @@ export default function PortalClient({ portal }: { portal: PortalData }) {
         body: JSON.stringify({ updateId, decision }),
       })
       const data = await res.json().catch(() => ({}))
-      if (res.status === 503) {
-        setDecisionError("Approvals are in demo mode until the database is configured.")
-        return
-      }
       if (!res.ok) throw new Error(data?.error || "Failed to update approval")
       setUpdates((prev) =>
         prev.map((update) => (update.id === updateId ? { ...update, status: data.update.status } : update)),

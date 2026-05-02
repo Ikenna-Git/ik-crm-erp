@@ -109,7 +109,7 @@ export function ProjectsBoard({
   onUpdateProject,
   onDeleteProject,
 }: ProjectsBoardProps) {
-  const [projects, setProjects] = useState<Project[]>(providedProjects || mockProjects)
+  const [projects, setProjects] = useState<Project[]>(providedProjects ?? [])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
@@ -129,7 +129,7 @@ export function ProjectsBoard({
   })
 
   useEffect(() => {
-    if (providedProjects) setProjects(providedProjects)
+    setProjects(providedProjects ?? [])
   }, [providedProjects])
 
   const filteredProjects = projects.filter((p) => {

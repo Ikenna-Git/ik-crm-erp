@@ -61,9 +61,6 @@ const buildMockProducts = (count: number): Product[] =>
 
 const mockProducts: Product[] = buildMockProducts(70)
 
-const STORAGE_KEY = "civis_inventory_products"
-const IMPORT_EVENT = "civis-inventory-import"
-
 const formatNaira = (amount: number) => {
   return new Intl.NumberFormat("en-NG", {
     style: "currency",
@@ -87,7 +84,7 @@ export function ProductsTable({
   onUpdateProduct,
   onDeleteProduct,
 }: ProductsTableProps) {
-  const [products, setProducts] = useState<Product[]>(providedProducts || mockProducts)
+  const [products, setProducts] = useState<Product[]>(providedProducts ?? [])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
@@ -103,51 +100,8 @@ export function ProductsTable({
   })
 
   useEffect(() => {
-    if (providedProducts) {
-      setProducts(providedProducts)
-      return
-    }
-    if (typeof window === "undefined") return
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed)) {
-          const merged = [
-            ...parsed,
-            ...mockProducts.filter((seed) => !parsed.some((item: Product) => item.id === seed.id)),
-          ]
-          setProducts(merged)
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
-          return
-        }
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(mockProducts))
-    } catch (err) {
-      console.warn("Failed to load products", err)
-    }
+    setProducts(providedProducts ?? [])
   }, [providedProducts])
-
-  useEffect(() => {
-    if (providedProducts || typeof window === "undefined") return
-    const handler = (event: Event) => {
-      const custom = event as CustomEvent<{ type?: string; items?: Product[] }>
-      if (custom.detail?.type === "products" && Array.isArray(custom.detail.items)) {
-        setProducts(custom.detail.items)
-      }
-    }
-    window.addEventListener(IMPORT_EVENT, handler)
-    return () => window.removeEventListener(IMPORT_EVENT, handler)
-  }, [providedProducts])
-
-  useEffect(() => {
-    if (providedProducts || typeof window === "undefined") return
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(products))
-    } catch (err) {
-      console.warn("Failed to persist products", err)
-    }
-  }, [products, providedProducts])
 
   const filteredProducts = products.filter(
     (product) =>

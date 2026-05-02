@@ -363,7 +363,7 @@ const formatDocDate = (value: string) =>
   new Date(value).toLocaleDateString("en-GB", { month: "short", day: "numeric", year: "numeric" })
 
 export default function DocsPage() {
-  const [docs, setDocs] = useState<DocItem[]>(DOCS_SEED)
+  const [docs, setDocs] = useState<DocItem[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [showEditor, setShowEditor] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -420,18 +420,18 @@ export default function DocsPage() {
         headers: { ...getSessionHeaders() },
       })
       if (res.status === 503) {
-        setApiError("Database not configured — showing demo docs.")
-        setDocs(DOCS_SEED)
+        setApiError("Documentation service is unavailable.")
+        setDocs([])
         return
       }
       const data = await parseJsonSafe(res)
       if (!res.ok) throw new Error(data?.error || "Failed to load docs")
       const items = Array.isArray(data.docs) ? data.docs.map(mapDoc) : []
-      setDocs(items.length ? items : DOCS_SEED)
+      setDocs(items)
     } catch (err: any) {
       console.error("Failed to load docs", err)
       setApiError(err?.message || "Failed to load docs")
-      setDocs(DOCS_SEED)
+      setDocs([])
     } finally {
       setLoading(false)
     }
@@ -562,7 +562,7 @@ export default function DocsPage() {
       setDocs((prev) => prev.filter((doc) => doc.id !== id))
     } catch (err) {
       console.warn("Failed to delete doc", err)
-      setDocs((prev) => prev.filter((doc) => doc.id !== id))
+      setUploadError(err instanceof Error ? err.message : "Failed to delete doc")
     }
   }
 
@@ -609,6 +609,12 @@ export default function DocsPage() {
             <CardContent className="py-10 flex items-center justify-center text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin mr-2" />
               Loading documentation...
+            </CardContent>
+          </Card>
+        ) : docs.length === 0 ? (
+          <Card>
+            <CardContent className="py-10 text-center text-muted-foreground">
+              No documentation has been added to this workspace yet.
             </CardContent>
           </Card>
         ) : (

@@ -85,7 +85,7 @@ type TasksKanbanProps = {
 }
 
 export function TasksKanban({ searchQuery, tasks: providedTasks, onAddTask, onUpdateTask, onDeleteTask }: TasksKanbanProps) {
-  const [tasks, setTasks] = useState<Task[]>(providedTasks || mockTasks)
+  const [tasks, setTasks] = useState<Task[]>(providedTasks ?? [])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
@@ -104,7 +104,7 @@ export function TasksKanban({ searchQuery, tasks: providedTasks, onAddTask, onUp
   })
 
   useEffect(() => {
-    if (providedTasks) setTasks(providedTasks)
+    setTasks(providedTasks ?? [])
   }, [providedTasks])
 
   const filteredTasks = tasks.filter((task) => {
