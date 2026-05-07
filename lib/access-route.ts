@@ -1,10 +1,21 @@
 import { NextResponse } from "next/server"
 import { ACCESS_MODULE_LABELS, type AccessLevel, type AccessModule, hasModuleAccess } from "@/lib/access-control"
+import { assertBillingFeatureAccess, type BillingFeature } from "@/lib/billing"
 import { getUserFromRequest, isRequestUserError, RequestUserError } from "@/lib/request-user"
 import { canManageWorkspaceSettings, isAdmin, isSuperAdmin } from "@/lib/authz"
 import { captureServerError, logSecurityEvent } from "@/lib/observability"
 
 type RequestContext = Awaited<ReturnType<typeof getUserFromRequest>>
+
+const MODULE_BILLING_FEATURES: Partial<Record<AccessModule, BillingFeature>> = {
+  ai: "ai.use",
+  crm: "crm.core",
+  accounting: "accounting.core",
+  portal: "portal.core",
+  projects: "projects.core",
+  hr: "hr.core",
+  inventory: "inventory.core",
+}
 
 export const requireAuthenticatedRequest = async (request: Request) => getUserFromRequest(request)
 
@@ -27,6 +38,16 @@ export const requireModuleAccess = async (
       metadata: { module, required },
     })
     throw new RequestUserError(`${label} ${required} access required`, 403)
+  }
+
+  const billingFeature = MODULE_BILLING_FEATURES[module]
+  if (billingFeature) {
+    await assertBillingFeatureAccess({
+      request,
+      org: context.org,
+      user: context.user,
+      feature: billingFeature,
+    })
   }
 
   return context

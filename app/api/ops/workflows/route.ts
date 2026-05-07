@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
+import { assertBillingFeatureAccess } from "@/lib/billing"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable workflows." }, { status: 503 })
@@ -9,7 +10,8 @@ const dbUnavailable = () =>
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await requireModuleAccess(request, "operations", "view")
+    const { org, user } = await requireModuleAccess(request, "operations", "view")
+    await assertBillingFeatureAccess({ request, org, user, feature: "workflows.manage" })
     const workflows = await prisma.automationWorkflow.findMany({
       where: { orgId: org.id },
       orderBy: { updatedAt: "desc" },
@@ -24,6 +26,7 @@ export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org, user } = await requireModuleAccess(request, "operations", "manage")
+    await assertBillingFeatureAccess({ request, org, user, feature: "workflows.manage" })
     const body = await request.json()
     const { name, trigger, action } = body || {}
     if (!name || !trigger || !action) {
@@ -60,6 +63,7 @@ export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org, user } = await requireModuleAccess(request, "operations", "manage")
+    await assertBillingFeatureAccess({ request, org, user, feature: "workflows.manage" })
     const body = await request.json()
     const { id, active, name, trigger, action } = body || {}
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
