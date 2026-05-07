@@ -88,7 +88,8 @@ export default function PricingPage() {
             Choose the perfect plan for your business needs. All plans include a 14-day free trial.
           </p>
           <p className="text-sm text-muted-foreground">
-            Pricing is currently a public preview. Self-serve checkout and subscription activation are not live yet.
+            Pricing is currently a public preview. Self-serve checkout only becomes live after a provider, price IDs, and
+            verified webhooks are configured for the workspace.
           </p>
         </div>
 

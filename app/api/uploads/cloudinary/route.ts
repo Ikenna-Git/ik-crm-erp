@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import crypto from "crypto"
 import { isRequestUserError } from "@/lib/request-user"
 import { requireAnyModuleAccess } from "@/lib/access-route"
+import { assertBillingFeatureAccess } from "@/lib/billing"
 import { captureServerError, logServerEvent } from "@/lib/observability"
 import { assertActionAccess } from "@/lib/rbac"
 import { createRateLimitErrorResponse, getRateLimitKey, rateLimit } from "@/lib/rate-limit"
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
       { module: "portal", level: "manage" },
     ])
     await assertActionAccess({ request, subject: user, orgId: org.id, action: "uploads.manage" })
+    await assertBillingFeatureAccess({ request, org, user, feature: "uploads.manage" })
 
     const limit = await rateLimit(getRateLimitKey(request, "cloudinary-upload", { orgId: org.id, userId: user.id }), {
       limit: 40,

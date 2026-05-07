@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 import { Role } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
 import { createAuditLog } from "@/lib/audit"
 import {
   ACCESS_PROFILES,
@@ -10,7 +9,8 @@ import {
   normalizeAccessProfile,
   summarizeModuleAccess,
 } from "@/lib/access-control"
-import { canAssignRole, canDeleteUser, getAssignableRoles, isAdmin } from "@/lib/authz"
+import { canAssignRole, canDeleteUser, getAssignableRoles } from "@/lib/authz"
+import { assertBillingFeatureAccess, assertSeatCapacity } from "@/lib/billing"
 import { issueSignupInvite, sendSignupInviteEmail } from "@/lib/invitations"
 import { logServerEvent } from "@/lib/observability"
 import { getPublicOrigin } from "@/lib/public-url"
@@ -86,6 +86,7 @@ export async function POST(request: Request) {
   try {
     const { org, user: actor } = await requireAdminRequest(request)
     await assertActionAccess({ request, subject: actor, orgId: org.id, action: "admin.users.invite" })
+    await assertBillingFeatureAccess({ request, org, user: actor, feature: "team.members.manage" })
     const limit = await rateLimit(getRateLimitKey(request, "admin-user-invite", { orgId: org.id, userId: actor.id }), {
       limit: 20,
       windowMs: 60_000,
@@ -148,6 +149,17 @@ export async function POST(request: Request) {
 
     if (existing && (existing.passwordHash || existing._count.accounts > 0)) {
       return NextResponse.json({ error: "This teammate already has an active account" }, { status: 409 })
+    }
+
+    if (!existing) {
+      const seatsUsed = await prisma.user.count({ where: { orgId: org.id } })
+      await assertSeatCapacity({
+        request,
+        org,
+        user: actor,
+        usedSeats: seatsUsed,
+        seatsToAdd: 1,
+      })
     }
 
     const created = existing

@@ -16,6 +16,8 @@ What this does:
 - does not delete records
 - exports a JSON report for manual review
 
+This is the recommended org-scoped dry-run before any cleanup decision.
+
 ## Review suspected records
 
 The report contains:
@@ -36,6 +38,14 @@ npm run fake-data:review -- --org <orgId> --report-only --include-suspected --ou
 ```
 
 This is still non-destructive. It only widens the report.
+
+## Exporting the report
+
+Choose any writable file path for `--out`, for example:
+
+```bash
+npm run fake-data:review -- --org <orgId> --report-only --out /tmp/civis-fake-data-report.json
+```
 
 ## Destructive mode
 

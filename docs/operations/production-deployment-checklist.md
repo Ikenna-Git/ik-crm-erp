@@ -2,9 +2,29 @@
 
 Updated: 2026-05-07
 
-Use this checklist before deploying or promoting a release to the live environment.
+Use this checklist before promoting Civis to live traffic.
 
-## Environment
+## A. Code-complete items
+
+- auth/admin hardening branch changes are present
+- private routes redirect unauthenticated users
+- protected APIs reject unauthenticated calls
+- admin and rollback routes are server-side protected
+- billing status route exists
+- checkout route exists and fails closed when provider config is missing
+- billing webhook route exists and fails closed when signature or provider config is missing
+- server-side plan gating is active for:
+  - CRM/accounting/portal/projects/HR/inventory core access by billing state
+  - AI
+  - uploads
+  - report exports
+  - webhooks
+  - playbooks/workflows
+  - team management / seat-limit checks
+- `npm run lint` passes
+- `npm run build` passes
+
+## B. Environment-required items
 
 - `NEXTAUTH_URL` is set to the real production domain
 - `NEXTAUTH_SECRET` is set and rotated appropriately
@@ -21,46 +41,74 @@ Use this checklist before deploying or promoting a release to the live environme
 - SMTP is configured and tested
 - Cloudinary is configured and tested
 - AI provider keys are configured if AI is enabled
-- payment provider envs are either configured intentionally or left blank with billing still marked non-live
-- local-dev fallback flags are explicitly set to `false`
+- no local-dev fallback flags are enabled:
+  - `ALLOW_DEV_HEADER_IDENTITY=false`
+  - `ALLOW_DEV_DEFAULT_IDENTITY=false`
+  - `NEXTAUTH_ALLOW_DEV_FALLBACK=false`
+  - `NEXT_PUBLIC_ENABLE_DEMO_MODE=false`
 
-## Database / build
+### Billing provider setup
+
+- choose the live provider path explicitly
+- if using Stripe:
+  - `BILLING_PROVIDER_DEFAULT=stripe` or set org `paymentProvider` to `stripe`
+  - `STRIPE_SECRET_KEY`
+  - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+  - `STRIPE_WEBHOOK_SECRET`
+  - plan price IDs:
+    - `STRIPE_PRICE_STARTER_MONTHLY`
+    - `STRIPE_PRICE_STARTER_QUARTERLY`
+    - `STRIPE_PRICE_STARTER_ANNUAL`
+    - `STRIPE_PRICE_PROFESSIONAL_MONTHLY`
+    - `STRIPE_PRICE_PROFESSIONAL_QUARTERLY`
+    - `STRIPE_PRICE_PROFESSIONAL_ANNUAL`
+    - `STRIPE_PRICE_ENTERPRISE_MONTHLY`
+    - `STRIPE_PRICE_ENTERPRISE_QUARTERLY`
+    - `STRIPE_PRICE_ENTERPRISE_ANNUAL`
+- if using Paystack or Flutterwave:
+  - credentials may be present, but checkout/webhook adapter work is still pending
+  - do not mark payments live yet
+
+## C. Human validation items
 
 - production database is reachable
 - pending Prisma migrations are applied
-- `npx prisma generate` succeeds
-- production build passes
+- `npx prisma generate` succeeds against the release build
 - dependency audit has been reviewed
-- critical/high dependency vulnerabilities are resolved or explicitly risk-accepted
-
-## Security / runtime
-
-- shared-store rate limiting is active in production
-- portal access-code rate limiting has been tested
-- observability/alerting receives test events
-- logged-out users cannot access dashboard or admin routes
-- non-admins cannot access admin routes or admin APIs
-- rollback/admin destructive routes are tested and audited
-- founder/super-admin account is validated
-- normal admin cannot grant `SUPER_ADMIN`
-- no dev/demo fallback flags are enabled
-
-## Data / onboarding
-
 - fake-data review report-only run has been completed against a reachable staging or production clone
+- founder/super-admin account is validated
 - new org onboarding has been tested end to end
 - invite acceptance has been tested
 - fresh workspace starts blank without demo leakage
-
-## Recovery
-
+- portal access-code rate limiting has been tested
+- shared-store rate limiting is active in production
+- observability/alerting receives test events
+- pricing page has been reviewed and does not imply live checkout unless billing is actually enabled
+- admin billing page correctly reports provider readiness
 - a backup has been completed before launch
 - restore drill has been tested and recorded
-- RPO/RTO assumptions are understood
+- smoke tests in `docs/operations/production-smoke-tests.md` pass
 
-## Billing honesty
+## D. Launch blockers
 
-- pricing page is reviewed and does not imply live checkout if checkout is not implemented
-- admin billing routes are protected
-- payment status is clearly marked non-live unless checkout + webhook + subscription lifecycle exist
-- plan gating status has been reviewed
+- do not launch with in-memory rate limiting as the only production limiter
+- do not launch with observability webhooks/Sentry unset if you expect incident visibility
+- do not mark payments live unless:
+  - checkout route is configured
+  - webhook verification is configured
+  - provider webhook endpoint is registered
+  - subscription lifecycle smoke tests pass
+- do not skip fake-data review on a reachable staging/prod clone
+- do not skip the backup + restore drill
+
+## Dependency risk acceptance
+
+Current known unresolved advisories after safe upgrades:
+
+- `next` moderate via bundled `postcss@8.4.31`
+- `nodemailer` moderate on the `7.x` line used with current `next-auth`
+
+Owner action before launch:
+
+- either accept these moderate risks explicitly for this release
+- or hold launch until upstream-safe dependency remediation is available and verified

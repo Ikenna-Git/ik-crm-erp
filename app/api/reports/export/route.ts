@@ -2,9 +2,8 @@ import { NextResponse } from "next/server"
 import nodemailer from "nodemailer"
 import { generateCsv } from "@/lib/reports"
 import { buildAccountingRows, buildCrmRows, buildVatRows, buildAuditRows } from "@/lib/report-builders"
-import { isSuperAdmin } from "@/lib/authz"
 import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
-import { canUseBillingFeature } from "@/lib/billing"
+import { assertBillingFeatureAccess } from "@/lib/billing"
 import { logServerEvent } from "@/lib/observability"
 import { assertActionAccess } from "@/lib/rbac"
 import { createRateLimitErrorResponse, getRateLimitKey, rateLimit } from "@/lib/rate-limit"
@@ -39,6 +38,7 @@ export async function POST(request: Request) {
   try {
     const { org, user } = await requireAdminRequest(request)
     await assertActionAccess({ request, subject: user, orgId: org.id, action: "reports.export" })
+    await assertBillingFeatureAccess({ request, org, user, feature: "reports.export" })
     const limit = await rateLimit(getRateLimitKey(request, "report-export", { orgId: org.id, userId: user.id }), {
       limit: 12,
       windowMs: 60_000,
@@ -111,12 +111,7 @@ export async function POST(request: Request) {
     }
 
     await assertActionAccess({ request, subject: user, orgId: org.id, action: "reports.export.email" })
-    if (!isSuperAdmin(user.role) && !canUseBillingFeature(org, "reports.export.email")) {
-      return NextResponse.json(
-        { error: "Email exports are not available for this workspace in its current billing state." },
-        { status: 403 },
-      )
-    }
+    await assertBillingFeatureAccess({ request, org, user, feature: "reports.export.email" })
 
     const missing = REQUIRED_ENVS.filter((key) => !process.env[key])
     if (missing.length) {

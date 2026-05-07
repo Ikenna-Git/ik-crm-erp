@@ -936,8 +936,8 @@ export default function SettingsPage() {
             <CardContent className="space-y-4">
               <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
                 <p className="text-sm text-muted-foreground">
-                  Civis billing is not fully self-serve yet. Pricing is public, but live checkout, invoices, and
-                  subscription lifecycle controls are still being wired at the workspace level.
+                  Civis pricing is public, but live charging only works after a supported provider, price IDs, and webhook
+                  verification are configured at the workspace level.
                 </p>
                 <p className="text-sm text-muted-foreground">
                   {canManageBilling
