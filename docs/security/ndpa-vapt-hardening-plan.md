@@ -116,7 +116,7 @@ Status as of 2026-05-02:
 - Dev-only fallback code paths still exist and must remain disabled outside local development.
 - Security controls are materially stronger, but authorization is still not a single complete policy engine across every action in the platform.
 - Billing/subscription lifecycle is still not implemented beyond metadata/admin settings.
-- CI now has a baseline workflow, but deeper SAST/secret scanning is still missing.
+- CI workflow setup is documented, but the workflow file is intentionally not included in this branch because the current GitHub token cannot push workflow changes. Deeper SAST/secret scanning is still missing.
 - Backup/restore discipline is now documented, but restore drills still need execution evidence.
 
 ## Recommended Next 3 Engineering Tasks
