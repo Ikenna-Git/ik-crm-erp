@@ -87,6 +87,9 @@ export default function PricingPage() {
           <p className="text-xl text-muted-foreground">
             Choose the perfect plan for your business needs. All plans include a 14-day free trial.
           </p>
+          <p className="text-sm text-muted-foreground">
+            Pricing is currently a public preview. Self-serve checkout and subscription activation are not live yet.
+          </p>
         </div>
 
         {/* Pricing Cards */}
@@ -122,7 +125,7 @@ export default function PricingPage() {
 
               {/* CTA Button */}
                 <Button className="w-full" variant={plan.highlighted ? "default" : "outline"}>
-                  Get Started
+                  Request Access
                 </Button>
 
                 {/* Features */}
@@ -153,7 +156,7 @@ export default function PricingPage() {
             <div className="space-y-2">
               <h3 className="font-semibold">What payment methods do you accept?</h3>
               <p className="text-sm text-muted-foreground">
-                We accept bank transfers, cards, and mobile money (MTN, Airtel) for Nigerian customers.
+                Planned payment methods include bank transfers, cards, and local payment rails once billing goes live.
               </p>
             </div>
             <div className="space-y-2">
@@ -174,9 +177,11 @@ export default function PricingPage() {
         {/* CTA Section */}
         <div className="bg-primary text-primary-foreground rounded-lg p-12 text-center space-y-4">
           <h2 className="text-3xl font-bold">Ready to get started?</h2>
-          <p className="text-lg opacity-90">Join thousands of businesses using Civis to manage their operations.</p>
+          <p className="text-lg opacity-90">
+            Civis is open for controlled rollout. Billing automation is still being implemented.
+          </p>
           <Button className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
-            Start Your Free Trial
+            Talk to Sales
           </Button>
         </div>
       </div>
