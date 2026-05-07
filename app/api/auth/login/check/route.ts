@@ -1,19 +1,33 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma, withPrismaRetry } from "@/lib/prisma"
 import { FOUNDER_SUPER_ADMIN_EMAIL } from "@/lib/authz"
+import { logServerEvent } from "@/lib/observability"
 import { verifyPassword } from "@/lib/password"
 import { allowDevAuthFallback } from "@/lib/runtime-flags"
-
-import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
+import { createRateLimitErrorResponse, getRateLimitKey, rateLimit } from "@/lib/rate-limit"
 
 export async function POST(request: NextRequest) {
   try {
-    const limit = rateLimit(getRateLimitKey(request, "auth-login-check"), { limit: 20, windowMs: 60_000 })
+    const limit = await rateLimit(getRateLimitKey(request, "auth-login-check"), {
+      limit: 20,
+      windowMs: 60_000,
+      strictInProduction: true,
+      action: "auth.login.check",
+    })
     if (!limit.ok) {
-      return NextResponse.json(
-        { error: "Too many login attempts. Please wait a minute and try again." },
-        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
-      )
+      if (limit.reason === "exceeded") {
+        void logServerEvent({
+          level: "warning",
+          category: "auth",
+          action: "auth.login.rate_limited",
+          message: "Login precheck was rate limited.",
+          request,
+        })
+      }
+      return createRateLimitErrorResponse(limit, {
+        exceeded: "Too many login attempts. Please wait a minute and try again.",
+        unavailable: "Login protection is not configured correctly right now. Try again later.",
+      })
     }
 
     const { email, password } = await request.json()
@@ -54,6 +68,14 @@ export async function POST(request: NextRequest) {
     )
 
     if (!user) {
+      void logServerEvent({
+        level: "warning",
+        category: "auth",
+        action: "auth.login.invalid_identity",
+        message: "Login precheck failed because the account was not found.",
+        request,
+        metadata: { email: normalizedEmail },
+      })
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 })
     }
 
@@ -81,6 +103,14 @@ export async function POST(request: NextRequest) {
     }
 
     if (!verifyPassword(password, user.passwordHash)) {
+      void logServerEvent({
+        level: "warning",
+        category: "auth",
+        action: "auth.login.invalid_password",
+        message: "Login precheck failed because the password was invalid.",
+        request,
+        metadata: { email: normalizedEmail, userId: user.id },
+      })
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 })
     }
 
@@ -88,7 +118,14 @@ export async function POST(request: NextRequest) {
       requires2FA: user.twoFactorEnabled,
     })
   } catch (error) {
-    console.error("Login precheck failed", error)
+    void logServerEvent({
+      level: "error",
+      category: "auth",
+      action: "auth.login.precheck_failed",
+      message: "Login precheck failed unexpectedly.",
+      request,
+      error,
+    })
 
     if (allowDevAuthFallback) {
       return NextResponse.json({ requires2FA: false, fallback: true })

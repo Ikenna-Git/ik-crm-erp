@@ -33,6 +33,17 @@ NEXTAUTH_SECRET="replace_with_a_long_random_secret"
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 
+# Shared rate limiting (required for serious multi-instance production)
+RATE_LIMIT_STORE="upstash"
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+
+# Observability / alerting (optional locally, recommended in production)
+OBSERVABILITY_WEBHOOK_URL=
+SECURITY_EVENTS_WEBHOOK_URL=
+ERROR_ALERT_WEBHOOK_URL=
+SENTRY_DSN=
+
 # Cloudinary (docs/gallery uploads)
 CLOUDINARY_CLOUD_NAME=
 CLOUDINARY_API_KEY=
@@ -71,10 +82,13 @@ Open `http://localhost:3000`.
 
 ## Notes
 - Production and staging require a real database, real auth sessions, and real workspace membership. Demo or fallback identity/data paths are explicitly quarantined to local development flags only.
+- Authenticated users without workspace membership are redirected to `/workspace-required`. Civis does not auto-create default/demo workspaces in production.
 - Email exports + notifications require SMTP envs; otherwise use desktop CSV download.
 - OAuth providers are optional; credentials login works with JWT sessions.
 - Founder-only `SUPER_ADMIN` is currently enforced in `lib/authz.ts` for `ikchils@gmail.com`. Treat that as a platform ownership control, not as a normal admin role.
-- Pricing is public marketing UI. Billing metadata and admin billing settings exist, but live subscription checkout/webhook automation is not implemented yet.
+- Shared rate limiting must use a real store in production. In-memory limits are only acceptable for local development.
+- Pricing is public marketing UI. Billing metadata, admin billing settings, and partial plan gating exist, but live subscription checkout/webhook automation is not implemented yet.
+- Structured observability hooks exist for auth failures, admin denials, exports, uploads, rollback, and portal abuse attempts. External delivery requires the observability webhook envs above.
 
 ## Scripts
 - `npm run dev` — start dev server
@@ -82,7 +96,8 @@ Open `http://localhost:3000`.
 - `npm run lint` — TypeScript no-emit check
 - `npm run typecheck` — TypeScript no-emit check
 - `npm run audit:deps` — dependency audit
-- `npm run fake-data:review -- --org <orgId>` — dry-run fake/demo data review for a single org
+- `npm run fake-data:review -- --org <orgId> --report-only --out /tmp/fake-data-report.json` — safe fake/demo data review for a single org
+- `npm run fake-data:review -- --org <orgId> --delete --confirm-delete DELETE_DEMO_DATA` — destructive cleanup for confirmed demo data only
 
 ## Documentation
 - Project dossier: `docs/project-dossier.md`
@@ -91,4 +106,7 @@ Open `http://localhost:3000`.
 - Security architecture: `docs/security/system-architecture.md`
 - Endpoint inventory: `docs/security/endpoint-inventory.md`
 - NDPA/VAPT hardening plan: `docs/security/ndpa-vapt-hardening-plan.md`
+- RBAC matrix: `docs/security/rbac-matrix.md`
+- Backup/restore operations: `docs/operations/backup-restore.md`
+- Payment readiness plan: `docs/billing/payment-readiness-plan.md`
 - OpenAPI spec: `docs/security/openapi.yaml`

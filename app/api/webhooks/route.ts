@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server"
 import crypto from "crypto"
 import { prisma } from "@/lib/prisma"
+import { hasBillingFeature } from "@/lib/billing"
 import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
-import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
+import { captureServerError, logServerEvent } from "@/lib/observability"
+import { assertActionAccess } from "@/lib/rbac"
+import { isSuperAdmin } from "@/lib/authz"
+import { createRateLimitErrorResponse, getRateLimitKey, rateLimit } from "@/lib/rate-limit"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable webhooks." }, { status: 503 })
@@ -24,7 +28,11 @@ const isValidWebhookUrl = (value?: string) => {
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await requireAdminRequest(request)
+    const { org, user } = await requireAdminRequest(request)
+    await assertActionAccess({ request, subject: user, orgId: org.id, action: "webhooks.manage" })
+    if (!isSuperAdmin(user.role) && !hasBillingFeature(org, "webhooks.manage")) {
+      return NextResponse.json({ error: "Webhooks are not available on this billing plan yet." }, { status: 403 })
+    }
 
     const webhooks = await prisma.webhookEndpoint.findMany({
       where: { orgId: org.id },
@@ -43,7 +51,12 @@ export async function GET(request: Request) {
   } catch (error) {
     const accessResponse = handleAccessRouteError(error)
     if (accessResponse) return accessResponse
-    console.error("Webhook fetch failed", error)
+    void captureServerError({
+      action: "webhooks.fetch.failed",
+      message: "Webhook fetch failed.",
+      request,
+      error,
+    })
     return NextResponse.json({ error: "Failed to load webhooks" }, { status: 500 })
   }
 }
@@ -52,15 +65,21 @@ export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org, user } = await requireAdminRequest(request)
-    const limit = rateLimit(getRateLimitKey(request, "webhook-create", { orgId: org.id, userId: user.id }), {
+    await assertActionAccess({ request, subject: user, orgId: org.id, action: "webhooks.manage" })
+    if (!isSuperAdmin(user.role) && !hasBillingFeature(org, "webhooks.manage")) {
+      return NextResponse.json({ error: "Webhooks are not available on this billing plan yet." }, { status: 403 })
+    }
+    const limit = await rateLimit(getRateLimitKey(request, "webhook-create", { orgId: org.id, userId: user.id }), {
       limit: 20,
       windowMs: 60_000,
+      strictInProduction: true,
+      action: "webhooks.create",
     })
     if (!limit.ok) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please wait and try again." },
-        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
-      )
+      return createRateLimitErrorResponse(limit, {
+        exceeded: "Rate limit exceeded. Please wait and try again.",
+        unavailable: "Webhook protection is not configured correctly right now. Try again later.",
+      })
     }
 
     const body = await request.json()
@@ -92,11 +111,27 @@ export async function POST(request: Request) {
       metadata: { name: webhook.name, url: webhook.url },
     })
 
+    void logServerEvent({
+      level: "info",
+      category: "webhook",
+      action: "webhooks.created",
+      message: "Webhook endpoint was created.",
+      request,
+      actor: { id: user.id, email: user.email, role: user.role },
+      orgId: org.id,
+      metadata: { webhookId: webhook.id, name: webhook.name },
+    })
+
     return NextResponse.json({ webhook })
   } catch (error) {
     const accessResponse = handleAccessRouteError(error)
     if (accessResponse) return accessResponse
-    console.error("Webhook create failed", error)
+    void captureServerError({
+      action: "webhooks.create.failed",
+      message: "Webhook create failed.",
+      request,
+      error,
+    })
     return NextResponse.json({ error: "Failed to create webhook" }, { status: 500 })
   }
 }
@@ -105,15 +140,21 @@ export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org, user } = await requireAdminRequest(request)
-    const limit = rateLimit(getRateLimitKey(request, "webhook-update", { orgId: org.id, userId: user.id }), {
+    await assertActionAccess({ request, subject: user, orgId: org.id, action: "webhooks.manage" })
+    if (!isSuperAdmin(user.role) && !hasBillingFeature(org, "webhooks.manage")) {
+      return NextResponse.json({ error: "Webhooks are not available on this billing plan yet." }, { status: 403 })
+    }
+    const limit = await rateLimit(getRateLimitKey(request, "webhook-update", { orgId: org.id, userId: user.id }), {
       limit: 20,
       windowMs: 60_000,
+      strictInProduction: true,
+      action: "webhooks.update",
     })
     if (!limit.ok) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please wait and try again." },
-        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
-      )
+      return createRateLimitErrorResponse(limit, {
+        exceeded: "Rate limit exceeded. Please wait and try again.",
+        unavailable: "Webhook protection is not configured correctly right now. Try again later.",
+      })
     }
 
     const body = await request.json()
@@ -147,11 +188,27 @@ export async function PATCH(request: Request) {
       metadata: { active: webhook.active },
     })
 
+    void logServerEvent({
+      level: "info",
+      category: "webhook",
+      action: "webhooks.updated",
+      message: "Webhook endpoint was updated.",
+      request,
+      actor: { id: user.id, email: user.email, role: user.role },
+      orgId: org.id,
+      metadata: { webhookId: webhook.id, active: webhook.active },
+    })
+
     return NextResponse.json({ webhook })
   } catch (error) {
     const accessResponse = handleAccessRouteError(error)
     if (accessResponse) return accessResponse
-    console.error("Webhook update failed", error)
+    void captureServerError({
+      action: "webhooks.update.failed",
+      message: "Webhook update failed.",
+      request,
+      error,
+    })
     return NextResponse.json({ error: "Failed to update webhook" }, { status: 500 })
   }
 }

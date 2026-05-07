@@ -2,7 +2,9 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
-import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
+import { logServerEvent } from "@/lib/observability"
+import { assertActionAccess } from "@/lib/rbac"
+import { createRateLimitErrorResponse, getRateLimitKey, rateLimit } from "@/lib/rate-limit"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable audit logs." }, { status: 503 })
@@ -22,7 +24,8 @@ const sanitizeMetadata = (value: unknown) => {
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await requireAdminRequest(request)
+    const { org, user } = await requireAdminRequest(request)
+    await assertActionAccess({ request, subject: user, orgId: org.id, action: "audit.read" })
     const logs = await prisma.auditLog.findMany({
       where: { orgId: org.id },
       orderBy: { createdAt: "desc" },
@@ -42,15 +45,29 @@ export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org, user } = await requireAdminRequest(request)
-    const limit = rateLimit(getRateLimitKey(request, "audit-write", { orgId: org.id, userId: user.id }), {
+    await assertActionAccess({ request, subject: user, orgId: org.id, action: "audit.write" })
+    const limit = await rateLimit(getRateLimitKey(request, "audit-write", { orgId: org.id, userId: user.id }), {
       limit: 30,
       windowMs: 60_000,
+      strictInProduction: true,
+      action: "audit.write",
     })
     if (!limit.ok) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please wait and try again." },
-        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
-      )
+      if (limit.reason === "exceeded") {
+        void logServerEvent({
+          level: "warning",
+          category: "audit",
+          action: "audit.write.rate_limited",
+          message: "Audit write request was rate limited.",
+          request,
+          actor: { id: user.id, email: user.email, role: user.role },
+          orgId: org.id,
+        })
+      }
+      return createRateLimitErrorResponse(limit, {
+        exceeded: "Rate limit exceeded. Please wait and try again.",
+        unavailable: "Audit protection is not configured correctly right now. Try again later.",
+      })
     }
 
     const body = await request.json()

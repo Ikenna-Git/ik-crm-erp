@@ -5,9 +5,11 @@ import { buildModuleAccessForUser, getDefaultAccessProfileForRole } from "@/lib/
 import { getDefaultTrialEndsAt } from "@/lib/billing"
 import { issueSignupInvite, sendSignupInviteEmail } from "@/lib/invitations"
 import { normalizeOrgStatus } from "@/lib/org-status"
+import { logServerEvent } from "@/lib/observability"
 import { getPublicOrigin } from "@/lib/public-url"
+import { assertActionAccess } from "@/lib/rbac"
 import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
-import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
+import { createRateLimitErrorResponse, getRateLimitKey, rateLimit } from "@/lib/rate-limit"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable org management." }, { status: 503 })
@@ -54,15 +56,18 @@ export async function POST(request: Request) {
 
   try {
     const { user } = await requireAdminRequest(request, { requireSuperAdmin: true })
-    const limit = rateLimit(getRateLimitKey(request, "admin-org-create", { userId: user.id, extra: "workspace" }), {
+    await assertActionAccess({ request, subject: user, action: "admin.orgs.manage" })
+    const limit = await rateLimit(getRateLimitKey(request, "admin-org-create", { userId: user.id, extra: "workspace" }), {
       limit: 10,
       windowMs: 60_000,
+      strictInProduction: true,
+      action: "admin.orgs.create",
     })
     if (!limit.ok) {
-      return NextResponse.json(
-        { error: "Too many workspace-creation requests. Please wait a minute and try again." },
-        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
-      )
+      return createRateLimitErrorResponse(limit, {
+        exceeded: "Too many workspace-creation requests. Please wait a minute and try again.",
+        unavailable: "Workspace-creation protection is not configured correctly right now. Try again later.",
+      })
     }
 
     const body = await request.json()
@@ -173,15 +178,18 @@ export async function PATCH(request: Request) {
 
   try {
     const { user } = await requireAdminRequest(request, { requireSuperAdmin: true })
-    const limit = rateLimit(getRateLimitKey(request, "admin-org-status", { userId: user.id, extra: "status" }), {
+    await assertActionAccess({ request, subject: user, action: "admin.orgs.manage" })
+    const limit = await rateLimit(getRateLimitKey(request, "admin-org-status", { userId: user.id, extra: "status" }), {
       limit: 20,
       windowMs: 60_000,
+      strictInProduction: true,
+      action: "admin.orgs.status",
     })
     if (!limit.ok) {
-      return NextResponse.json(
-        { error: "Too many workspace status changes. Please wait a minute and try again." },
-        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
-      )
+      return createRateLimitErrorResponse(limit, {
+        exceeded: "Too many workspace status changes. Please wait a minute and try again.",
+        unavailable: "Workspace-lifecycle protection is not configured correctly right now. Try again later.",
+      })
     }
 
     const body = await request.json()

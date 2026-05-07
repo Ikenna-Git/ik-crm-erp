@@ -1,10 +1,19 @@
 export const BILLING_PLANS = ["trial", "starter", "professional", "enterprise"] as const
 export const BILLING_STATUSES = ["trial", "active", "past_due", "suspended", "canceled"] as const
 export const BILLING_CYCLES = ["monthly", "quarterly", "annual", "custom"] as const
+export const BILLING_FEATURES = [
+  "billing.settings.manage",
+  "billing.provider_refs.manage",
+  "reports.export.email",
+  "webhooks.manage",
+  "seats.visibility",
+  "plan.gating",
+] as const
 
 export type BillingPlan = (typeof BILLING_PLANS)[number]
 export type BillingStatus = (typeof BILLING_STATUSES)[number]
 export type BillingCycle = (typeof BILLING_CYCLES)[number]
+export type BillingFeature = (typeof BILLING_FEATURES)[number]
 
 export const BILLING_PLAN_LABELS: Record<BillingPlan, string> = {
   trial: "Trial",
@@ -54,3 +63,92 @@ export const getBillingProviderReadiness = () => ({
   flutterwave: Boolean(process.env.FLUTTERWAVE_SECRET_KEY && process.env.FLUTTERWAVE_PUBLIC_KEY),
   stripe: Boolean(process.env.STRIPE_SECRET_KEY && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY),
 })
+
+const BILLING_FEATURE_MATRIX: Record<BillingPlan, Record<BillingFeature, boolean>> = {
+  trial: {
+    "billing.settings.manage": true,
+    "billing.provider_refs.manage": false,
+    "reports.export.email": false,
+    "webhooks.manage": false,
+    "seats.visibility": true,
+    "plan.gating": false,
+  },
+  starter: {
+    "billing.settings.manage": true,
+    "billing.provider_refs.manage": false,
+    "reports.export.email": true,
+    "webhooks.manage": false,
+    "seats.visibility": true,
+    "plan.gating": true,
+  },
+  professional: {
+    "billing.settings.manage": true,
+    "billing.provider_refs.manage": false,
+    "reports.export.email": true,
+    "webhooks.manage": true,
+    "seats.visibility": true,
+    "plan.gating": true,
+  },
+  enterprise: {
+    "billing.settings.manage": true,
+    "billing.provider_refs.manage": true,
+    "reports.export.email": true,
+    "webhooks.manage": true,
+    "seats.visibility": true,
+    "plan.gating": true,
+  },
+}
+
+type BillingOrgLike = {
+  billingPlan?: string | null
+  billingStatus?: string | null
+  paymentProvider?: string | null
+  paymentCustomerRef?: string | null
+  paymentSubscriptionRef?: string | null
+  trialEndsAt?: Date | string | null
+  seatLimit?: number | null
+}
+
+export const hasBillingFeature = (org: BillingOrgLike, feature: BillingFeature) => {
+  const plan = normalizeBillingPlan(org.billingPlan)
+  return BILLING_FEATURE_MATRIX[plan][feature]
+}
+
+export const isBillingSuspended = (org: BillingOrgLike) => normalizeBillingStatus(org.billingStatus) === "suspended"
+
+export const getBillingConfigurationState = (org: BillingOrgLike) => {
+  const status = normalizeBillingStatus(org.billingStatus)
+  const provider = String(org.paymentProvider || "").trim().toLowerCase()
+  const hasProvider = Boolean(provider)
+  const hasRefs = Boolean(org.paymentCustomerRef || org.paymentSubscriptionRef)
+  const readiness = getBillingProviderReadiness()
+  const providerConfigured =
+    !provider ||
+    (provider === "paystack" && readiness.paystack) ||
+    (provider === "flutterwave" && readiness.flutterwave) ||
+    (provider === "stripe" && readiness.stripe)
+
+  return {
+    status,
+    provider,
+    hasProvider,
+    hasRefs,
+    providerConfigured,
+    paymentsConfigured: hasProvider && providerConfigured && hasRefs,
+    planGatingEnabled: hasBillingFeature(org, "plan.gating"),
+  }
+}
+
+export const getBillingReadinessSummary = (org: BillingOrgLike) => {
+  const state = getBillingConfigurationState(org)
+  const trialEndsAt = org.trialEndsAt ? new Date(org.trialEndsAt) : null
+  const trialExpired = Boolean(trialEndsAt && trialEndsAt.getTime() < Date.now())
+  return {
+    ...state,
+    trialEndsAt,
+    trialExpired,
+    seatLimit: org.seatLimit || 0,
+    liveCheckoutImplemented: false,
+    webhookLifecycleImplemented: false,
+  }
+}

@@ -44,6 +44,15 @@ type BillingResponse = {
     flutterwave: boolean
     stripe: boolean
   }
+  billingReadiness?: {
+    status: string
+    provider: string
+    paymentsConfigured: boolean
+    planGatingEnabled: boolean
+    trialExpired: boolean
+    liveCheckoutImplemented: boolean
+    webhookLifecycleImplemented: boolean
+  }
 }
 
 const formatDateInput = (value?: string | null) => (value ? new Date(value).toISOString().slice(0, 10) : "")
@@ -312,6 +321,20 @@ export default function AdminBillingPage() {
               <p className="mt-3 text-sm text-slate-300">
                 This is the billing foundation layer: owner-level visibility now, live provider charging integration next.
               </p>
+              {data?.billingReadiness ? (
+                <div className="mt-3 space-y-1 text-xs text-slate-400">
+                  <p>Billing status: {data.billingReadiness.status}</p>
+                  <p>Plan gating: {data.billingReadiness.planGatingEnabled ? "available" : "not configured for this plan"}</p>
+                  <p>Live checkout: {data.billingReadiness.liveCheckoutImplemented ? "implemented" : "not implemented"}</p>
+                  <p>
+                    Webhook lifecycle:{" "}
+                    {data.billingReadiness.webhookLifecycleImplemented ? "implemented" : "not implemented"}
+                  </p>
+                  <p>
+                    Payments: {data.billingReadiness.paymentsConfigured ? "provider refs configured" : "not configured"}
+                  </p>
+                </div>
+              ) : null}
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">

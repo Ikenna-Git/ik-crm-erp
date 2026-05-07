@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { prisma, withPrismaRetry } from "@/lib/prisma"
 import { getBillingProviderReadiness } from "@/lib/billing"
 import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
+import { getObservabilityReadiness } from "@/lib/observability"
+import { getRateLimitReadiness } from "@/lib/rate-limit"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable founder status." }, { status: 503 })
@@ -63,6 +65,8 @@ export async function GET(request: Request) {
     const googleOauthConfigured = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)
     const billingProviderReadiness = getBillingProviderReadiness()
     const billingReadyCount = Object.values(billingProviderReadiness).filter(Boolean).length
+    const observabilityReadiness = getObservabilityReadiness()
+    const rateLimitReadiness = getRateLimitReadiness()
     const aiProviders = {
       openai: Boolean(process.env.OPENAI_API_KEY),
       anthropic: Boolean(process.env.ANTHROPIC_API_KEY),
@@ -110,6 +114,26 @@ export async function GET(request: Request) {
           billingReadyCount > 0
             ? `${billingReadyCount} billing provider${billingReadyCount === 1 ? "" : "s"} configured for future charging flows.`
             : "No billing provider credentials detected yet. Org-owner billing controls are live, but payments are not wired.",
+      },
+      {
+        id: "rate-limit",
+        label: "Shared rate limiting",
+        status: rateLimitReadiness.productionSafe ? "healthy" : "critical",
+        detail: rateLimitReadiness.productionSafe
+          ? `Rate limiting is using ${rateLimitReadiness.store}.`
+          : "Production-safe shared rate limiting is not configured yet. High-risk public and admin routes should not go live like this.",
+      },
+      {
+        id: "observability",
+        label: "Server observability",
+        status:
+          observabilityReadiness.genericWebhook || observabilityReadiness.securityWebhook || observabilityReadiness.errorWebhook
+            ? "healthy"
+            : "warning",
+        detail:
+          observabilityReadiness.genericWebhook || observabilityReadiness.securityWebhook || observabilityReadiness.errorWebhook
+            ? "Structured observability webhooks are configured."
+            : "Structured server logging is present, but no external alerting webhook is configured yet.",
       },
       {
         id: "ai",
@@ -174,6 +198,8 @@ export async function GET(request: Request) {
       watchlist,
       aiProviders,
       billingProviders: billingProviderReadiness,
+      observability: observabilityReadiness,
+      rateLimiting: rateLimitReadiness,
       meta: {
         inviteCount,
         largestWorkspace: largestWorkspace
