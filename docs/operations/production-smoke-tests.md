@@ -47,6 +47,8 @@ Run these checks after deployment and before opening Civis broadly.
   - pass: request reaches normal validation/business logic
 - org at seat limit attempts a new invite
   - pass: receives clear seat-limit error and the attempt is logged
+- org with active billing and available seats sends a new invite
+  - pass: invite flow proceeds to normal validation and delivery
 
 ## 4. Rate limiting
 
@@ -100,3 +102,10 @@ Run these checks after deployment and before opening Civis broadly.
 - no browser console crashes on main flows
 - no unhandled server exceptions on main flows
 - no dev/demo flags are enabled in production
+
+## 9. Backup and dependency evidence
+
+- backup/restore evidence section in `docs/operations/backup-restore.md`
+  - pass: updated with a real backup record and restore-drill record, or launch is held
+- remaining dependency advisories
+  - pass: either remediated or explicitly risk-accepted before launch

@@ -92,3 +92,21 @@ These are operational targets, not guarantees. Tighten them before enterprise ro
 - Never run restore drills against the live production database
 - Never rely on a single provider screenshot or UI badge as proof of backup validity
 - If billing later becomes revenue-critical, include payment-webhook reconciliation in restore drills
+
+## Evidence Record
+
+Current status:
+
+- backup evidence: NOT RECORDED IN REPO
+- restore drill: NOT PERFORMED
+
+Use this section to record actual execution evidence:
+
+- backup command used:
+- backup date/time:
+- operator:
+- restore drill date/time:
+- restored into:
+- validation checks completed:
+- issues found:
+- sign-off:

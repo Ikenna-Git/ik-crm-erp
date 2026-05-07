@@ -18,6 +18,12 @@ What this does:
 
 This is the recommended org-scoped dry-run before any cleanup decision.
 
+Equivalent minimal command without a custom output path:
+
+```bash
+npm run fake-data:review -- --org <orgId> --report-only
+```
+
 ## Review suspected records
 
 The report contains:
@@ -45,6 +51,12 @@ Choose any writable file path for `--out`, for example:
 
 ```bash
 npm run fake-data:review -- --org <orgId> --report-only --out /tmp/civis-fake-data-report.json
+```
+
+For a wider suspected-record review export:
+
+```bash
+npm run fake-data:review -- --org <orgId> --report-only --include-suspected --out /tmp/civis-fake-data-review.json
 ```
 
 ## Destructive mode
@@ -79,3 +91,13 @@ Common fixes:
 - export the report
 - review with the owner
 - only then consider destructive cleanup
+
+## Exact destructive command
+
+Only after approval:
+
+```bash
+npm run fake-data:review -- --org <orgId> --delete --confirm-delete DELETE_DEMO_DATA
+```
+
+This does not become safe just because the command runs. Review the report first.
