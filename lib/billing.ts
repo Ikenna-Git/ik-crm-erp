@@ -109,12 +109,39 @@ type BillingOrgLike = {
   seatLimit?: number | null
 }
 
+export const isTrialExpired = (org: BillingOrgLike) => {
+  if (!org.trialEndsAt) return false
+  const trialEndsAt = new Date(org.trialEndsAt)
+  return Number.isFinite(trialEndsAt.getTime()) && trialEndsAt.getTime() < Date.now()
+}
+
 export const hasBillingFeature = (org: BillingOrgLike, feature: BillingFeature) => {
   const plan = normalizeBillingPlan(org.billingPlan)
   return BILLING_FEATURE_MATRIX[plan][feature]
 }
 
 export const isBillingSuspended = (org: BillingOrgLike) => normalizeBillingStatus(org.billingStatus) === "suspended"
+
+export const canUseBillingFeature = (org: BillingOrgLike, feature: BillingFeature) => {
+  if (!hasBillingFeature(org, feature)) {
+    return false
+  }
+
+  if (feature === "billing.settings.manage" || feature === "seats.visibility") {
+    return true
+  }
+
+  const status = normalizeBillingStatus(org.billingStatus)
+  if (status === "active") {
+    return true
+  }
+
+  if (status === "trial") {
+    return !isTrialExpired(org)
+  }
+
+  return false
+}
 
 export const getBillingConfigurationState = (org: BillingOrgLike) => {
   const status = normalizeBillingStatus(org.billingStatus)
@@ -142,7 +169,7 @@ export const getBillingConfigurationState = (org: BillingOrgLike) => {
 export const getBillingReadinessSummary = (org: BillingOrgLike) => {
   const state = getBillingConfigurationState(org)
   const trialEndsAt = org.trialEndsAt ? new Date(org.trialEndsAt) : null
-  const trialExpired = Boolean(trialEndsAt && trialEndsAt.getTime() < Date.now())
+  const trialExpired = isTrialExpired(org)
   return {
     ...state,
     trialEndsAt,
