@@ -28,6 +28,7 @@ type BillingResponse = {
     seatsUsed: number
     seatsRemaining: number
     privilegedUserCount: number
+    atSeatLimit?: boolean
   }
   permissions: {
     canManageBilling: boolean
@@ -52,6 +53,25 @@ type BillingResponse = {
     trialExpired: boolean
     liveCheckoutImplemented: boolean
     webhookLifecycleImplemented: boolean
+    checkoutAvailable?: boolean
+    webhookAvailable?: boolean
+  }
+  providerRuntime?: {
+    selectedProvider?: string | null
+    checkoutAvailable: boolean
+    webhookAvailable: boolean
+    states: Record<
+      string,
+      {
+        name: string
+        implemented: boolean
+        envReady: boolean
+        checkoutReady: boolean
+        webhookReady: boolean
+        missing: string[]
+        note?: string
+      }
+    >
   }
 }
 
@@ -120,7 +140,17 @@ export default function AdminBillingPage() {
       })
       const payload = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(payload?.error || "Failed to update billing")
-      setData((current) => (current ? { ...current, org: payload.org } : current))
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              org: payload.org,
+              summary: payload.summary || current.summary,
+              providerRuntime: payload.providerRuntime || current.providerRuntime,
+              billingReadiness: payload.billingReadiness || current.billingReadiness,
+            }
+          : current,
+      )
       setSuccess("Billing controls saved.")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update billing")
@@ -299,6 +329,7 @@ export default function AdminBillingPage() {
                 <div>Seats used: {data?.summary.seatsUsed || 0}</div>
                 <div>Seats remaining: {data?.summary.seatsRemaining || 0}</div>
                 <div>Privileged users: {data?.summary.privilegedUserCount || 0}</div>
+                {data?.summary.atSeatLimit ? <div className="text-amber-300">Seat limit reached. Upgrade or raise the seat cap before inviting more users.</div> : null}
               </div>
             </div>
 
@@ -308,31 +339,63 @@ export default function AdminBillingPage() {
                 <p className="font-medium">Provider readiness</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Badge className={data?.providerReadiness.paystack ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"}>
-                  Paystack {data?.providerReadiness.paystack ? "ready" : "missing"}
-                </Badge>
-                <Badge className={data?.providerReadiness.flutterwave ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"}>
-                  Flutterwave {data?.providerReadiness.flutterwave ? "ready" : "missing"}
-                </Badge>
-                <Badge className={data?.providerReadiness.stripe ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"}>
-                  Stripe {data?.providerReadiness.stripe ? "ready" : "missing"}
-                </Badge>
+                {(["paystack", "flutterwave", "stripe"] as const).map((provider) => {
+                  const state = data?.providerRuntime?.states?.[provider]
+                  const statusLabel = !state
+                    ? "unknown"
+                    : state.checkoutReady && state.webhookReady
+                      ? "configured"
+                      : state.envReady
+                        ? state.implemented
+                          ? "partial"
+                          : "placeholder"
+                        : "missing"
+                  const tone =
+                    statusLabel === "configured"
+                      ? "bg-emerald-500/15 text-emerald-300"
+                      : statusLabel === "partial"
+                        ? "bg-amber-500/15 text-amber-300"
+                        : statusLabel === "placeholder"
+                          ? "bg-sky-500/15 text-sky-300"
+                          : "bg-rose-500/15 text-rose-300"
+
+                  return (
+                    <Badge key={provider} className={tone}>
+                      {provider === "stripe" ? "Stripe" : provider === "paystack" ? "Paystack" : "Flutterwave"} {statusLabel}
+                    </Badge>
+                  )
+                })}
               </div>
               <p className="mt-3 text-sm text-slate-300">
-                This is the billing foundation layer: owner-level visibility now, live provider charging integration next.
+                Self-serve checkout only becomes live when a supported provider is selected and its credentials, price IDs,
+                and webhook secret are configured.
               </p>
               {data?.billingReadiness ? (
                 <div className="mt-3 space-y-1 text-xs text-slate-400">
                   <p>Billing status: {data.billingReadiness.status}</p>
+                  <p>Selected provider: {data.providerRuntime?.selectedProvider || "not selected"}</p>
                   <p>Plan gating: {data.billingReadiness.planGatingEnabled ? "available" : "not configured for this plan"}</p>
-                  <p>Live checkout: {data.billingReadiness.liveCheckoutImplemented ? "implemented" : "not implemented"}</p>
+                  <p>
+                    Live checkout:{" "}
+                    {data.billingReadiness.checkoutAvailable || data.billingReadiness.liveCheckoutImplemented
+                      ? "implemented and configurable"
+                      : "not configured"}
+                  </p>
                   <p>
                     Webhook lifecycle:{" "}
-                    {data.billingReadiness.webhookLifecycleImplemented ? "implemented" : "not implemented"}
+                    {data.billingReadiness.webhookAvailable || data.billingReadiness.webhookLifecycleImplemented
+                      ? "implemented and configurable"
+                      : "not configured"}
                   </p>
                   <p>
                     Payments: {data.billingReadiness.paymentsConfigured ? "provider refs configured" : "not configured"}
                   </p>
+                  {data.providerRuntime?.selectedProvider &&
+                  data.providerRuntime.states?.[data.providerRuntime.selectedProvider]?.missing?.length ? (
+                    <p>
+                      Missing config: {data.providerRuntime.states[data.providerRuntime.selectedProvider].missing.join(", ")}
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
             </div>

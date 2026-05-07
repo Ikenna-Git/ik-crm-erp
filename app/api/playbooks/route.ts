@@ -3,6 +3,7 @@ import { PlaybookStatus } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
+import { assertBillingFeatureAccess } from "@/lib/billing"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable playbooks." }, { status: 503 })
@@ -10,7 +11,8 @@ const dbUnavailable = () =>
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await requireModuleAccess(request, "playbooks", "view")
+    const { org, user } = await requireModuleAccess(request, "playbooks", "view")
+    await assertBillingFeatureAccess({ request, org, user, feature: "playbooks.manage" })
     const runs = await prisma.playbookRun.findMany({
       where: { orgId: org.id },
       orderBy: { updatedAt: "desc" },
@@ -25,6 +27,7 @@ export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org, user } = await requireModuleAccess(request, "playbooks", "manage")
+    await assertBillingFeatureAccess({ request, org, user, feature: "playbooks.manage" })
     const body = await request.json()
     const { templateId, name, category, notes } = body || {}
     if (!templateId || !name || !category) {
@@ -63,6 +66,7 @@ export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org, user } = await requireModuleAccess(request, "playbooks", "manage")
+    await assertBillingFeatureAccess({ request, org, user, feature: "playbooks.manage" })
     const body = await request.json()
     const { id, status, progress, notes } = body || {}
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })

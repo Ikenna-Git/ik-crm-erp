@@ -19,7 +19,7 @@ const PUBLIC_PAGE_ROUTES = new Set([
 
 const PUBLIC_PAGE_PREFIXES = ["/portal/"]
 const AUTH_PAGES = new Set(["/login", "/signup", "/forgot-password", "/reset-password"])
-const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/portal/", "/api/invitations/"]
+const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/portal/", "/api/invitations/", "/api/billing/webhook"]
 const STATIC_PREFIXES = ["/_next/", "/images/", "/icons/"]
 const STATIC_FILES = new Set([
   "/favicon.ico",

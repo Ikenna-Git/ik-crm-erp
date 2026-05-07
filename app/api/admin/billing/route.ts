@@ -9,13 +9,15 @@ import {
   BILLING_PLANS,
   BILLING_STATUS_LABELS,
   BILLING_STATUSES,
+  getBillingFeatureAvailability,
   getBillingProviderReadiness,
-  getBillingReadinessSummary,
+  getSeatAvailability,
   hasBillingFeature,
   normalizeBillingCycle,
   normalizeBillingPlan,
   normalizeBillingStatus,
 } from "@/lib/billing"
+import { BILLING_PROVIDER_NAMES, getBillingProviderRuntimeSummary, getBillingStatusPayload, normalizeBillingProviderName } from "@/lib/billing-provider"
 import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
 import { logServerEvent } from "@/lib/observability"
 import { assertActionAccess } from "@/lib/rbac"
@@ -41,6 +43,9 @@ export async function GET(request: Request) {
       prisma.user.count({ where: { orgId: org.id } }),
       prisma.user.count({ where: { orgId: org.id, role: { in: ["ORG_OWNER", "ADMIN", "SUPER_ADMIN"] } } }),
     ])
+    const seatAvailability = getSeatAvailability(org, seatUsage)
+    const billingStatus = getBillingStatusPayload({ org, seatsUsed: seatUsage })
+    const providerRuntime = getBillingProviderRuntimeSummary(org)
 
     return NextResponse.json({
       org: {
@@ -59,8 +64,9 @@ export async function GET(request: Request) {
       },
       summary: {
         seatsUsed: seatUsage,
-        seatsRemaining: Math.max((org.seatLimit || 5) - seatUsage, 0),
+        seatsRemaining: seatAvailability.remaining,
         privilegedUserCount,
+        atSeatLimit: seatUsage >= seatAvailability.limit,
       },
       permissions: {
         canManageBilling: canManageWorkspaceSettings(user.role),
@@ -73,7 +79,13 @@ export async function GET(request: Request) {
         cycles: BILLING_CYCLES.map((value) => ({ value, label: BILLING_CYCLE_LABELS[value] })),
       },
       providerReadiness: getBillingProviderReadiness(),
-      billingReadiness: getBillingReadinessSummary(org),
+      providerRuntime,
+      billingReadiness: {
+        ...billingStatus.billingReadiness,
+        checkoutAvailable: providerRuntime.checkoutAvailable,
+        webhookAvailable: providerRuntime.webhookAvailable,
+      },
+      featureAccess: getBillingFeatureAvailability(org),
     })
   } catch (error) {
     return handleAccessRouteError(error, "Failed to load billing settings")
@@ -118,13 +130,20 @@ export async function PATCH(request: Request) {
 
     if (isSuperAdmin(user.role)) {
       await assertActionAccess({ request, subject: user, orgId: org.id, action: "billing.providerRefs.manage" })
+      const provider = normalizeBillingProviderName(body?.paymentProvider)
+      if (body?.paymentProvider && !provider) {
+        return NextResponse.json(
+          { error: `paymentProvider must be one of: ${BILLING_PROVIDER_NAMES.join(", ")}` },
+          { status: 400 },
+        )
+      }
       updateData.billingPlan = normalizeBillingPlan(body?.billingPlan || org.billingPlan)
       updateData.billingStatus = normalizeBillingStatus(body?.billingStatus || org.billingStatus)
       updateData.billingCycle = normalizeBillingCycle(body?.billingCycle || org.billingCycle)
       updateData.seatLimit = Math.max(Number(body?.seatLimit || org.seatLimit || 5) || 5, 1)
       updateData.nextBillingDate = parseOptionalDate(body?.nextBillingDate)
       updateData.trialEndsAt = parseOptionalDate(body?.trialEndsAt)
-      updateData.paymentProvider = String(body?.paymentProvider || "").trim() || null
+      updateData.paymentProvider = provider || null
       updateData.paymentCustomerRef = String(body?.paymentCustomerRef || "").trim() || null
       updateData.paymentSubscriptionRef = String(body?.paymentSubscriptionRef || "").trim() || null
     }
@@ -170,6 +189,11 @@ export async function PATCH(request: Request) {
       },
     })
 
+    const seatsUsed = await prisma.user.count({ where: { orgId: updated.id } })
+    const seatAvailability = getSeatAvailability(updated, seatsUsed)
+    const billingStatus = getBillingStatusPayload({ org: updated, seatsUsed })
+    const providerRuntime = getBillingProviderRuntimeSummary(updated)
+
     return NextResponse.json({
       org: {
         id: updated.id,
@@ -185,7 +209,20 @@ export async function PATCH(request: Request) {
         paymentCustomerRef: isSuperAdmin(user.role) ? updated.paymentCustomerRef || "" : "",
         paymentSubscriptionRef: isSuperAdmin(user.role) ? updated.paymentSubscriptionRef || "" : "",
       },
-      billingReadiness: getBillingReadinessSummary(updated),
+      summary: {
+        seatsUsed,
+        seatsRemaining: seatAvailability.remaining,
+        privilegedUserCount: await prisma.user.count({
+          where: { orgId: updated.id, role: { in: ["ORG_OWNER", "ADMIN", "SUPER_ADMIN"] } },
+        }),
+        atSeatLimit: seatsUsed >= seatAvailability.limit,
+      },
+      providerRuntime,
+      billingReadiness: {
+        ...billingStatus.billingReadiness,
+        checkoutAvailable: providerRuntime.checkoutAvailable,
+        webhookAvailable: providerRuntime.webhookAvailable,
+      },
     })
   } catch (error) {
     return handleAccessRouteError(error, "Failed to update billing settings")

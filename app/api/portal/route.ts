@@ -3,6 +3,7 @@ import { PortalStatus } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
+import { assertBillingFeatureAccess } from "@/lib/billing"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable client portal." }, { status: 503 })
@@ -12,7 +13,8 @@ const generateAccessCode = () => Math.random().toString(36).slice(2, 10)
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await requireModuleAccess(request, "portal", "view")
+    const { org, user } = await requireModuleAccess(request, "portal", "view")
+    await assertBillingFeatureAccess({ request, org, user, feature: "portal.core" })
     const portals = await prisma.clientPortal.findMany({
       where: { orgId: org.id },
       orderBy: { updatedAt: "desc" },
@@ -31,6 +33,7 @@ export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org, user } = await requireModuleAccess(request, "portal", "manage")
+    await assertBillingFeatureAccess({ request, org, user, feature: "portal.manage" })
     const body = await request.json()
     const { name, contactName, contactEmail, summary } = body || {}
     if (!name) return NextResponse.json({ error: "name is required" }, { status: 400 })
@@ -77,6 +80,7 @@ export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org, user } = await requireModuleAccess(request, "portal", "manage")
+    await assertBillingFeatureAccess({ request, org, user, feature: "portal.manage" })
     const body = await request.json()
     const { id, status, summary } = body || {}
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
