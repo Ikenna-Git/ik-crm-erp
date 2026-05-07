@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - p0-production-hardening-auth-admin-billing
+      - p0-*
   pull_request:
 
 jobs:
@@ -27,7 +27,7 @@ jobs:
       - name: Prisma generate
         run: npx prisma generate
 
-      - name: Lint (typecheck gate)
+      - name: Typecheck / lint gate
         run: npm run lint
 
       - name: Build

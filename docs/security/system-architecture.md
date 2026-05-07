@@ -95,6 +95,7 @@ flowchart LR
 
 - Central route protection now exists through `proxy.ts`, and the previously exposed business endpoints are no longer intentionally public.
 - Header/default identity fallback has been quarantined behind explicit local-development flags, but the codebase still carries those dev-only branches and they must not be enabled outside local development.
-- Public portal code routes remain intentionally public, with in-memory rate limiting as a baseline. That is safer than before, but still not sufficient for multi-instance production; a shared store limiter is still required.
+- Public portal code routes remain intentionally public. The codebase is now prepared for shared-store rate limiting through Upstash-style envs, but production should not be treated as multi-instance-safe until those envs are configured.
 - The platform still relies on route/helper enforcement rather than a fully uniform action-policy engine for every business operation.
 - Payment and subscription lifecycle handling is not implemented yet; billing is metadata/admin-settings only.
+- Structured observability hooks now exist for auth failures, admin denials, exports, uploads, rollback, and public-portal abuse attempts, but external alert delivery still depends on environment configuration.

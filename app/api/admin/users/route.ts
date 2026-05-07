@@ -12,9 +12,11 @@ import {
 } from "@/lib/access-control"
 import { canAssignRole, canDeleteUser, getAssignableRoles, isAdmin } from "@/lib/authz"
 import { issueSignupInvite, sendSignupInviteEmail } from "@/lib/invitations"
+import { logServerEvent } from "@/lib/observability"
 import { getPublicOrigin } from "@/lib/public-url"
+import { assertActionAccess } from "@/lib/rbac"
 import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
-import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
+import { createRateLimitErrorResponse, getRateLimitKey, rateLimit } from "@/lib/rate-limit"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable admin management." }, { status: 503 })
@@ -83,15 +85,18 @@ export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org, user: actor } = await requireAdminRequest(request)
-    const limit = rateLimit(getRateLimitKey(request, "admin-user-invite", { orgId: org.id, userId: actor.id }), {
+    await assertActionAccess({ request, subject: actor, orgId: org.id, action: "admin.users.invite" })
+    const limit = await rateLimit(getRateLimitKey(request, "admin-user-invite", { orgId: org.id, userId: actor.id }), {
       limit: 20,
       windowMs: 60_000,
+      strictInProduction: true,
+      action: "admin.users.invite",
     })
     if (!limit.ok) {
-      return NextResponse.json(
-        { error: "Too many invite requests. Please wait a minute and try again." },
-        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
-      )
+      return createRateLimitErrorResponse(limit, {
+        exceeded: "Too many invite requests. Please wait a minute and try again.",
+        unavailable: "Invite protection is not configured correctly right now. Try again later.",
+      })
     }
 
     const body = await request.json()
@@ -251,15 +256,18 @@ export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org, user: actor } = await requireAdminRequest(request)
-    const limit = rateLimit(getRateLimitKey(request, "admin-user-update", { orgId: org.id, userId: actor.id }), {
+    await assertActionAccess({ request, subject: actor, orgId: org.id, action: "admin.users.roleChange" })
+    const limit = await rateLimit(getRateLimitKey(request, "admin-user-update", { orgId: org.id, userId: actor.id }), {
       limit: 30,
       windowMs: 60_000,
+      strictInProduction: true,
+      action: "admin.users.role_change",
     })
     if (!limit.ok) {
-      return NextResponse.json(
-        { error: "Too many user-update requests. Please wait a minute and try again." },
-        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
-      )
+      return createRateLimitErrorResponse(limit, {
+        exceeded: "Too many user-update requests. Please wait a minute and try again.",
+        unavailable: "User-management protection is not configured correctly right now. Try again later.",
+      })
     }
 
     const body = await request.json()
@@ -352,15 +360,18 @@ export async function DELETE(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org, user: actor } = await requireAdminRequest(request)
-    const limit = rateLimit(getRateLimitKey(request, "admin-user-delete", { orgId: org.id, userId: actor.id }), {
+    await assertActionAccess({ request, subject: actor, orgId: org.id, action: "admin.users.delete" })
+    const limit = await rateLimit(getRateLimitKey(request, "admin-user-delete", { orgId: org.id, userId: actor.id }), {
       limit: 15,
       windowMs: 60_000,
+      strictInProduction: true,
+      action: "admin.users.delete",
     })
     if (!limit.ok) {
-      return NextResponse.json(
-        { error: "Too many user-removal requests. Please wait a minute and try again." },
-        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
-      )
+      return createRateLimitErrorResponse(limit, {
+        exceeded: "Too many user-removal requests. Please wait a minute and try again.",
+        unavailable: "User-removal protection is not configured correctly right now. Try again later.",
+      })
     }
 
     const { searchParams } = new URL(request.url)

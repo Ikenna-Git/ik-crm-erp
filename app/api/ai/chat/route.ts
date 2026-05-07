@@ -3,10 +3,12 @@ import { resolveProvider, callProvider, type AiMessage } from "@/lib/ai/provider
 import { buildFallbackResponse } from "@/lib/ai/fallback"
 import { findKnowledge } from "@/lib/ai/knowledge"
 import { requireModuleAccess } from "@/lib/access-route"
+import { logServerEvent } from "@/lib/observability"
+import { assertActionAccess } from "@/lib/rbac"
 import { isRequestUserError } from "@/lib/request-user"
 import { createAuditLog } from "@/lib/audit"
 import { prisma } from "@/lib/prisma"
-import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
+import { createRateLimitErrorResponse, getRateLimitKey, rateLimit } from "@/lib/rate-limit"
 
 type AiMode = "qna" | "summary" | "email" | "tour"
 type AiAction = {
@@ -558,17 +560,31 @@ const resolveDataQuery = async (
 export async function POST(request: Request) {
   try {
     const { org, user } = await requireModuleAccess(request, "ai", "view")
+    await assertActionAccess({ request, subject: user, orgId: org.id, action: "ai.use" })
 
     if (Number.isFinite(aiRateLimitPerMinute) && aiRateLimitPerMinute > 0) {
-      const limit = rateLimit(getRateLimitKey(request, "ai", { orgId: org.id, userId: user.id }), {
+      const limit = await rateLimit(getRateLimitKey(request, "ai", { orgId: org.id, userId: user.id }), {
         limit: aiRateLimitPerMinute,
         windowMs: 60_000,
+        strictInProduction: true,
+        action: "ai.chat",
       })
       if (!limit.ok) {
-        return NextResponse.json(
-          { error: "Rate limit exceeded. Please wait a moment and try again." },
-          { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
-        )
+        if (limit.reason === "exceeded") {
+          void logServerEvent({
+            level: "warning",
+            category: "system",
+            action: "ai.chat.rate_limited",
+            message: "AI request was rate limited.",
+            request,
+            actor: { id: user.id, email: user.email, role: user.role },
+            orgId: org.id,
+          })
+        }
+        return createRateLimitErrorResponse(limit, {
+          exceeded: "Rate limit exceeded. Please wait a moment and try again.",
+          unavailable: "AI protection is not configured correctly right now. Try again later.",
+        })
       }
     }
 

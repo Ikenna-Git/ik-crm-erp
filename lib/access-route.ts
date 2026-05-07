@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { ACCESS_MODULE_LABELS, type AccessLevel, type AccessModule, hasModuleAccess } from "@/lib/access-control"
 import { getUserFromRequest, isRequestUserError, RequestUserError } from "@/lib/request-user"
 import { canManageWorkspaceSettings, isAdmin, isSuperAdmin } from "@/lib/authz"
+import { captureServerError, logSecurityEvent } from "@/lib/observability"
 
 type RequestContext = Awaited<ReturnType<typeof getUserFromRequest>>
 
@@ -16,6 +17,15 @@ export const requireModuleAccess = async (
 
   if (!hasModuleAccess(context.user, module, required)) {
     const label = ACCESS_MODULE_LABELS[module]
+    void logSecurityEvent({
+      level: "warning",
+      action: "module.access.denied",
+      message: `${label} ${required} access was denied.`,
+      request,
+      actor: { id: context.user.id, email: context.user.email, role: context.user.role },
+      orgId: context.org.id,
+      metadata: { module, required },
+    })
     throw new RequestUserError(`${label} ${required} access required`, 403)
   }
 
@@ -31,6 +41,15 @@ export const requireAnyModuleAccess = async (
 
   if (!matched) {
     const labels = requirements.map((entry) => `${ACCESS_MODULE_LABELS[entry.module]} ${entry.level || "view"}`)
+    void logSecurityEvent({
+      level: "warning",
+      action: "module.access.denied",
+      message: "No required module access combination matched.",
+      request,
+      actor: { id: context.user.id, email: context.user.email, role: context.user.role },
+      orgId: context.org.id,
+      metadata: { requirements },
+    })
     throw new RequestUserError(`${labels.join(" or ")} access required`, 403)
   }
 
@@ -48,6 +67,15 @@ export const requireAdminRequest = async (
 
   if (options?.requireSuperAdmin) {
     if (!isSuperAdmin(context.user.role)) {
+      void logSecurityEvent({
+        level: "warning",
+        action: "admin.access.denied",
+        message: "Super admin access was denied.",
+        request,
+        actor: { id: context.user.id, email: context.user.email, role: context.user.role },
+        orgId: context.org.id,
+        metadata: { requiredRole: "SUPER_ADMIN" },
+      })
       throw new RequestUserError("Super admin access required", 403)
     }
     return context
@@ -55,12 +83,30 @@ export const requireAdminRequest = async (
 
   if (options?.requireWorkspaceOwner) {
     if (!canManageWorkspaceSettings(context.user.role)) {
+      void logSecurityEvent({
+        level: "warning",
+        action: "admin.access.denied",
+        message: "Organization owner access was denied.",
+        request,
+        actor: { id: context.user.id, email: context.user.email, role: context.user.role },
+        orgId: context.org.id,
+        metadata: { requiredRole: "ORG_OWNER" },
+      })
       throw new RequestUserError("Organization owner access required", 403)
     }
     return context
   }
 
   if (!isAdmin(context.user.role)) {
+    void logSecurityEvent({
+      level: "warning",
+      action: "admin.access.denied",
+      message: "Admin access was denied.",
+      request,
+      actor: { id: context.user.id, email: context.user.email, role: context.user.role },
+      orgId: context.org.id,
+      metadata: { requiredRole: "ADMIN" },
+    })
     throw new RequestUserError("Admin access required", 403)
   }
 
@@ -74,7 +120,12 @@ export const assertSameOrg = (context: RequestContext, entityOrgId?: string | nu
 }
 
 export const handleAccessRouteError = (error: unknown, fallback = "Request failed") => {
-  console.error(fallback, error)
+  void captureServerError({
+    action: "route.handler.failed",
+    message: fallback,
+    error,
+    metadata: { fallback },
+  })
   if (isRequestUserError(error)) {
     return NextResponse.json({ error: error.message }, { status: error.status })
   }

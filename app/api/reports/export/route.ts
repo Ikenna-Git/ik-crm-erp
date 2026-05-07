@@ -2,8 +2,12 @@ import { NextResponse } from "next/server"
 import nodemailer from "nodemailer"
 import { generateCsv } from "@/lib/reports"
 import { buildAccountingRows, buildCrmRows, buildVatRows, buildAuditRows } from "@/lib/report-builders"
+import { isSuperAdmin } from "@/lib/authz"
 import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
-import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
+import { hasBillingFeature } from "@/lib/billing"
+import { logServerEvent } from "@/lib/observability"
+import { assertActionAccess } from "@/lib/rbac"
+import { createRateLimitErrorResponse, getRateLimitKey, rateLimit } from "@/lib/rate-limit"
 import { createAuditLog } from "@/lib/audit"
 
 const REQUIRED_ENVS = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM"] as const
@@ -34,15 +38,30 @@ export async function POST(request: Request) {
 
   try {
     const { org, user } = await requireAdminRequest(request)
-    const limit = rateLimit(getRateLimitKey(request, "report-export", { orgId: org.id, userId: user.id }), {
+    await assertActionAccess({ request, subject: user, orgId: org.id, action: "reports.export" })
+    const limit = await rateLimit(getRateLimitKey(request, "report-export", { orgId: org.id, userId: user.id }), {
       limit: 12,
       windowMs: 60_000,
+      strictInProduction: true,
+      action: "reports.export",
     })
     if (!limit.ok) {
-      return NextResponse.json(
-        { error: "Too many export requests. Please wait a minute and try again." },
-        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
-      )
+      if (limit.reason === "exceeded") {
+        void logServerEvent({
+          level: "warning",
+          category: "export",
+          action: "reports.export.rate_limited",
+          message: "Report export was rate limited.",
+          request,
+          actor: { id: user.id, email: user.email, role: user.role },
+          orgId: org.id,
+          metadata: { type, target },
+        })
+      }
+      return createRateLimitErrorResponse(limit, {
+        exceeded: "Too many export requests. Please wait a minute and try again.",
+        unavailable: "Export protection is not configured correctly right now. Try again later.",
+      })
     }
 
     const rows =
@@ -59,6 +78,16 @@ export async function POST(request: Request) {
     const filename = `${org.name || "report"}-${type}.csv`
 
     if (target === "desktop") {
+      void logServerEvent({
+        level: "info",
+        category: "export",
+        action: "reports.export.desktop",
+        message: "Desktop report export was requested.",
+        request,
+        actor: { id: user.id, email: user.email, role: user.role },
+        orgId: org.id,
+        metadata: { type, target },
+      })
       await createAuditLog({
         orgId: org.id,
         userId: user.id,
@@ -79,6 +108,14 @@ export async function POST(request: Request) {
 
     if (!email) {
       return NextResponse.json({ error: "Email is required for email export" }, { status: 400 })
+    }
+
+    await assertActionAccess({ request, subject: user, orgId: org.id, action: "reports.export.email" })
+    if (!isSuperAdmin(user.role) && !hasBillingFeature(org, "reports.export.email")) {
+      return NextResponse.json(
+        { error: "Email exports are not available on this billing plan yet." },
+        { status: 403 },
+      )
     }
 
     const missing = REQUIRED_ENVS.filter((key) => !process.env[key])
@@ -105,6 +142,17 @@ export async function POST(request: Request) {
       subject: `Civis ${type} report`,
       text: "Your requested CSV report is attached.",
       attachments: [{ filename, content: csv, contentType: "text/csv" }],
+    })
+
+    void logServerEvent({
+      level: "info",
+      category: "export",
+      action: "reports.export.email",
+      message: "Email report export was requested.",
+      request,
+      actor: { id: user.id, email: user.email, role: user.role },
+      orgId: org.id,
+      metadata: { type, target, email },
     })
 
     await createAuditLog({

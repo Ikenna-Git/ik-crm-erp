@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
-import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
+import { createRateLimitErrorResponse, getRateLimitKey, rateLimit } from "@/lib/rate-limit"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable CRM fields." }, { status: 503 })
@@ -90,12 +90,17 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const limit = rateLimit(getRateLimitKey(request, "crm-fields"), { limit: 20, windowMs: 60_000 })
+    const limit = await rateLimit(getRateLimitKey(request, "crm-fields"), {
+      limit: 20,
+      windowMs: 60_000,
+      strictInProduction: false,
+      action: "crm.fields.manage",
+    })
     if (!limit.ok) {
-      return NextResponse.json(
-        { error: "Too many field changes. Please wait and try again." },
-        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
-      )
+      return createRateLimitErrorResponse(limit, {
+        exceeded: "Too many field changes. Please wait and try again.",
+        unavailable: "CRM field protection is not configured correctly right now. Try again later.",
+      })
     }
     const { org, user } = await requireModuleAccess(request, "crm", "manage")
     const body = await request.json()

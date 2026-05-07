@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
-import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
+import { logServerEvent } from "@/lib/observability"
+import { createRateLimitErrorResponse, getRateLimitKey, rateLimit } from "@/lib/rate-limit"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable approvals." }, { status: 503 })
@@ -21,12 +22,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ cod
       return NextResponse.json({ error: "Portal code is required" }, { status: 400 })
     }
 
-    const limit = rateLimit(getRateLimitKey(request, "portal-approval", { code }), { limit: 60, windowMs: 60_000 })
+    const limit = await rateLimit(getRateLimitKey(request, "portal-approval", { code }), {
+      limit: 60,
+      windowMs: 60_000,
+      strictInProduction: true,
+      action: "portal.approval",
+    })
     if (!limit.ok) {
-      return NextResponse.json(
-        { error: "Too many approval requests. Please retry shortly." },
-        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
-      )
+      if (limit.reason === "exceeded") {
+        void logServerEvent({
+          level: "warning",
+          category: "portal",
+          action: "portal.approval.rate_limited",
+          message: "Public portal approval request was rate limited.",
+          request,
+          metadata: { code },
+        })
+      }
+      return createRateLimitErrorResponse(limit, {
+        exceeded: "Too many approval requests. Please retry shortly.",
+        unavailable: "Portal approval protection is not configured correctly right now. Try again later.",
+      })
     }
 
     const body = await request.json()

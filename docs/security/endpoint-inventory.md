@@ -87,12 +87,12 @@ Legend:
 
 ## Priority Fixes From This Matrix
 
-1. Replace in-memory rate limiting with a shared-store implementation for portal, auth, export, upload, and AI endpoints.
+1. Configure shared-store rate limiting in production for portal, auth, export, upload, AI, and admin-destructive endpoints. The code is prepared for Upstash-style shared storage, but env configuration is still required before calling it production-grade.
 
-2. Finish a full action-level authorization matrix per module (`view/edit/approve/manage`) and map it to every business route.
+2. Continue expanding the centralized action-level authorization matrix per module (`view/edit/approve/manage`) and map it to the remaining lower-risk business routes.
 
 3. Keep legacy bypasses closed:
 - `/api/settings` user creation remains disabled
 - fallback identity paths must stay dev-only
 
-4. Adopt uniform pagination/filter/sort contract across list endpoints.
+4. Complete observability, backup/restore drills, and commercial billing lifecycle work before calling the platform fully production-ready.

@@ -56,6 +56,7 @@ const PROTECTED_PAGE_PREFIXES = [
 ]
 
 const isProtectedPage = (pathname: string) => PROTECTED_PAGE_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+const WORKSPACE_REQUIRED_ROUTE = "/workspace-required"
 
 const buildLoginRedirect = (request: NextRequest) => {
   const loginUrl = new URL("/login", request.url)
@@ -64,10 +65,13 @@ const buildLoginRedirect = (request: NextRequest) => {
   return NextResponse.redirect(loginUrl)
 }
 
-const buildAuthenticatedHome = (request: NextRequest, role?: string | null) => {
+const buildAuthenticatedHome = (request: NextRequest, role?: string | null, orgId?: string | null) => {
   const callbackUrl = request.nextUrl.searchParams.get("callbackUrl")
   if (callbackUrl && callbackUrl.startsWith("/") && !callbackUrl.startsWith("/login") && !callbackUrl.startsWith("/signup")) {
     return NextResponse.redirect(new URL(callbackUrl, request.url))
+  }
+  if (!orgId && !isSuperAdmin(role)) {
+    return NextResponse.redirect(new URL(WORKSPACE_REQUIRED_ROUTE, request.url))
   }
   return NextResponse.redirect(new URL(isAdmin(role) ? "/admin" : "/dashboard", request.url))
 }
@@ -92,9 +96,20 @@ export async function proxy(request: NextRequest) {
 
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
   const role = typeof token?.role === "string" ? token.role : null
+  const orgId = typeof token?.orgId === "string" ? token.orgId : null
 
   if (AUTH_PAGES.has(pathname) && token) {
-    return buildAuthenticatedHome(request, role)
+    return buildAuthenticatedHome(request, role, orgId)
+  }
+
+  if (pathname === WORKSPACE_REQUIRED_ROUTE) {
+    if (!token) {
+      return buildLoginRedirect(request)
+    }
+    if (orgId || isSuperAdmin(role)) {
+      return NextResponse.redirect(new URL(isAdmin(role) ? "/admin" : "/dashboard", request.url))
+    }
+    return NextResponse.next()
   }
 
   if (pathname === "/dashboard/demo" && process.env.NODE_ENV !== "development") {
@@ -140,6 +155,10 @@ export async function proxy(request: NextRequest) {
   if (isProtectedPage(pathname)) {
     if (!token) {
       return buildLoginRedirect(request)
+    }
+
+    if (!orgId && !isSuperAdmin(role)) {
+      return NextResponse.redirect(new URL(WORKSPACE_REQUIRED_ROUTE, request.url))
     }
 
     if (pathname.startsWith("/admin") && !isAdmin(role)) {

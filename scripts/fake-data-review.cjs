@@ -20,11 +20,14 @@ const hasFlag = (flag) => argv.includes(flag)
 const orgId = readArg("--org")
 const outPath = readArg("--out")
 const destructive = hasFlag("--delete")
+const reportOnly = hasFlag("--report-only") || !destructive
 const includeSuspected = hasFlag("--include-suspected")
 const confirmDelete = readArg("--confirm-delete")
 
 if (!orgId) {
-  console.error("Usage: node scripts/fake-data-review.cjs --org <orgId> [--out report.json] [--delete --confirm-delete DELETE_DEMO_DATA] [--include-suspected]")
+  console.error(
+    "Usage: node scripts/fake-data-review.cjs --org <orgId> [--out report.json] [--report-only] [--delete --confirm-delete DELETE_DEMO_DATA] [--include-suspected]",
+  )
   process.exit(1)
 }
 
@@ -211,7 +214,24 @@ const buildDeletePlan = (reportItems) => {
   ]
 }
 
+const printDbRemediation = (error) => {
+  const message = error instanceof Error ? error.message : String(error || "")
+  if (!/P1001|P1002|Can\'t reach database server|timed out|connect/i.test(message)) {
+    return false
+  }
+
+  console.error("Fake-data review could not reach the database.")
+  console.error("Remediation:")
+  console.error("1. Verify DATABASE_URL points to a reachable Postgres instance.")
+  console.error("2. If you use Neon, prefer the direct connection string for admin/maintenance tasks.")
+  console.error("3. If you use Render/Postgres, confirm the instance is running and reachable from this machine.")
+  console.error("4. Re-run in safe mode first: npm run fake-data:review -- --org <orgId> --report-only --out /tmp/fake-data-report.json")
+  return true
+}
+
 const run = async () => {
+  await prisma.$connect()
+
   const org = await prisma.org.findUnique({
     where: { id: orgId },
     select: { id: true, name: true, status: true },
@@ -243,7 +263,7 @@ const run = async () => {
   const report = {
     generatedAt: new Date().toISOString(),
     org,
-    dryRun: !destructive,
+    dryRun: reportOnly,
     destructive,
     includeSuspected,
     summary: {
@@ -268,7 +288,7 @@ const run = async () => {
     console.log(`[SUSPECTED] ${item.model} ${item.id} :: ${item.reasons.join(", ")}`)
   })
 
-  if (!destructive) {
+  if (reportOnly) {
     console.log("Dry run only. No records were deleted.")
     return
   }
@@ -288,7 +308,9 @@ const run = async () => {
 
 run()
   .catch((error) => {
-    console.error(error instanceof Error ? error.message : error)
+    if (!printDbRemediation(error)) {
+      console.error(error instanceof Error ? error.message : error)
+    }
     process.exitCode = 1
   })
   .finally(async () => {
