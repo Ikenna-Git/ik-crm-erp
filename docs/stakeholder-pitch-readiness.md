@@ -83,9 +83,9 @@ These are the next layer. The product can be pitched without every single item h
 
 ### Reliability and Recovery
 
-- error tracking is configured
+- external error tracking or alert delivery is configured
 - uptime and health monitoring are configured
-- a backup and restore plan exists and has been tested
+- a backup and restore plan exists and a restore drill has been tested
 - incident response ownership is documented
 
 ### Governance
@@ -150,7 +150,8 @@ For Civis right now, the next correct sequence is:
 3. validate centralized auth and admin control-plane behavior on live data
 4. validate HR, projects, and inventory on live data without seeded demo leakage
 5. add monitoring/recovery basics
-6. choose and implement billing/provider flow honestly
-7. complete the first stakeholder pitch gate review
+6. configure shared-store rate limiting and observability in the target environment
+7. choose and implement billing/provider flow honestly
+8. complete the first stakeholder pitch gate review
 
 This document should be treated as a release gate, not just as notes.

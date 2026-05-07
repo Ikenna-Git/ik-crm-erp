@@ -10,11 +10,16 @@ import {
   BILLING_STATUS_LABELS,
   BILLING_STATUSES,
   getBillingProviderReadiness,
+  getBillingReadinessSummary,
+  hasBillingFeature,
   normalizeBillingCycle,
   normalizeBillingPlan,
   normalizeBillingStatus,
 } from "@/lib/billing"
 import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
+import { logServerEvent } from "@/lib/observability"
+import { assertActionAccess } from "@/lib/rbac"
+import { createRateLimitErrorResponse, getRateLimitKey, rateLimit } from "@/lib/rate-limit"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable billing controls." }, { status: 503 })
@@ -30,6 +35,7 @@ export async function GET(request: Request) {
 
   try {
     const { org, user } = await requireAdminRequest(request)
+    await assertActionAccess({ request, subject: user, orgId: org.id, action: "billing.view" })
 
     const [seatUsage, privilegedUserCount] = await Promise.all([
       prisma.user.count({ where: { orgId: org.id } }),
@@ -67,6 +73,7 @@ export async function GET(request: Request) {
         cycles: BILLING_CYCLES.map((value) => ({ value, label: BILLING_CYCLE_LABELS[value] })),
       },
       providerReadiness: getBillingProviderReadiness(),
+      billingReadiness: getBillingReadinessSummary(org),
     })
   } catch (error) {
     return handleAccessRouteError(error, "Failed to load billing settings")
@@ -78,6 +85,30 @@ export async function PATCH(request: Request) {
 
   try {
     const { org, user } = await requireAdminRequest(request, { requireWorkspaceOwner: true })
+    await assertActionAccess({ request, subject: user, orgId: org.id, action: "billing.manage" })
+    const limit = await rateLimit(getRateLimitKey(request, "admin-billing-update", { orgId: org.id, userId: user.id }), {
+      limit: 12,
+      windowMs: 60_000,
+      strictInProduction: true,
+      action: "admin.billing.update",
+    })
+    if (!limit.ok) {
+      if (limit.reason === "exceeded") {
+        void logServerEvent({
+          level: "warning",
+          category: "billing",
+          action: "admin.billing.rate_limited",
+          message: "Billing settings update was rate limited.",
+          request,
+          actor: { id: user.id, email: user.email, role: user.role },
+          orgId: org.id,
+        })
+      }
+      return createRateLimitErrorResponse(limit, {
+        exceeded: "Too many billing changes. Please wait a minute and try again.",
+        unavailable: "Billing protection is not configured correctly right now. Try again later.",
+      })
+    }
 
     const body = await request.json()
     const billingEmail = String(body?.billingEmail || "").trim()
@@ -86,6 +117,7 @@ export async function PATCH(request: Request) {
     }
 
     if (isSuperAdmin(user.role)) {
+      await assertActionAccess({ request, subject: user, orgId: org.id, action: "billing.providerRefs.manage" })
       updateData.billingPlan = normalizeBillingPlan(body?.billingPlan || org.billingPlan)
       updateData.billingStatus = normalizeBillingStatus(body?.billingStatus || org.billingStatus)
       updateData.billingCycle = normalizeBillingCycle(body?.billingCycle || org.billingCycle)
@@ -95,6 +127,10 @@ export async function PATCH(request: Request) {
       updateData.paymentProvider = String(body?.paymentProvider || "").trim() || null
       updateData.paymentCustomerRef = String(body?.paymentCustomerRef || "").trim() || null
       updateData.paymentSubscriptionRef = String(body?.paymentSubscriptionRef || "").trim() || null
+    }
+
+    if (!isSuperAdmin(user.role) && !hasBillingFeature(org, "billing.settings.manage")) {
+      return NextResponse.json({ error: "Billing settings are not available for this plan yet." }, { status: 403 })
     }
 
     const updated = await prisma.org.update({
@@ -118,6 +154,22 @@ export async function PATCH(request: Request) {
       },
     })
 
+    void logServerEvent({
+      level: "info",
+      category: "billing",
+      action: "admin.billing.updated",
+      message: "Billing settings were updated.",
+      request,
+      actor: { id: user.id, email: user.email, role: user.role },
+      orgId: org.id,
+      metadata: {
+        billingPlan: updated.billingPlan,
+        billingStatus: updated.billingStatus,
+        billingCycle: updated.billingCycle,
+        paymentProvider: updated.paymentProvider,
+      },
+    })
+
     return NextResponse.json({
       org: {
         id: updated.id,
@@ -133,6 +185,7 @@ export async function PATCH(request: Request) {
         paymentCustomerRef: isSuperAdmin(user.role) ? updated.paymentCustomerRef || "" : "",
         paymentSubscriptionRef: isSuperAdmin(user.role) ? updated.paymentSubscriptionRef || "" : "",
       },
+      billingReadiness: getBillingReadinessSummary(updated),
     })
   } catch (error) {
     return handleAccessRouteError(error, "Failed to update billing settings")

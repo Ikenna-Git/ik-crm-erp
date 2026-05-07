@@ -2,7 +2,9 @@ import { NextResponse } from "next/server"
 import crypto from "crypto"
 import { isRequestUserError } from "@/lib/request-user"
 import { requireAnyModuleAccess } from "@/lib/access-route"
-import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
+import { captureServerError, logServerEvent } from "@/lib/observability"
+import { assertActionAccess } from "@/lib/rbac"
+import { createRateLimitErrorResponse, getRateLimitKey, rateLimit } from "@/lib/rate-limit"
 import { isDevelopment } from "@/lib/runtime-flags"
 
 const required = ["CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET"] as const
@@ -31,16 +33,30 @@ export async function POST(request: Request) {
       { module: "gallery", level: "manage" },
       { module: "portal", level: "manage" },
     ])
+    await assertActionAccess({ request, subject: user, orgId: org.id, action: "uploads.manage" })
 
-    const limit = rateLimit(getRateLimitKey(request, "cloudinary-upload", { orgId: org.id, userId: user.id }), {
+    const limit = await rateLimit(getRateLimitKey(request, "cloudinary-upload", { orgId: org.id, userId: user.id }), {
       limit: 40,
       windowMs: 60_000,
+      strictInProduction: true,
+      action: "upload.cloudinary",
     })
     if (!limit.ok) {
-      return NextResponse.json(
-        { error: "Too many upload requests. Please wait a minute and try again." },
-        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
-      )
+      if (limit.reason === "exceeded") {
+        void logServerEvent({
+          level: "warning",
+          category: "upload",
+          action: "upload.cloudinary.rate_limited",
+          message: "Cloudinary upload was rate limited.",
+          request,
+          actor: { id: user.id, email: user.email, role: user.role },
+          orgId: org.id,
+        })
+      }
+      return createRateLimitErrorResponse(limit, {
+        exceeded: "Too many upload requests. Please wait a minute and try again.",
+        unavailable: "Upload protection is not configured correctly right now. Try again later.",
+      })
     }
 
     const missing = required.filter((key) => !process.env[key])
@@ -76,6 +92,16 @@ export async function POST(request: Request) {
           mocked: true,
         })
       }
+      void logServerEvent({
+        level: "warning",
+        category: "upload",
+        action: "upload.cloudinary.missing_config",
+        message: "Cloudinary upload was attempted without production configuration.",
+        request,
+        actor: { id: user.id, email: user.email, role: user.role },
+        orgId: org.id,
+        metadata: { missing },
+      })
       return missingCloudinary()
     }
 
@@ -96,6 +122,17 @@ export async function POST(request: Request) {
     const data = await response.json()
 
     if (!response.ok) {
+      void logServerEvent({
+        level: "error",
+        category: "upload",
+        action: "upload.cloudinary.failed",
+        message: "Cloudinary upload request failed.",
+        request,
+        actor: { id: user.id, email: user.email, role: user.role },
+        orgId: org.id,
+        metadata: { folder, status: response.status },
+        error: data,
+      })
       return NextResponse.json({ error: data?.error?.message || "Upload failed" }, { status: 500 })
     }
 
@@ -109,7 +146,12 @@ export async function POST(request: Request) {
     if (isRequestUserError(error)) {
       return NextResponse.json({ error: error.message }, { status: error.status })
     }
-    console.error("Cloudinary upload failed", error)
+    void captureServerError({
+      action: "upload.cloudinary.failed",
+      message: "Cloudinary upload failed unexpectedly.",
+      request,
+      error,
+    })
     return NextResponse.json({ error: "Upload failed" }, { status: 500 })
   }
 }

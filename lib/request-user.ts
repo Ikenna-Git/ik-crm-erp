@@ -6,6 +6,7 @@ import { getDefaultOrg } from "@/lib/defaultOrg"
 import { authOptions } from "@/lib/auth"
 import { FOUNDER_SUPER_ADMIN_EMAIL, isSuperAdmin } from "@/lib/authz"
 import { getOrgStatusMessage } from "@/lib/org-status"
+import { logServerEvent } from "@/lib/observability"
 import { allowDevDefaultIdentity, allowDevHeaderIdentity } from "@/lib/runtime-flags"
 
 const fallbackEmail = FOUNDER_SUPER_ADMIN_EMAIL
@@ -69,6 +70,14 @@ export const getSessionIdentityFromRequest = async (request: Request): Promise<R
     return sanitizeIdentity(email)
   }
 
+  void logServerEvent({
+    level: "warning",
+    category: "auth",
+    action: "auth.session.missing",
+    message: "Request rejected because no verified session identity was available.",
+    request,
+    metadata: { fallbackHeadersAllowed: allowDevHeaderIdentity, fallbackDefaultAllowed: allowDevDefaultIdentity },
+  })
   throw new RequestUserError("Authentication required", 401)
 }
 
@@ -128,6 +137,15 @@ export const getUserFromRequest = async (request: Request) => {
   }
 
   if (!allowDevDefaultIdentity) {
+    void logServerEvent({
+      level: "warning",
+      category: "auth",
+      action: "auth.workspace.missing",
+      message: "Authenticated request has no workspace membership.",
+      request,
+      actor: { email: identity.email, role: identity.role },
+      metadata: { email: identity.email },
+    })
     throw new RequestUserError("No workspace membership found for this account", 403)
   }
 

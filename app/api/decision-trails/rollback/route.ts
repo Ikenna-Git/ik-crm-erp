@@ -3,7 +3,9 @@ import { prisma } from "@/lib/prisma"
 import { assertSameOrg, handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
 import { restoreDateField } from "@/lib/decision-trails"
-import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
+import { logServerEvent } from "@/lib/observability"
+import { assertActionAccess } from "@/lib/rbac"
+import { createRateLimitErrorResponse, getRateLimitKey, rateLimit } from "@/lib/rate-limit"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable decision trails." }, { status: 503 })
@@ -14,15 +16,18 @@ export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org, user } = await requireAdminRequest(request)
-    const limit = rateLimit(getRateLimitKey(request, "decision-rollback", { orgId: org.id, userId: user.id }), {
+    await assertActionAccess({ request, subject: user, orgId: org.id, action: "rollback.execute" })
+    const limit = await rateLimit(getRateLimitKey(request, "decision-rollback", { orgId: org.id, userId: user.id }), {
       limit: 10,
       windowMs: 60_000,
+      strictInProduction: true,
+      action: "decision.rollback",
     })
     if (!limit.ok) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please wait and try again." },
-        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
-      )
+      return createRateLimitErrorResponse(limit, {
+        exceeded: "Rate limit exceeded. Please wait and try again.",
+        unavailable: "Rollback protection is not configured correctly right now. Try again later.",
+      })
     }
     const body = await request.json()
     const id = typeof body?.id === "string" ? body.id.trim() : ""
@@ -114,6 +119,17 @@ export async function POST(request: Request) {
       entity: trail.entity,
       entityId: entityId,
       metadata: { decisionId: trail.id, entity: trail.entity },
+    })
+
+    void logServerEvent({
+      level: "warning",
+      category: "rollback",
+      action: "decision.rollback.executed",
+      message: "A decision rollback was executed.",
+      request,
+      actor: { id: user.id, email: user.email, role: user.role },
+      orgId: org.id,
+      metadata: { decisionId: trail.id, entity: trail.entity, entityId },
     })
 
     return NextResponse.json({ ok: true })

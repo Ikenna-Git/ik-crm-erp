@@ -3,7 +3,7 @@ import nodemailer from "nodemailer"
 import { prisma } from "@/lib/prisma"
 import { getUserFromRequest, isRequestUserError } from "@/lib/request-user"
 import type { NotificationType } from "@prisma/client"
-import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
+import { createRateLimitErrorResponse, getRateLimitKey, rateLimit } from "@/lib/rate-limit"
 
 const REQUIRED_ENVS = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM"] as const
 
@@ -104,15 +104,17 @@ export async function POST(request: Request) {
 
   try {
     const { org, user } = await getUserFromRequest(request)
-    const limit = rateLimit(getRateLimitKey(request, "notifications-create", { orgId: org.id, userId: user.id }), {
+    const limit = await rateLimit(getRateLimitKey(request, "notifications-create", { orgId: org.id, userId: user.id }), {
       limit: 20,
       windowMs: 60_000,
+      strictInProduction: false,
+      action: "notifications.create",
     })
     if (!limit.ok) {
-      return NextResponse.json(
-        { error: "Too many notification requests. Please wait a minute and try again." },
-        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
-      )
+      return createRateLimitErrorResponse(limit, {
+        exceeded: "Too many notification requests. Please wait a minute and try again.",
+        unavailable: "Notification protection is not configured correctly right now. Try again later.",
+      })
     }
 
     const normalizedType = typeof type === "string" ? type.toUpperCase() : "INFO"

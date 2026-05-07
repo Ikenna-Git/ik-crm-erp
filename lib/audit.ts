@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
+import { captureServerError } from "@/lib/observability"
 
 type AuditInput = {
   orgId: string
@@ -23,7 +24,14 @@ export const createAuditLog = async ({ orgId, userId, action, entity, entityId, 
       },
     })
   } catch (error) {
-    console.error("Audit log create failed", error)
+    void captureServerError({
+      action: "audit.write.failed",
+      message: "Audit log create failed.",
+      orgId,
+      actor: userId ? { id: userId } : null,
+      metadata: { action, entity, entityId },
+      error,
+    })
     return null
   }
 }
