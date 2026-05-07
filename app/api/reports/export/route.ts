@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import nodemailer from "nodemailer"
 import { generateCsv } from "@/lib/reports"
 import { buildAccountingRows, buildCrmRows, buildVatRows, buildAuditRows } from "@/lib/report-builders"
-import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
+import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
 import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
 import { createAuditLog } from "@/lib/audit"
 
@@ -22,13 +22,6 @@ export async function POST(request: Request) {
     )
   }
 
-  const limit = rateLimit(getRateLimitKey(request, "report-export"), { limit: 12, windowMs: 60_000 })
-  if (!limit.ok) {
-    return NextResponse.json(
-      { error: "Too many export requests. Please wait a minute and try again." },
-      { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
-    )
-  }
   const body = (await request.json().catch(() => ({}))) as ExportBody
   const { type, target, email } = body
 
@@ -40,7 +33,17 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { org, user } = await requireModuleAccess(request, "analytics", "view")
+    const { org, user } = await requireAdminRequest(request)
+    const limit = rateLimit(getRateLimitKey(request, "report-export", { orgId: org.id, userId: user.id }), {
+      limit: 12,
+      windowMs: 60_000,
+    })
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: "Too many export requests. Please wait a minute and try again." },
+        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
+      )
+    }
 
     const rows =
       type === "accounting"

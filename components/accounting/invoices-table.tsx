@@ -66,6 +66,7 @@ export function InvoicesTable({
   searchQuery,
   invoices: providedInvoices,
   onAddInvoice,
+  onUpdateInvoice,
   onDeleteInvoice,
   showAmounts = true,
 }: Props) {

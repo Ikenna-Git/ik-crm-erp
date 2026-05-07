@@ -82,14 +82,9 @@ export default function SettingsPage() {
   const [passwordSaving, setPasswordSaving] = useState(false)
   const [passwordStatus, setPasswordStatus] = useState("")
 
-  const [billing] = useState({
-    plan: "Pro",
-    seats: { used: 8, total: 12 },
-    renewal: "2025-06-01",
-    amount: "₦250,000 / mo",
-  })
-
   const [showPasswords, setShowPasswords] = useState(false)
+  const canManageBilling =
+    session?.user?.role === "SUPER_ADMIN" || session?.user?.role === "ORG_OWNER" || session?.user?.role === "ADMIN"
 
   const storageKeys = {
     security: "civis_settings_security",
@@ -936,46 +931,24 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Billing</CardTitle>
-              <CardDescription>Plan, seats, and invoices.</CardDescription>
+              <CardDescription>Workspace billing is managed from the secured admin billing area.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">Current plan</p>
-                  <p className="text-xl font-bold">
-                    {billing.plan} <span className="text-sm text-muted-foreground">({billing.amount})</span>
-                  </p>
-                  <p className="text-sm text-muted-foreground">Renews on {billing.renewal}</p>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">Seats</p>
-                  <p className="text-xl font-bold">
-                    {billing.seats.used} / {billing.seats.total} used
-                  </p>
-                  <div className="flex gap-2">
-                    <Button variant="outline" className="bg-transparent">
-                      Manage seats
-                    </Button>
-                    <Button>Upgrade plan</Button>
-                  </div>
-                </div>
-              </div>
-              <Separator />
-              <div className="space-y-2">
-                <p className="font-medium">Invoices</p>
-                <div className="border border-border rounded-lg divide-y divide-border">
-                  {["2025-01", "2024-12", "2024-11"].map((invoice) => (
-                    <div key={invoice} className="flex items-center justify-between px-4 py-3">
-                      <div>
-                        <p className="font-medium">Invoice {invoice}</p>
-                        <p className="text-xs text-muted-foreground">Paid • ₦250,000</p>
-                      </div>
-                      <Button variant="outline" size="sm" className="bg-transparent">
-                        Download
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+              <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Civis billing is not fully self-serve yet. Pricing is public, but live checkout, invoices, and
+                  subscription lifecycle controls are still being wired at the workspace level.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {canManageBilling
+                    ? "Use the secured admin billing page to manage billing contacts and workspace billing status."
+                    : "Your workspace owner or admin manages billing contacts, plan posture, and subscription updates."}
+                </p>
+                {canManageBilling ? (
+                  <Button asChild>
+                    <a href="/admin/billing">Open admin billing</a>
+                  </Button>
+                ) : null}
               </div>
             </CardContent>
           </Card>

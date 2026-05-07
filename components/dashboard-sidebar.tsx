@@ -26,6 +26,8 @@ import { Button } from "@/components/ui/button"
 import { hasModuleAccess, type AccessModule } from "@/lib/access-control"
 import { isAdmin } from "@/lib/authz"
 
+const demoMode = process.env.NEXT_PUBLIC_ENABLE_DEMO_MODE === "true"
+
 const baseNavigation = [
   { name: "Overview", href: "/dashboard", icon: BarChart3, module: "overview" as AccessModule },
   { name: "Civis AI", href: "/dashboard/ai", icon: Sparkles, module: "ai" as AccessModule },
@@ -38,7 +40,7 @@ const baseNavigation = [
   { name: "HR", href: "/dashboard/hr", icon: Users, module: "hr" as AccessModule },
   { name: "Gallery", href: "/dashboard/gallery", icon: ImageIcon, module: "gallery" as AccessModule },
   { name: "Docs", href: "/dashboard/docs", icon: BookOpen, module: "docs" as AccessModule },
-  { name: "Demo", href: "/dashboard/demo", icon: Play, module: "demo" as AccessModule },
+  ...(demoMode ? [{ name: "Demo", href: "/dashboard/demo", icon: Play, module: "demo" as AccessModule }] : []),
   { name: "Playbooks", href: "/dashboard/playbooks", icon: ClipboardList, module: "playbooks" as AccessModule },
   { name: "Analytics", href: "/dashboard/analytics", icon: TrendingUp, module: "analytics" as AccessModule },
   { name: "Operations", href: "/dashboard/operations", icon: Workflow, module: "operations" as AccessModule },

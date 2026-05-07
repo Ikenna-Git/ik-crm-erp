@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server"
 import crypto from "crypto"
-import { getSessionIdentityFromRequest, isRequestUserError } from "@/lib/request-user"
+import { isRequestUserError } from "@/lib/request-user"
+import { requireAnyModuleAccess } from "@/lib/access-route"
 import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
+import { isDevelopment } from "@/lib/runtime-flags"
 
 const required = ["CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET"] as const
 const allowedMimePrefixes = ["image/", "video/", "application/pdf"]
@@ -24,9 +26,16 @@ const normalizeFolder = (value: string) => {
 
 export async function POST(request: Request) {
   try {
-    await getSessionIdentityFromRequest(request)
+    const { org, user } = await requireAnyModuleAccess(request, [
+      { module: "docs", level: "manage" },
+      { module: "gallery", level: "manage" },
+      { module: "portal", level: "manage" },
+    ])
 
-    const limit = rateLimit(getRateLimitKey(request, "cloudinary-upload"), { limit: 40, windowMs: 60_000 })
+    const limit = rateLimit(getRateLimitKey(request, "cloudinary-upload", { orgId: org.id, userId: user.id }), {
+      limit: 40,
+      windowMs: 60_000,
+    })
     if (!limit.ok) {
       return NextResponse.json(
         { error: "Too many upload requests. Please wait a minute and try again." },
@@ -55,7 +64,7 @@ export async function POST(request: Request) {
     }
 
     if (missing.length) {
-      if (process.env.NODE_ENV !== "production") {
+      if (isDevelopment) {
         const buffer = Buffer.from(await file.arrayBuffer())
         const mime = file.type || "application/octet-stream"
         const dataUrl = `data:${mime};base64,${buffer.toString("base64")}`

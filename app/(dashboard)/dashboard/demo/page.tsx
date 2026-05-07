@@ -28,6 +28,7 @@ type DemoVideo = {
 
 const STORAGE_KEY = "civis_demo_videos"
 const categoryOrder = ["Fundamentals", "CRM", "Accounting", "Inventory", "Projects", "HR", "Analytics", "Integration", "Security"]
+const demoMode = process.env.NEXT_PUBLIC_ENABLE_DEMO_MODE === "true"
 
 const demoTitles = [
   "Getting Started with Civis",
@@ -95,6 +96,18 @@ const dedupeVideos = (items: DemoVideo[]) => {
 }
 
 export default function DemoPage() {
+  if (!demoMode) {
+    return (
+      <main className="flex-1 overflow-auto">
+        <div className="p-8">
+          <div className="rounded-lg border border-dashed border-border bg-muted/20 p-8 text-sm text-muted-foreground">
+            Demo content is disabled in this environment.
+          </div>
+        </div>
+      </main>
+    )
+  }
+
   const [videos, setVideos] = useState<DemoVideo[]>(demoVideos)
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)

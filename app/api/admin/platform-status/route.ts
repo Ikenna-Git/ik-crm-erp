@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma, withPrismaRetry } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
-import { isSuperAdmin } from "@/lib/authz"
 import { getBillingProviderReadiness } from "@/lib/billing"
+import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable founder status." }, { status: 503 })
@@ -11,10 +10,7 @@ export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
 
   try {
-    const { user } = await getUserFromRequest(request)
-    if (!isSuperAdmin(user.role)) {
-      return NextResponse.json({ error: "Super admin access required" }, { status: 403 })
-    }
+    await requireAdminRequest(request, { requireSuperAdmin: true })
 
     const startedAt = Date.now()
 
@@ -186,7 +182,6 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
-    console.error("Platform status failed", error)
-    return NextResponse.json({ error: "Failed to load founder platform status" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load founder platform status")
   }
 }
