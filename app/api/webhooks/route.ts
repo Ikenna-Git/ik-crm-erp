@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import crypto from "crypto"
 import { prisma } from "@/lib/prisma"
-import { hasBillingFeature } from "@/lib/billing"
+import { canUseBillingFeature } from "@/lib/billing"
 import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
 import { captureServerError, logServerEvent } from "@/lib/observability"
@@ -30,8 +30,11 @@ export async function GET(request: Request) {
   try {
     const { org, user } = await requireAdminRequest(request)
     await assertActionAccess({ request, subject: user, orgId: org.id, action: "webhooks.manage" })
-    if (!isSuperAdmin(user.role) && !hasBillingFeature(org, "webhooks.manage")) {
-      return NextResponse.json({ error: "Webhooks are not available on this billing plan yet." }, { status: 403 })
+    if (!isSuperAdmin(user.role) && !canUseBillingFeature(org, "webhooks.manage")) {
+      return NextResponse.json(
+        { error: "Webhooks are not available for this workspace in its current billing state." },
+        { status: 403 },
+      )
     }
 
     const webhooks = await prisma.webhookEndpoint.findMany({
@@ -66,8 +69,11 @@ export async function POST(request: Request) {
   try {
     const { org, user } = await requireAdminRequest(request)
     await assertActionAccess({ request, subject: user, orgId: org.id, action: "webhooks.manage" })
-    if (!isSuperAdmin(user.role) && !hasBillingFeature(org, "webhooks.manage")) {
-      return NextResponse.json({ error: "Webhooks are not available on this billing plan yet." }, { status: 403 })
+    if (!isSuperAdmin(user.role) && !canUseBillingFeature(org, "webhooks.manage")) {
+      return NextResponse.json(
+        { error: "Webhooks are not available for this workspace in its current billing state." },
+        { status: 403 },
+      )
     }
     const limit = await rateLimit(getRateLimitKey(request, "webhook-create", { orgId: org.id, userId: user.id }), {
       limit: 20,
@@ -141,8 +147,11 @@ export async function PATCH(request: Request) {
   try {
     const { org, user } = await requireAdminRequest(request)
     await assertActionAccess({ request, subject: user, orgId: org.id, action: "webhooks.manage" })
-    if (!isSuperAdmin(user.role) && !hasBillingFeature(org, "webhooks.manage")) {
-      return NextResponse.json({ error: "Webhooks are not available on this billing plan yet." }, { status: 403 })
+    if (!isSuperAdmin(user.role) && !canUseBillingFeature(org, "webhooks.manage")) {
+      return NextResponse.json(
+        { error: "Webhooks are not available for this workspace in its current billing state." },
+        { status: 403 },
+      )
     }
     const limit = await rateLimit(getRateLimitKey(request, "webhook-update", { orgId: org.id, userId: user.id }), {
       limit: 20,

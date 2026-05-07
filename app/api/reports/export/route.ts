@@ -4,7 +4,7 @@ import { generateCsv } from "@/lib/reports"
 import { buildAccountingRows, buildCrmRows, buildVatRows, buildAuditRows } from "@/lib/report-builders"
 import { isSuperAdmin } from "@/lib/authz"
 import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
-import { hasBillingFeature } from "@/lib/billing"
+import { canUseBillingFeature } from "@/lib/billing"
 import { logServerEvent } from "@/lib/observability"
 import { assertActionAccess } from "@/lib/rbac"
 import { createRateLimitErrorResponse, getRateLimitKey, rateLimit } from "@/lib/rate-limit"
@@ -111,9 +111,9 @@ export async function POST(request: Request) {
     }
 
     await assertActionAccess({ request, subject: user, orgId: org.id, action: "reports.export.email" })
-    if (!isSuperAdmin(user.role) && !hasBillingFeature(org, "reports.export.email")) {
+    if (!isSuperAdmin(user.role) && !canUseBillingFeature(org, "reports.export.email")) {
       return NextResponse.json(
-        { error: "Email exports are not available on this billing plan yet." },
+        { error: "Email exports are not available for this workspace in its current billing state." },
         { status: 403 },
       )
     }

@@ -100,6 +100,7 @@ Open `http://localhost:3000`.
 - `npm run fake-data:review -- --org <orgId> --delete --confirm-delete DELETE_DEMO_DATA` — destructive cleanup for confirmed demo data only
 
 ## Documentation
+- Production env template: `.env.production.example`
 - Project dossier: `docs/project-dossier.md`
 - Product overview: `docs/product-overview.md`
 - Technical handoff: `docs/technical-handoff.md`
@@ -108,5 +109,8 @@ Open `http://localhost:3000`.
 - NDPA/VAPT hardening plan: `docs/security/ndpa-vapt-hardening-plan.md`
 - RBAC matrix: `docs/security/rbac-matrix.md`
 - Backup/restore operations: `docs/operations/backup-restore.md`
+- Production deployment checklist: `docs/operations/production-deployment-checklist.md`
+- Production smoke tests: `docs/operations/production-smoke-tests.md`
+- Fake-data review workflow: `docs/operations/fake-data-review.md`
 - Payment readiness plan: `docs/billing/payment-readiness-plan.md`
 - OpenAPI spec: `docs/security/openapi.yaml`

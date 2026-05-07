@@ -93,6 +93,7 @@ Implemented:
   - billing settings access by plan
   - webhook management by plan
   - email report exports by plan
+- safe failure for paid/gated features when billing is suspended, canceled, past due, or the trial has expired
 
 Still missing:
 
