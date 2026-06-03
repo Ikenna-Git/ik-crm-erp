@@ -11,6 +11,19 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
+const AUTH_RESPONSE_ERROR =
+  "Authentication is not returning a valid response right now. Check the staging auth configuration and try again."
+
+const isJsonParseError = (value: unknown) => value instanceof Error && value.message.includes("JSON")
+
+const safeJson = async <T,>(response: Response): Promise<T | null> => {
+  try {
+    return (await response.json()) as T
+  } catch {
+    return null
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState("")
@@ -23,10 +36,14 @@ export default function LoginPage() {
 
   useEffect(() => {
     const loadProviders = async () => {
-      const providers = await getProviders()
-      setOauthReady({
-        google: Boolean(providers?.google),
-      })
+      try {
+        const providers = await getProviders()
+        setOauthReady({
+          google: Boolean(providers?.google),
+        })
+      } catch {
+        setOauthReady({ google: false })
+      }
     }
     loadProviders()
   }, [])
@@ -53,10 +70,10 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       })
 
-      const precheckData = await precheckResponse.json()
+      const precheckData = await safeJson<{ error?: string; requires2FA?: boolean }>(precheckResponse)
 
       if (!precheckResponse.ok) {
-        throw new Error(precheckData.error || "Login failed. Please try again.")
+        throw new Error(precheckData?.error || "Login failed. Please try again.")
       }
 
       if (precheckData?.requires2FA) {
@@ -77,7 +94,7 @@ export default function LoginPage() {
 
       router.push("/dashboard")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed. Please try again.")
+      setError(isJsonParseError(err) ? AUTH_RESPONSE_ERROR : err instanceof Error ? err.message : "Login failed. Please try again.")
     } finally {
       setLoading(false)
     }
@@ -103,7 +120,7 @@ export default function LoginPage() {
 
       router.push("/dashboard")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Verification failed")
+      setError(isJsonParseError(err) ? AUTH_RESPONSE_ERROR : err instanceof Error ? err.message : "Verification failed")
     } finally {
       setLoading(false)
     }
