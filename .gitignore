@@ -3,10 +3,12 @@ node_modules
 out
 .env
 .env.*
+.enc.local
 dist
 build
 coverage
 .DS_Store
+tsconfig.tsbuildinfo
 npm-debug.log*
 pnpm-debug.log*
 yarn-error.log*ø

@@ -11,6 +11,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
+const AUTH_RESPONSE_ERROR =
+  "Authentication is not returning a valid response right now. Check the staging auth configuration and try again."
+
+const isJsonParseError = (value: unknown) => value instanceof Error && value.message.includes("JSON")
+
 type InviteDetails = {
   token: string
   email: string
@@ -36,10 +41,14 @@ function SignupPageContent() {
 
   useEffect(() => {
     const loadProviders = async () => {
-      const providers = await getProviders()
-      setOauthReady({
-        google: Boolean(providers?.google),
-      })
+      try {
+        const providers = await getProviders()
+        setOauthReady({
+          google: Boolean(providers?.google),
+        })
+      } catch {
+        setOauthReady({ google: false })
+      }
     }
     loadProviders()
   }, [])
@@ -134,7 +143,7 @@ function SignupPageContent() {
       }
       router.push("/dashboard")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Signup failed. Please try again.")
+      setError(isJsonParseError(err) ? AUTH_RESPONSE_ERROR : err instanceof Error ? err.message : "Signup failed. Please try again.")
     } finally {
       setLoading(false)
     }
