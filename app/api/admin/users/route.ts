@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server"
 import { Role } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
 import { createAuditLog } from "@/lib/audit"
 import {
   ACCESS_PROFILES,
@@ -10,9 +9,10 @@ import {
   normalizeAccessProfile,
   summarizeModuleAccess,
 } from "@/lib/access-control"
-import { canAssignRole, canDeleteUser, getAssignableRoles, isAdmin } from "@/lib/authz"
+import { canAssignRole, canDeleteUser, getAssignableRoles } from "@/lib/authz"
 import { issueSignupInvite, sendSignupInviteEmail } from "@/lib/invitations"
 import { getPublicOrigin } from "@/lib/public-url"
+import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable admin management." }, { status: 503 })
@@ -45,10 +45,7 @@ const mapAdminUser = (user: {
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
-    if (!isAdmin(user.role)) {
-      return NextResponse.json({ error: "Not authorized" }, { status: 403 })
-    }
+    const { org, user } = await requireAdminRequest(request)
     const users = await prisma.user.findMany({
       where: { orgId: org.id },
       orderBy: { createdAt: "desc" },
@@ -76,18 +73,14 @@ export async function GET(request: Request) {
       accessProfiles: ACCESS_PROFILES,
     })
   } catch (error) {
-    console.error("Admin users fetch failed", error)
-    return NextResponse.json({ error: "Failed to load users" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load users")
   }
 }
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user: actor } = await getUserFromRequest(request)
-    if (!isAdmin(actor.role)) {
-      return NextResponse.json({ error: "Not authorized" }, { status: 403 })
-    }
+    const { org, user: actor } = await requireAdminRequest(request)
 
     const body = await request.json()
     const name = String(body?.name || "").trim()
@@ -238,18 +231,14 @@ export async function POST(request: Request) {
             : "User created, but email delivery failed. Share the invite link manually.",
     })
   } catch (error) {
-    console.error("Admin user invite failed", error)
-    return NextResponse.json({ error: "Failed to invite user" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to invite user")
   }
 }
 
 export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user: actor } = await getUserFromRequest(request)
-    if (!isAdmin(actor.role)) {
-      return NextResponse.json({ error: "Not authorized" }, { status: 403 })
-    }
+    const { org, user: actor } = await requireAdminRequest(request)
 
     const body = await request.json()
     const { id, role, accessProfile } = body || {}
@@ -333,18 +322,14 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ user: mapAdminUser(updated) })
   } catch (error) {
-    console.error("Admin user update failed", error)
-    return NextResponse.json({ error: "Failed to update user" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to update user")
   }
 }
 
 export async function DELETE(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user: actor } = await getUserFromRequest(request)
-    if (!isAdmin(actor.role)) {
-      return NextResponse.json({ error: "Not authorized" }, { status: 403 })
-    }
+    const { org, user: actor } = await requireAdminRequest(request)
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
@@ -410,7 +395,6 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Admin user delete failed", error)
-    return NextResponse.json({ error: "Failed to remove user" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to remove user")
   }
 }

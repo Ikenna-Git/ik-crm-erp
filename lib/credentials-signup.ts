@@ -123,7 +123,12 @@ export const completeCredentialsSignup = async ({
     }
   }
 
+  if (!invite && !isFounderBootstrap) {
+    return { ok: false, error: "This account must be activated from its invite link.", status: 409 }
+  }
+
   const org = await getDefaultOrg()
+  const targetOrgId = invite?.orgId || org.id
   const createdUser = await withPrismaRetry("credentialsSignup.createUser", () =>
     prisma.user.create({
       data: {
@@ -135,11 +140,15 @@ export const completeCredentialsSignup = async ({
           role,
           accessProfile: getDefaultAccessProfileForRole(role),
         }),
-        orgId: org.id,
+        orgId: targetOrgId,
         passwordHash: hashPassword(trimmedPassword),
       },
     }),
   )
+
+  if (inviteToken) {
+    await consumeSignupInvite(inviteToken)
+  }
 
   return {
     ok: true,

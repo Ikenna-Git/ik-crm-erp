@@ -1,6 +1,6 @@
 import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import type { AuthOptions } from "next-auth"
-import type { Adapter } from "next-auth/adapters"
+import type { Adapter, AdapterUser } from "next-auth/adapters"
 import { randomUUID } from "crypto"
 import GoogleProvider from "next-auth/providers/google"
 import CredentialsProvider from "next-auth/providers/credentials"
@@ -11,10 +11,9 @@ import { buildModuleAccessForUser, getDefaultAccessProfileForRole } from "@/lib/
 import { completeCredentialsSignup } from "@/lib/credentials-signup"
 import { getDefaultOrg } from "@/lib/defaultOrg"
 import { verifyPassword } from "@/lib/password"
+import { allowDevAuthFallback, allowDevDefaultIdentity } from "@/lib/runtime-flags"
 
 const useAdapter = process.env.NODE_ENV === "production" || process.env.NEXTAUTH_USE_ADAPTER === "true"
-const allowCredentialsFallback =
-  process.env.NODE_ENV !== "production" || process.env.NEXTAUTH_ALLOW_FALLBACK === "true"
 
 const buildLocalUser = (email: string, name: string, role: string) =>
   ({
@@ -63,7 +62,7 @@ const buildProviders = () => {
         const role = email === FOUNDER_SUPER_ADMIN_EMAIL ? "SUPER_ADMIN" : "USER"
 
         if (!useAdapter) {
-          return allowCredentialsFallback ? buildLocalUser(email, name, role) : null
+          return allowDevAuthFallback ? buildLocalUser(email, name, role) : null
         }
 
         try {
@@ -141,7 +140,7 @@ const buildProviders = () => {
         } catch (error) {
           console.error("Credentials authorize failed", error)
 
-          if (allowCredentialsFallback) {
+          if (allowDevAuthFallback) {
             console.warn("Using local credentials fallback user (DB unavailable).")
             return buildLocalUser(email, name, role)
           }
@@ -162,9 +161,30 @@ const buildAdapter = (): Adapter | undefined => {
 
   return {
     ...base,
-    async createUser(data) {
-      const org = await getDefaultOrg()
+    async createUser(data: AdapterUser) {
       const email = data.email?.toLowerCase().trim()
+      const role = email === FOUNDER_SUPER_ADMIN_EMAIL ? "SUPER_ADMIN" : "USER"
+      const accessProfile = getDefaultAccessProfileForRole(role)
+
+      if (email) {
+        const existing = await prisma.user.findUnique({
+          where: { email },
+        })
+
+        if (existing) {
+          return existing as any
+        }
+      }
+
+      if (!email) {
+        throw new Error("OAuth sign-in requires a verified email address")
+      }
+
+      if (email !== FOUNDER_SUPER_ADMIN_EMAIL && !allowDevDefaultIdentity) {
+        throw new Error("No workspace membership found for this account")
+      }
+
+      const org = await getDefaultOrg()
 
       const created = await prisma.user.create({
         data: {
@@ -173,11 +193,11 @@ const buildAdapter = (): Adapter | undefined => {
           name: data.name?.trim() || email?.split("@")[0] || "User",
           image: data.image,
           emailVerified: data.emailVerified ?? null,
-          role: email === FOUNDER_SUPER_ADMIN_EMAIL ? "SUPER_ADMIN" : "USER",
-          accessProfile: getDefaultAccessProfileForRole(email === FOUNDER_SUPER_ADMIN_EMAIL ? "SUPER_ADMIN" : "USER"),
+          role,
+          accessProfile,
           moduleAccess: buildModuleAccessForUser({
-            role: email === FOUNDER_SUPER_ADMIN_EMAIL ? "SUPER_ADMIN" : "USER",
-            accessProfile: getDefaultAccessProfileForRole(email === FOUNDER_SUPER_ADMIN_EMAIL ? "SUPER_ADMIN" : "USER"),
+            role,
+            accessProfile,
           }),
         },
       })

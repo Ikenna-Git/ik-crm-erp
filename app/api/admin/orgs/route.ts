@@ -2,12 +2,11 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
 import { buildModuleAccessForUser, getDefaultAccessProfileForRole } from "@/lib/access-control"
-import { getUserFromRequest } from "@/lib/request-user"
-import { isSuperAdmin } from "@/lib/authz"
 import { getDefaultTrialEndsAt } from "@/lib/billing"
 import { issueSignupInvite, sendSignupInviteEmail } from "@/lib/invitations"
 import { normalizeOrgStatus } from "@/lib/org-status"
 import { getPublicOrigin } from "@/lib/public-url"
+import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable org management." }, { status: 503 })
@@ -16,10 +15,7 @@ export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
 
   try {
-    const { user } = await getUserFromRequest(request)
-    if (!isSuperAdmin(user.role)) {
-      return NextResponse.json({ error: "Super admin access required" }, { status: 403 })
-    }
+    await requireAdminRequest(request, { requireSuperAdmin: true })
 
     const orgs = await prisma.org.findMany({
       orderBy: { updatedAt: "desc" },
@@ -48,8 +44,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ orgs })
   } catch (error) {
-    console.error("Org listing failed", error)
-    return NextResponse.json({ error: "Failed to load organizations" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load organizations")
   }
 }
 
@@ -57,10 +52,7 @@ export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
 
   try {
-    const { user } = await getUserFromRequest(request)
-    if (!isSuperAdmin(user.role)) {
-      return NextResponse.json({ error: "Super admin access required" }, { status: 403 })
-    }
+    const { user } = await requireAdminRequest(request, { requireSuperAdmin: true })
 
     const body = await request.json()
     const orgName = String(body?.name || "").trim()
@@ -161,8 +153,7 @@ export async function POST(request: Request) {
           : "Workspace created, but invite email delivery failed. Share the initial owner invite link manually.",
     })
   } catch (error) {
-    console.error("Org creation failed", error)
-    return NextResponse.json({ error: "Failed to create workspace" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to create workspace")
   }
 }
 
@@ -170,10 +161,7 @@ export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
 
   try {
-    const { user } = await getUserFromRequest(request)
-    if (!isSuperAdmin(user.role)) {
-      return NextResponse.json({ error: "Super admin access required" }, { status: 403 })
-    }
+    const { user } = await requireAdminRequest(request, { requireSuperAdmin: true })
 
     const body = await request.json()
     const orgId = String(body?.id || "").trim()
@@ -225,7 +213,6 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ org: updated })
   } catch (error) {
-    console.error("Org status update failed", error)
-    return NextResponse.json({ error: "Failed to update workspace status" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to update workspace status")
   }
 }
