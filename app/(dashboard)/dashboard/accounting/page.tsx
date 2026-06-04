@@ -1,5 +1,6 @@
 "use client"
 
+import dynamic from "next/dynamic"
 import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -16,12 +17,31 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { InvoicesTable, type Invoice } from "@/components/accounting/invoices-table"
-import { ExpensesTable, type Expense } from "@/components/accounting/expenses-table"
-import { FinancialReports } from "@/components/accounting/financial-reports"
+import type { Invoice } from "@/components/accounting/invoices-table"
+import type { Expense } from "@/components/accounting/expenses-table"
 import { SectionErrorBoundary } from "@/components/shared/section-error-boundary"
 import { getSessionHeaders } from "@/lib/user-settings"
 import { formatNaira } from "@/lib/currency"
+
+const sectionLoader = (label: string) => () => <div className="text-sm text-muted-foreground">Loading {label}...</div>
+
+const InvoicesTable = dynamic(() => import("@/components/accounting/invoices-table").then((mod) => mod.InvoicesTable), {
+  ssr: false,
+  loading: sectionLoader("invoices"),
+})
+
+const ExpensesTable = dynamic(() => import("@/components/accounting/expenses-table").then((mod) => mod.ExpensesTable), {
+  ssr: false,
+  loading: sectionLoader("expenses"),
+})
+
+const FinancialReports = dynamic(
+  () => import("@/components/accounting/financial-reports").then((mod) => mod.FinancialReports),
+  {
+    ssr: false,
+    loading: sectionLoader("financial reports"),
+  },
+)
 
 const invoiceClients = ["Acme Corp", "Northwind", "Globex", "Venture Labs", "Nimbus", "Zenith"]
 const expenseCategories = ["utilities", "travel", "equipment", "software", "office", "meals"]
