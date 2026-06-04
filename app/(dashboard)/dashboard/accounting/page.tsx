@@ -114,6 +114,7 @@ export default function AccountingPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
   const [importNotice, setImportNotice] = useState("")
   const [openInvoiceDialog, setOpenInvoiceDialog] = useState(false)
   const [invoiceForm, setInvoiceForm] = useState({
