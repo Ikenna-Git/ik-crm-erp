@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
+import { assertSameOrg, handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
 import { restoreDateField } from "@/lib/decision-trails"
-import { isAdmin } from "@/lib/authz"
+import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable decision trails." }, { status: 503 })
@@ -13,18 +13,26 @@ const ensureObject = (value: any) => (value && typeof value === "object" ? value
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
-    if (!isAdmin(user.role)) {
-      return NextResponse.json({ error: "Admin access required for rollback" }, { status: 403 })
+    const { org, user } = await requireAdminRequest(request)
+    const limit = rateLimit(getRateLimitKey(request, "decision-rollback", { orgId: org.id, userId: user.id }), {
+      limit: 10,
+      windowMs: 60_000,
+    })
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Please wait and try again." },
+        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
+      )
     }
     const body = await request.json()
-    const { id } = body || {}
+    const id = typeof body?.id === "string" ? body.id.trim() : ""
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
 
     const trail = await prisma.decisionTrail.findUnique({ where: { id } })
-    if (!trail || trail.orgId !== org.id) {
+    if (!trail) {
       return NextResponse.json({ error: "Decision trail not found" }, { status: 404 })
     }
+    assertSameOrg({ org, user }, trail.orgId, "Decision trail")
     if (trail.rolledBackAt) {
       return NextResponse.json({ error: "This decision has already been rolled back" }, { status: 400 })
     }
@@ -102,14 +110,16 @@ export async function POST(request: Request) {
     await createAuditLog({
       orgId: org.id,
       userId: user.id,
-      action: `Rolled back ${trail.entity}`,
+      action: "decision.rollback",
       entity: trail.entity,
       entityId: entityId,
-      metadata: { decisionId: trail.id },
+      metadata: { decisionId: trail.id, entity: trail.entity },
     })
 
     return NextResponse.json({ ok: true })
   } catch (error) {
+    const accessResponse = handleAccessRouteError(error)
+    if (accessResponse) return accessResponse
     console.error("Decision rollback failed", error)
     return NextResponse.json({ error: "Failed to roll back decision" }, { status: 500 })
   }

@@ -12,15 +12,16 @@ const normalizeDecision = (value?: string) => {
   return null
 }
 
-export async function POST(request: Request, { params }: { params: { code: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ code: string }> }) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const code = params.code?.trim()
+    const { code: rawCode } = await params
+    const code = rawCode?.trim()
     if (!code) {
       return NextResponse.json({ error: "Portal code is required" }, { status: 400 })
     }
 
-    const limit = rateLimit(getRateLimitKey(request, `portal-approval:${code}`), { limit: 60, windowMs: 60_000 })
+    const limit = rateLimit(getRateLimitKey(request, "portal-approval", { code }), { limit: 60, windowMs: 60_000 })
     if (!limit.ok) {
       return NextResponse.json(
         { error: "Too many approval requests. Please retry shortly." },
@@ -34,6 +35,7 @@ export async function POST(request: Request, { params }: { params: { code: strin
     if (!updateId || !normalized) {
       return NextResponse.json({ error: "updateId and decision are required" }, { status: 400 })
     }
+    const safeActorName = typeof actorName === "string" ? actorName.trim().slice(0, 120) : "Client"
 
     const portal = await prisma.clientPortal.findUnique({
       where: { accessCode: code },
@@ -57,7 +59,7 @@ export async function POST(request: Request, { params }: { params: { code: strin
       action: `Client portal update ${normalized.toLowerCase()}`,
       entity: "ClientPortalUpdate",
       entityId: updateId,
-      metadata: { actorName: actorName || "Client", decision: normalized },
+      metadata: { actorName: safeActorName || "Client", decision: normalized },
     })
 
     return NextResponse.json({ update: updated })

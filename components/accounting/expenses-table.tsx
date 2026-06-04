@@ -81,6 +81,7 @@ export function ExpensesTable({
   searchQuery,
   expenses: providedExpenses,
   onAddExpense,
+  onUpdateExpense,
   onDeleteExpense,
   showAmounts = true,
 }: Props) {

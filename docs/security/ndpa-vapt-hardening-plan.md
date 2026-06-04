@@ -13,6 +13,10 @@ This plan converts the NDPA + VAPT recommendations into execution phases for thi
 - Disable header-based user impersonation fallback outside local dev.
 - Enforce strict role checks for admin/rollback/webhook-secret operations.
 
+Status as of 2026-05-02:
+- Implemented in code: centralized route protection via `proxy.ts`, private API authentication for the previously exposed business routes, stricter admin/rollback/webhook guards, and dev-only gating for fallback identity branches.
+- Still open: distributed/shared rate limiting, stronger observability/alerting, and a full action-level authorization matrix across every module.
+
 ### B) Secrets and environment hygiene
 - Rotate and re-issue all secrets after any accidental exposure:
   - `DATABASE_URL`, `NEXTAUTH_SECRET`, SMTP, Cloudinary, AI keys.
@@ -107,14 +111,14 @@ This plan converts the NDPA + VAPT recommendations into execution phases for thi
 
 ## Current Gaps Detected in This Repo
 
-- Public endpoints exposing business operations/data exist.
-- Header-driven identity fallback can permit impersonation patterns if not tightly controlled.
-- Security controls are implemented per-route, not yet centralized.
-- No visible CI security workflow currently in `.github/workflows`.
+- Public portal endpoints remain intentionally public by access code and still need a distributed anti-enumeration/rate-limit store for serious production use.
+- Dev-only fallback code paths still exist and must remain disabled outside local development.
+- Security controls are materially stronger, but authorization is still not a single complete policy engine across every action in the platform.
+- Billing/subscription lifecycle is still not implemented beyond metadata/admin settings.
+- CI now has a baseline workflow, but deeper SAST/secret scanning is still missing.
 
 ## Recommended Next 3 Engineering Tasks
 
-1. Implement centralized request identity + authorization guard and migrate all routes.
-2. Add CI security workflow (SAST/SCA/secret scanning) and fail PRs on critical findings.
-3. Add public endpoint protection + portal brute-force protection with per-IP and per-code limits.
-
+1. Replace the in-memory portal/auth/export/upload rate limiter with a shared store implementation.
+2. Add production observability and incident alerting for auth, DB, AI, upload, and webhook failures.
+3. Finish action-level RBAC and commercial gating for admin, billing, and sensitive module actions.

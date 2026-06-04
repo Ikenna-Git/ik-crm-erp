@@ -2,12 +2,20 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma, withPrismaRetry } from "@/lib/prisma"
 import { FOUNDER_SUPER_ADMIN_EMAIL } from "@/lib/authz"
 import { verifyPassword } from "@/lib/password"
+import { allowDevAuthFallback } from "@/lib/runtime-flags"
 
-const allowCredentialsFallback =
-  process.env.NODE_ENV !== "production" || process.env.NEXTAUTH_ALLOW_FALLBACK === "true"
+import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
 
 export async function POST(request: NextRequest) {
   try {
+    const limit = rateLimit(getRateLimitKey(request, "auth-login-check"), { limit: 20, windowMs: 60_000 })
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: "Too many login attempts. Please wait a minute and try again." },
+        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
+      )
+    }
+
     const { email, password } = await request.json()
 
     if (!email || !password || typeof email !== "string" || typeof password !== "string") {
@@ -17,7 +25,10 @@ export async function POST(request: NextRequest) {
     const normalizedEmail = email.toLowerCase().trim()
 
     if (!process.env.DATABASE_URL) {
-      return NextResponse.json({ requires2FA: false, fallback: allowCredentialsFallback })
+      if (allowDevAuthFallback) {
+        return NextResponse.json({ requires2FA: false, fallback: true })
+      }
+      return NextResponse.json({ error: "Database not configured" }, { status: 503 })
     }
 
     const user = await withPrismaRetry("auth.loginCheck.findUser", () =>
@@ -79,7 +90,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Login precheck failed", error)
 
-    if (allowCredentialsFallback) {
+    if (allowDevAuthFallback) {
       return NextResponse.json({ requires2FA: false, fallback: true })
     }
 

@@ -109,9 +109,10 @@ const runSeed: PlaybookRun[] = [
 ]
 
 const STORAGE_KEY = "civis_playbook_runs"
+const demoMode = process.env.NEXT_PUBLIC_ENABLE_DEMO_MODE === "true"
 
 export default function PlaybooksPage() {
-  const [runs, setRuns] = useState<PlaybookRun[]>(runSeed)
+  const [runs, setRuns] = useState<PlaybookRun[]>(demoMode ? runSeed : [])
   const [selectedTemplate, setSelectedTemplate] = useState<PlaybookTemplate | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -142,7 +143,7 @@ export default function PlaybooksPage() {
         }
       } catch (err: any) {
         setError(err?.message || "Failed to load playbooks")
-        if (typeof window !== "undefined") {
+        if (demoMode && typeof window !== "undefined") {
           try {
             const stored = localStorage.getItem(STORAGE_KEY)
             if (stored) {
@@ -164,7 +165,7 @@ export default function PlaybooksPage() {
   }, [])
 
   useEffect(() => {
-    if (typeof window === "undefined") return
+    if (!demoMode || typeof window === "undefined") return
     localStorage.setItem(STORAGE_KEY, JSON.stringify(runs))
   }, [runs])
 
@@ -202,18 +203,20 @@ export default function PlaybooksPage() {
       ])
     } catch (err: any) {
       setError(err?.message || "Failed to launch playbook")
-      setRuns((prev) => [
-        {
-          id: `run-${Date.now()}`,
-          templateId: template.id,
-          name: template.name,
-          category: template.category,
-          status: "Active",
-          progress: 10,
-          startedAt: "Just now",
-        },
-        ...prev,
-      ])
+      if (demoMode) {
+        setRuns((prev) => [
+          {
+            id: `run-${Date.now()}`,
+            templateId: template.id,
+            name: template.name,
+            category: template.category,
+            status: "Active",
+            progress: 10,
+            startedAt: "Just now",
+          },
+          ...prev,
+        ])
+      }
     }
   }
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
-import { canManageWorkspaceSettings, isAdmin, isSuperAdmin } from "@/lib/authz"
+import { canManageWorkspaceSettings, isSuperAdmin } from "@/lib/authz"
 import {
   BILLING_CYCLE_LABELS,
   BILLING_CYCLES,
@@ -14,7 +14,7 @@ import {
   normalizeBillingPlan,
   normalizeBillingStatus,
 } from "@/lib/billing"
-import { getUserFromRequest } from "@/lib/request-user"
+import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable billing controls." }, { status: 503 })
@@ -29,10 +29,7 @@ export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
 
   try {
-    const { org, user } = await getUserFromRequest(request)
-    if (!isAdmin(user.role)) {
-      return NextResponse.json({ error: "Not authorized" }, { status: 403 })
-    }
+    const { org, user } = await requireAdminRequest(request)
 
     const [seatUsage, privilegedUserCount] = await Promise.all([
       prisma.user.count({ where: { orgId: org.id } }),
@@ -72,8 +69,7 @@ export async function GET(request: Request) {
       providerReadiness: getBillingProviderReadiness(),
     })
   } catch (error) {
-    console.error("Billing settings fetch failed", error)
-    return NextResponse.json({ error: "Failed to load billing settings" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load billing settings")
   }
 }
 
@@ -81,10 +77,7 @@ export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
 
   try {
-    const { org, user } = await getUserFromRequest(request)
-    if (!canManageWorkspaceSettings(user.role)) {
-      return NextResponse.json({ error: "Organization owner access required" }, { status: 403 })
-    }
+    const { org, user } = await requireAdminRequest(request, { requireWorkspaceOwner: true })
 
     const body = await request.json()
     const billingEmail = String(body?.billingEmail || "").trim()
@@ -142,7 +135,6 @@ export async function PATCH(request: Request) {
       },
     })
   } catch (error) {
-    console.error("Billing settings update failed", error)
-    return NextResponse.json({ error: "Failed to update billing settings" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to update billing settings")
   }
 }

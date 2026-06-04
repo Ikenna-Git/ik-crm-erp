@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
-import { getUserFromRequest } from "@/lib/request-user"
 import { canManageWorkspaceSettings, isAdmin, isSuperAdmin } from "@/lib/authz"
 
 const dbUnavailable = () =>
@@ -11,10 +11,7 @@ export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
 
   try {
-    const { org, user } = await getUserFromRequest(request)
-    if (!isAdmin(user.role)) {
-      return NextResponse.json({ error: "Not authorized" }, { status: 403 })
-    }
+    const { org, user } = await requireAdminRequest(request)
 
     const [userCount, adminCount, crmFieldCount] = await Promise.all([
       prisma.user.count({ where: { orgId: org.id } }),
@@ -36,6 +33,8 @@ export async function GET(request: Request) {
       },
     })
   } catch (error) {
+    const accessResponse = handleAccessRouteError(error)
+    if (accessResponse) return accessResponse
     console.error("Workspace settings fetch failed", error)
     return NextResponse.json({ error: "Failed to load workspace settings" }, { status: 500 })
   }
@@ -45,10 +44,7 @@ export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
 
   try {
-    const { org, user } = await getUserFromRequest(request)
-    if (!canManageWorkspaceSettings(user.role)) {
-      return NextResponse.json({ error: "Organization owner access required" }, { status: 403 })
-    }
+    const { org, user } = await requireAdminRequest(request, { requireWorkspaceOwner: true })
 
     const body = await request.json()
     const name = String(body?.name || "").trim()
@@ -79,6 +75,8 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ org: updated })
   } catch (error) {
+    const accessResponse = handleAccessRouteError(error)
+    if (accessResponse) return accessResponse
     console.error("Workspace settings update failed", error)
     return NextResponse.json({ error: "Failed to update workspace settings" }, { status: 500 })
   }

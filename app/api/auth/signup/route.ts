@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
 import { completeCredentialsSignup } from "@/lib/credentials-signup"
-
-const allowCredentialsFallback =
-  process.env.NODE_ENV !== "production" || process.env.NEXTAUTH_ALLOW_FALLBACK === "true"
+import { allowDevAuthFallback } from "@/lib/runtime-flags"
+import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
 
 export async function POST(request: NextRequest) {
   try {
+    const limit = rateLimit(getRateLimitKey(request, "auth-signup"), { limit: 10, windowMs: 60_000 })
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: "Too many signup attempts. Please wait a minute and try again." },
+        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
+      )
+    }
+
     const { name, email, password, inviteToken } = await request.json()
 
     if (!name || !email || !password) {
@@ -13,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!process.env.DATABASE_URL) {
-      if (allowCredentialsFallback) {
+      if (allowDevAuthFallback) {
         return NextResponse.json({
           success: true,
           fallback: true,

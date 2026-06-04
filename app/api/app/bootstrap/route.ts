@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest, isRequestUserError } from "@/lib/request-user"
 import { hasModuleAccess } from "@/lib/access-control"
+import { handleAccessRouteError, requireAuthenticatedRequest } from "@/lib/access-route"
 
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) {
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     )
   }
   try {
-    const { org, user } = await getUserFromRequest(request)
+    const { org, user } = await requireAuthenticatedRequest(request)
     const [contacts, companies, deals, tasks, invoices, expenses] = await Promise.all([
       hasModuleAccess(user, "crm", "view") ? prisma.contact.findMany({ where: { orgId: org.id } }) : Promise.resolve([]),
       hasModuleAccess(user, "crm", "view") ? prisma.company.findMany({ where: { orgId: org.id } }) : Promise.resolve([]),
@@ -28,10 +28,6 @@ export async function GET(request: Request) {
     ])
     return NextResponse.json({ org, contacts, companies, deals, tasks, invoices, expenses })
   } catch (error) {
-    if (isRequestUserError(error)) {
-      return NextResponse.json({ error: error.message }, { status: error.status })
-    }
-    console.error("Bootstrap load failed", error)
-    return NextResponse.json({ error: "Failed to load bootstrap data" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load bootstrap data")
   }
 }

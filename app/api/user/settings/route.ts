@@ -4,13 +4,11 @@ import { getUserFromRequest } from "@/lib/request-user"
 import { createAuditLog } from "@/lib/audit"
 import { buildModuleAccessForUser } from "@/lib/access-control"
 import { getDefaultKpis } from "@/lib/kpis"
-import { FOUNDER_SUPER_ADMIN_EMAIL } from "@/lib/authz"
 import { DEFAULT_CRM_VIEWS, DEFAULT_ONBOARDING_TASKS } from "@/lib/user-settings"
+import { isRequestUserError } from "@/lib/request-user"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable user settings." }, { status: 503 })
-const isDev = process.env.NODE_ENV !== "production"
-
 const DEFAULT_SETTINGS = {
   theme: "dark",
   density: "comfortable",
@@ -138,92 +136,11 @@ const toCrmViews = (settings: any) => ({
   deals: settings.crmDealView || DEFAULT_CRM_VIEWS.deals,
 })
 
-const getFallbackIdentity = (request: Request) => {
-  const email = request.headers.get("x-user-email")?.trim() || process.env.DEFAULT_USER_EMAIL || FOUNDER_SUPER_ADMIN_EMAIL
-  const name = request.headers.get("x-user-name")?.trim() || email.split("@")[0]
-  const role = email.toLowerCase() === FOUNDER_SUPER_ADMIN_EMAIL ? "SUPER_ADMIN" : "USER"
-  return { name, email, role }
-}
-
 const mergeCrmViews = (crmViews?: any) => ({
   contacts: crmViews?.contacts || DEFAULT_CRM_VIEWS.contacts,
   companies: crmViews?.companies || DEFAULT_CRM_VIEWS.companies,
   deals: crmViews?.deals || DEFAULT_CRM_VIEWS.deals,
 })
-
-const buildFallbackSettingsPayload = (
-  identity: { name: string; email: string; role: string },
-  overrides?: {
-    profile?: Record<string, any>
-    preferences?: Record<string, any>
-    notifications?: Record<string, any>
-    kpis?: unknown
-    digest?: Record<string, any>
-    onboarding?: unknown
-    crmViews?: unknown
-  },
-) => {
-  const profile = {
-    ...DEFAULT_SETTINGS,
-    name: identity.name,
-    email: identity.email,
-  } as any
-
-  const profilePayload = {
-    name: overrides?.profile?.name ?? profile.name,
-    email: overrides?.profile?.email ?? profile.email,
-    title: overrides?.profile?.title ?? "",
-    phone: overrides?.profile?.phone ?? "",
-    timezone: overrides?.profile?.timezone ?? "Africa/Lagos",
-    locale: overrides?.profile?.locale ?? "en-NG",
-  }
-
-  const preferencesPayload = {
-    ...DEFAULT_SETTINGS,
-    ...(overrides?.preferences || {}),
-  } as any
-
-  const notificationPayload = {
-    email: overrides?.notifications?.email ?? DEFAULT_SETTINGS.emailNotifications,
-    product: overrides?.notifications?.product ?? DEFAULT_SETTINGS.productNotifications,
-    security: overrides?.notifications?.security ?? DEFAULT_SETTINGS.securityNotifications,
-    reminders: overrides?.notifications?.reminders ?? DEFAULT_SETTINGS.reminderNotifications,
-    marketing: overrides?.notifications?.marketing ?? DEFAULT_SETTINGS.marketingNotifications,
-    sms: overrides?.notifications?.sms ?? DEFAULT_SETTINGS.smsNotifications,
-  }
-
-  const digestPayload = {
-    enabled: overrides?.digest?.enabled ?? DEFAULT_SETTINGS.digestEnabled,
-    day: overrides?.digest?.day ?? DEFAULT_SETTINGS.digestDay,
-    time: overrides?.digest?.time ?? DEFAULT_SETTINGS.digestTime,
-    email: overrides?.digest?.email ?? identity.email,
-  }
-
-  const kpisPayload =
-    Array.isArray(overrides?.kpis) && overrides?.kpis.length ? (overrides?.kpis as any[]) : getDefaultKpis(identity.role)
-  const onboardingPayload =
-    Array.isArray(overrides?.onboarding) && overrides?.onboarding.length
-      ? (overrides?.onboarding as any[])
-      : DEFAULT_ONBOARDING_TASKS
-
-  return {
-    profile: profilePayload,
-    preferences: {
-      theme: preferencesPayload.theme || DEFAULT_SETTINGS.theme,
-      density: preferencesPayload.density || DEFAULT_SETTINGS.density,
-      currency: preferencesPayload.currency || DEFAULT_SETTINGS.currency,
-      landing: preferencesPayload.landing || DEFAULT_SETTINGS.landing,
-      dateFormat: preferencesPayload.dateFormat || DEFAULT_SETTINGS.dateFormat,
-      aiProvider: preferencesPayload.aiProvider || DEFAULT_SETTINGS.aiProvider,
-    },
-    notifications: notificationPayload,
-    kpis: kpisPayload,
-    digest: digestPayload,
-    onboarding: onboardingPayload,
-    crmViews: mergeCrmViews(overrides?.crmViews),
-    simulated: true,
-  }
-}
 
 const ensureSettings = async (userId: string, role: string, email?: string | null) => {
   try {
@@ -264,9 +181,8 @@ export async function GET(request: Request) {
     })
   } catch (error) {
     console.error("User settings fetch failed", error)
-    if (isDev) {
-      const fallback = buildFallbackSettingsPayload(getFallbackIdentity(request))
-      return NextResponse.json(fallback)
+    if (isRequestUserError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
     }
     return NextResponse.json({ error: "Failed to load user settings" }, { status: 500 })
   }
@@ -374,18 +290,8 @@ export async function PATCH(request: Request) {
     })
   } catch (error) {
     console.error("User settings update failed", error)
-    if (isDev) {
-      const { profile = {}, preferences = {}, notifications = {}, kpis, digest = {}, onboarding, crmViews } = body || {}
-      const fallback = buildFallbackSettingsPayload(getFallbackIdentity(request), {
-        profile,
-        preferences,
-        notifications,
-        kpis,
-        digest,
-        onboarding,
-        crmViews,
-      })
-      return NextResponse.json(fallback)
+    if (isRequestUserError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
     }
     return NextResponse.json({ error: "Failed to update user settings" }, { status: 500 })
   }

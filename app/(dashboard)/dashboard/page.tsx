@@ -30,6 +30,23 @@ const emptyCommand = {
   recentActivity: [],
 }
 
+type DecisionFeedItem = {
+  id: string
+  title: string
+  detail: string
+  impact: keyof typeof impactStyles
+  href: string
+  action: string
+}
+
+type RecentActivityItem = {
+  id: string
+  title: string
+  detail: string
+  time: string
+  status: keyof typeof activityStatusStyles
+}
+
 const impactStyles = {
   High: "bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200",
   Medium: "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-200",
@@ -140,8 +157,10 @@ export default function DashboardPage() {
     return { ...kpi, value: display }
   })
 
-  const decisionFeed = Array.isArray(command.decisions) ? command.decisions : []
-  const recentActivity = Array.isArray(command.recentActivity) ? command.recentActivity : []
+  const decisionFeed: DecisionFeedItem[] = Array.isArray(command.decisions) ? (command.decisions as DecisionFeedItem[]) : []
+  const recentActivity: RecentActivityItem[] = Array.isArray(command.recentActivity)
+    ? (command.recentActivity as RecentActivityItem[])
+    : []
 
   const toggleKpi = (id: string) => {
     setKpiDraft((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]))

@@ -1,6 +1,6 @@
 # Civis System Architecture (Security View)
 
-This diagram and notes are generated from the current codebase (`app/api/*`, `lib/*`, `prisma/*`) as of 2026-03-08.
+This diagram and notes are generated from the current codebase (`app/api/*`, `lib/*`, `prisma/*`) as of 2026-05-02.
 
 ## 1) High-Level Architecture
 
@@ -91,9 +91,10 @@ flowchart LR
 5. Notification & reporting
 - Email dispatch through SMTP and exports through CSV/email paths
 
-## 5) Immediate Architecture Risks (from current implementation)
+## 5) Immediate Architecture Risks (current residuals)
 
-- Some API routes are still effectively unauthenticated (`/api/tasks`, `/api/app/bootstrap`, `/api/reports/export`, `/api/uploads/cloudinary`).
-- Identity fallback using request headers (`x-user-email`) exists in several flows.
-- Public portal code routes are not yet protected by anti-enumeration/rate-limit controls.
-
+- Central route protection now exists through `proxy.ts`, and the previously exposed business endpoints are no longer intentionally public.
+- Header/default identity fallback has been quarantined behind explicit local-development flags, but the codebase still carries those dev-only branches and they must not be enabled outside local development.
+- Public portal code routes remain intentionally public, with in-memory rate limiting as a baseline. That is safer than before, but still not sufficient for multi-instance production; a shared store limiter is still required.
+- The platform still relies on route/helper enforcement rather than a fully uniform action-policy engine for every business operation.
+- Payment and subscription lifecycle handling is not implemented yet; billing is metadata/admin-settings only.

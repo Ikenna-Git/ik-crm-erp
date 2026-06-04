@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server"
 import nodemailer from "nodemailer"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
+import { getUserFromRequest, isRequestUserError } from "@/lib/request-user"
 import type { NotificationType } from "@prisma/client"
+import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
 
 const REQUIRED_ENVS = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM"] as const
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable notifications." }, { status: 503 })
-
-const isDev = process.env.NODE_ENV !== "production"
 
 type NotificationRecord = {
   id: string
@@ -23,27 +22,6 @@ type NotificationRecord = {
   read: boolean
   createdAt: Date
 }
-
-const globalForNotifications = globalThis as unknown as {
-  civisNotifications?: Map<string, NotificationRecord[]>
-}
-
-const memoryStore = globalForNotifications.civisNotifications || new Map<string, NotificationRecord[]>()
-if (isDev) globalForNotifications.civisNotifications = memoryStore
-
-const getLocalIdentity = (request: Request) => {
-  const email = request.headers.get("x-user-email")?.trim() || process.env.DEFAULT_USER_EMAIL || "ikchils@gmail.com"
-  const orgId = "org-local"
-  const userId = `local-${Buffer.from(email).toString("hex").slice(0, 20)}`
-  return { orgId, userId, email }
-}
-
-const getStoreKey = (orgId: string, userId: string) => `${orgId}:${userId}`
-
-const toMemoryResponse = (record: NotificationRecord) => ({
-  ...record,
-  createdAt: record.createdAt.toISOString(),
-})
 
 const ensureSettings = async (userId: string) =>
   prisma.userSettings.upsert({
@@ -108,11 +86,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ notifications })
   } catch (error) {
     console.error("Notifications fetch failed", error)
-    if (isDev) {
-      const identity = getLocalIdentity(request)
-      const key = getStoreKey(identity.orgId, identity.userId)
-      const notifications = (memoryStore.get(key) || []).map(toMemoryResponse)
-      return NextResponse.json({ notifications, simulated: true })
+    if (isRequestUserError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
     }
     return NextResponse.json({ error: "Failed to load notifications" }, { status: 500 })
   }
@@ -129,6 +104,16 @@ export async function POST(request: Request) {
 
   try {
     const { org, user } = await getUserFromRequest(request)
+    const limit = rateLimit(getRateLimitKey(request, "notifications-create", { orgId: org.id, userId: user.id }), {
+      limit: 20,
+      windowMs: 60_000,
+    })
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: "Too many notification requests. Please wait a minute and try again." },
+        { status: 429, headers: { "Retry-After": retryAfterSeconds(limit.resetAt).toString() } },
+      )
+    }
 
     const normalizedType = typeof type === "string" ? type.toUpperCase() : "INFO"
     const safeType: NotificationType = ["INFO", "SUCCESS", "WARNING", "ERROR"].includes(normalizedType)
@@ -162,38 +147,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ notification, email: emailStatus })
   } catch (error) {
     console.error("Notification create failed", error)
-    if (isDev) {
-      const identity = getLocalIdentity(request)
-      const key = getStoreKey(identity.orgId, identity.userId)
-      const normalizedType = typeof type === "string" ? type.toUpperCase() : "INFO"
-      const safeType: NotificationType = ["INFO", "SUCCESS", "WARNING", "ERROR"].includes(normalizedType)
-        ? (normalizedType as NotificationType)
-        : "INFO"
-
-      const notification: NotificationRecord = {
-        id: `n_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        orgId: identity.orgId,
-        userId: identity.userId,
-        title,
-        message: description || "",
-        type: safeType,
-        source: source || null,
-        channel: channel || null,
-        read: false,
-        createdAt: new Date(),
-      }
-
-      const current = memoryStore.get(key) || []
-      memoryStore.set(key, [notification, ...current].slice(0, 50))
-
-      return NextResponse.json({
-        notification: toMemoryResponse(notification),
-        email: {
-          sent: false,
-          error: deliverEmail ? "Simulated mode: email not sent." : undefined,
-        },
-        simulated: true,
-      })
+    if (isRequestUserError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
     }
     return NextResponse.json({ error: "Failed to create notification" }, { status: 500 })
   }
@@ -225,21 +180,8 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ notifications })
   } catch (error) {
     console.error("Notifications update failed", error)
-    if (isDev) {
-      const identity = getLocalIdentity(request)
-      const key = getStoreKey(identity.orgId, identity.userId)
-      const current = [...(memoryStore.get(key) || [])]
-
-      let next = current
-      if (clear) {
-        next = []
-      } else if (markAll) {
-        next = next.map((item) => ({ ...item, read: true }))
-      } else if (id) {
-        next = next.map((item) => (item.id === id ? { ...item, read: true } : item))
-      }
-      memoryStore.set(key, next)
-      return NextResponse.json({ notifications: next.map(toMemoryResponse), simulated: true })
+    if (isRequestUserError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
     }
     return NextResponse.json({ error: "Failed to update notifications" }, { status: 500 })
   }

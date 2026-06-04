@@ -5,8 +5,11 @@
   "scripts": {
     "build": "prisma generate && next build --webpack",
     "dev": "next dev",
-    "lint": "eslint .",
-    "start": "next start"
+    "lint": "tsc --noEmit",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "audit:deps": "npm audit --audit-level=high",
+    "fake-data:review": "node scripts/fake-data-review.cjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

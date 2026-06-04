@@ -83,6 +83,7 @@ const buildFallbackCompanies = (count: number) =>
 const fallbackContacts = buildFallbackContacts(70)
 const fallbackDeals = buildFallbackDeals(70)
 const fallbackCompanies = buildFallbackCompanies(50)
+const demoMode = process.env.NEXT_PUBLIC_ENABLE_DEMO_MODE === "true"
 
 export default function CRMPage() {
   const searchQuery = ""
@@ -194,18 +195,25 @@ export default function CRMPage() {
       setFollowupNotice("")
       const res = await fetch("/api/crm/followups", { headers: { ...getSessionHeaders() } })
       if (res.status === 503) {
-        setFollowupSummary(buildLocalFollowups())
+        if (demoMode) {
+          setFollowupSummary(buildLocalFollowups())
+        } else {
+          setFollowupSummary(null)
+          setFollowupNotice("Follow-up data is unavailable until the database connection is restored.")
+        }
         return
       }
       const data = await parseJsonSafe(res)
       if (!res.ok) throw new Error(data?.error || "Failed to load follow-ups")
       setFollowupSummary(data.summary)
-      if (data?.simulated) {
-        setFollowupNotice("Showing simulated follow-ups while database is offline.")
-      }
     } catch (err: any) {
       console.warn("Failed to load follow-ups", err)
-      setFollowupSummary(buildLocalFollowups())
+      if (demoMode) {
+        setFollowupSummary(buildLocalFollowups())
+      } else {
+        setFollowupSummary(null)
+        setFollowupNotice(err?.message || "Failed to load follow-ups.")
+      }
     } finally {
       setFollowupLoading(false)
     }
@@ -227,11 +235,6 @@ export default function CRMPage() {
       const data = await parseJsonSafe(res)
       if (!res.ok) throw new Error(data?.error || "Failed to generate follow-ups")
       const created = data.created?.contacts + data.created?.deals
-      if (data?.simulated) {
-        setFollowupNotice(`Simulated mode: generated ${created || 0} follow-up tasks while DB is offline.`)
-        setFollowupSummary(data.summary)
-        return
-      }
       const skipped = Number(data.skipped || 0)
       setFollowupNotice(
         skipped > 0

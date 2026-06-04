@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { PlaybookStatus } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
@@ -68,7 +69,9 @@ export async function PATCH(request: Request) {
 
     const normalizedStatus = typeof status === "string" ? status.toUpperCase() : undefined
     const safeStatus =
-      normalizedStatus && ["ACTIVE", "PAUSED", "COMPLETED"].includes(normalizedStatus) ? normalizedStatus : undefined
+      normalizedStatus && ["ACTIVE", "PAUSED", "COMPLETED"].includes(normalizedStatus)
+        ? (normalizedStatus as PlaybookStatus)
+        : undefined
 
     const run = await prisma.playbookRun.update({
       where: { id },
