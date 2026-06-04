@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { InvoicesTable, type Invoice } from "@/components/accounting/invoices-table"
 import { ExpensesTable, type Expense } from "@/components/accounting/expenses-table"
 import { FinancialReports } from "@/components/accounting/financial-reports"
+import { SectionErrorBoundary } from "@/components/shared/section-error-boundary"
 import { getSessionHeaders } from "@/lib/user-settings"
 import { formatNaira } from "@/lib/currency"
 
@@ -817,97 +818,107 @@ export default function AccountingPage() {
 
         {/* Invoices Tab */}
         <TabsContent value="invoices" className="space-y-4">
-          <InvoicesTable
-            searchQuery={searchQuery}
-            invoices={invoices}
-            showAmounts={financeUnlocked}
-            onAddInvoice={createInvoice}
-            onUpdateInvoice={handleUpdateInvoice}
-            onDeleteInvoice={handleDeleteInvoice}
-          />
+          <SectionErrorBoundary title="Invoices">
+            <InvoicesTable
+              searchQuery={searchQuery}
+              invoices={invoices}
+              showAmounts={financeUnlocked}
+              onAddInvoice={createInvoice}
+              onUpdateInvoice={handleUpdateInvoice}
+              onDeleteInvoice={handleDeleteInvoice}
+            />
+          </SectionErrorBoundary>
         </TabsContent>
 
         {/* Expenses Tab */}
         <TabsContent value="expenses" className="space-y-4">
-          <ExpensesTable
-            searchQuery={searchQuery}
-            expenses={expenses}
-            showAmounts={financeUnlocked}
-            onAddExpense={createExpense}
-            onUpdateExpense={handleUpdateExpense}
-            onDeleteExpense={handleDeleteExpense}
-          />
+          <SectionErrorBoundary title="Expenses">
+            <ExpensesTable
+              searchQuery={searchQuery}
+              expenses={expenses}
+              showAmounts={financeUnlocked}
+              onAddExpense={createExpense}
+              onUpdateExpense={handleUpdateExpense}
+              onDeleteExpense={handleDeleteExpense}
+            />
+          </SectionErrorBoundary>
         </TabsContent>
 
         {/* Reports Tab */}
         <TabsContent value="reports" className="space-y-4">
-          <FinancialReports />
-          <Card>
-            <CardHeader>
-              <CardTitle>Report Packs</CardTitle>
-              <CardDescription>Curated bundles for finance, leadership, and compliance.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {reportPacks.map((pack) => (
-                <div key={pack.id} className="flex flex-col gap-3 rounded-lg border border-border p-4 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <p className="font-medium">{pack.title}</p>
-                    <p className="text-sm text-muted-foreground">{pack.detail}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{pack.cadence} cadence</p>
+          <SectionErrorBoundary title="Financial reports">
+            <FinancialReports />
+          </SectionErrorBoundary>
+          <SectionErrorBoundary title="Report packs">
+            <Card>
+              <CardHeader>
+                <CardTitle>Report Packs</CardTitle>
+                <CardDescription>Curated bundles for finance, leadership, and compliance.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {reportPacks.map((pack) => (
+                  <div key={pack.id} className="flex flex-col gap-3 rounded-lg border border-border p-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="font-medium">{pack.title}</p>
+                      <p className="text-sm text-muted-foreground">{pack.detail}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{pack.cadence} cadence</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => handleExportReports("desktop")}>
+                        Export CSV
+                      </Button>
+                      <Button size="sm" variant="outline" className="bg-transparent" onClick={() => handleExportReports("email")}>
+                        Send Email
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={() => handleExportReports("desktop")}>
-                      Export CSV
-                    </Button>
-                    <Button size="sm" variant="outline" className="bg-transparent" onClick={() => handleExportReports("email")}>
-                      Send Email
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+                ))}
+              </CardContent>
+            </Card>
+          </SectionErrorBoundary>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Regional Compliance Pack (NGN)</CardTitle>
-              <CardDescription>VAT presets and audit-ready exports for regulators.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-lg border border-border p-4 space-y-2">
-                  <p className="font-medium">VAT Snapshot</p>
-                  <p className="text-sm text-muted-foreground">7.5% VAT on taxable revenue.</p>
-                  <div className="text-sm">
-                    <p>Taxable revenue: {financeUnlocked ? formatNaira(vatTaxable) : "Locked"}</p>
-                    <p>VAT due: {financeUnlocked ? formatNaira(vatDue) : "Locked"}</p>
+          <SectionErrorBoundary title="Compliance pack">
+            <Card>
+              <CardHeader>
+                <CardTitle>Regional Compliance Pack (NGN)</CardTitle>
+                <CardDescription>VAT presets and audit-ready exports for regulators.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-lg border border-border p-4 space-y-2">
+                    <p className="font-medium">VAT Snapshot</p>
+                    <p className="text-sm text-muted-foreground">7.5% VAT on taxable revenue.</p>
+                    <div className="text-sm">
+                      <p>Taxable revenue: {financeUnlocked ? formatNaira(vatTaxable) : "Locked"}</p>
+                      <p>VAT due: {financeUnlocked ? formatNaira(vatDue) : "Locked"}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      <Button size="sm" onClick={() => handleExportCompliance("vat", "desktop")}>
+                        Export VAT CSV
+                      </Button>
+                      <Button size="sm" variant="outline" className="bg-transparent" onClick={() => handleExportCompliance("vat", "email")}>
+                        Email VAT CSV
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    <Button size="sm" onClick={() => handleExportCompliance("vat", "desktop")}>
-                      Export VAT CSV
-                    </Button>
-                    <Button size="sm" variant="outline" className="bg-transparent" onClick={() => handleExportCompliance("vat", "email")}>
-                      Email VAT CSV
-                    </Button>
+                  <div className="rounded-lg border border-border p-4 space-y-2">
+                    <p className="font-medium">Audit-ready exports</p>
+                    <p className="text-sm text-muted-foreground">
+                      Pull action logs, approval trails, and edits for compliance review.
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      <Button size="sm" onClick={() => handleExportCompliance("audit", "desktop")}>
+                        Export audit log
+                      </Button>
+                      <Button size="sm" variant="outline" className="bg-transparent" onClick={() => handleExportCompliance("audit", "email")}>
+                        Email audit log
+                      </Button>
+                    </div>
                   </div>
                 </div>
-                <div className="rounded-lg border border-border p-4 space-y-2">
-                  <p className="font-medium">Audit-ready exports</p>
-                  <p className="text-sm text-muted-foreground">
-                    Pull action logs, approval trails, and edits for compliance review.
-                  </p>
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    <Button size="sm" onClick={() => handleExportCompliance("audit", "desktop")}>
-                      Export audit log
-                    </Button>
-                    <Button size="sm" variant="outline" className="bg-transparent" onClick={() => handleExportCompliance("audit", "email")}>
-                      Email audit log
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </SectionErrorBoundary>
         </TabsContent>
 
         <TabsContent value="import" className="space-y-4">
