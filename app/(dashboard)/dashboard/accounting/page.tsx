@@ -54,6 +54,19 @@ const buildFallbackExpenses = (count: number): Expense[] =>
 const fallbackInvoices = buildFallbackInvoices(70)
 const fallbackExpenses = buildFallbackExpenses(70)
 
+const safeDateString = (value: unknown) => {
+  if (!value) return undefined
+  const parsed = new Date(String(value))
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed.toISOString().slice(0, 10)
+}
+
+const safeNumber = (value: unknown) => {
+  const parsed = typeof value === "number" ? value : Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+const safeString = (value: unknown, fallback = "") => (typeof value === "string" ? value : fallback)
+
 const reportPacks = [
   {
     id: "close-pack",
@@ -157,27 +170,23 @@ export default function AccountingPage() {
   }
 
   const mapInvoice = (inv: any): Invoice => ({
-    id: inv.id,
-    number: inv.invoiceNumber,
-    client: inv.clientName,
-    amount: inv.amount,
-    status: String(inv.status || "DRAFT").toLowerCase() as Invoice["status"],
-    date: inv.issueDate
-      ? new Date(inv.issueDate).toISOString().slice(0, 10)
-      : inv.createdAt
-        ? new Date(inv.createdAt).toISOString().slice(0, 10)
-        : undefined,
-    dueDate: inv.dueDate ? new Date(inv.dueDate).toISOString().slice(0, 10) : undefined,
+    id: safeString(inv?.id, `invoice-${Date.now()}`),
+    number: safeString(inv?.invoiceNumber, "Untitled invoice"),
+    client: safeString(inv?.clientName, "Unknown client"),
+    amount: safeNumber(inv?.amount),
+    status: String(inv?.status || "DRAFT").toLowerCase() as Invoice["status"],
+    date: safeDateString(inv?.issueDate) || safeDateString(inv?.createdAt),
+    dueDate: safeDateString(inv?.dueDate),
   })
 
   const mapExpense = (exp: any): Expense => ({
-    id: exp.id,
-    description: exp.description,
-    category: exp.category,
-    amount: exp.amount,
-    date: exp.date ? new Date(exp.date).toISOString().slice(0, 10) : undefined,
-    status: String(exp.status || "PENDING").toLowerCase() as Expense["status"],
-    submittedBy: exp.submittedBy || "System",
+    id: safeString(exp?.id, `expense-${Date.now()}`),
+    description: safeString(exp?.description, "Untitled expense"),
+    category: safeString(exp?.category, "other"),
+    amount: safeNumber(exp?.amount),
+    date: safeDateString(exp?.date),
+    status: String(exp?.status || "PENDING").toLowerCase() as Expense["status"],
+    submittedBy: safeString(exp?.submittedBy, "System"),
   })
 
   const downloadTemplate = (type: "invoices" | "expenses") => {

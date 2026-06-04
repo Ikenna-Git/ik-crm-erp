@@ -71,6 +71,12 @@ type Props = {
 const formatNaira = (amount: number) =>
   new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", minimumFractionDigits: 0 }).format(amount * 805)
 
+const safeSearchValue = (value: unknown) => (typeof value === "string" ? value : "").toLowerCase()
+const safeAmount = (value: unknown) => {
+  const parsed = typeof value === "number" ? value : Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
 export function ExpensesTable({
   searchQuery,
   expenses: providedExpenses,
@@ -101,8 +107,8 @@ export function ExpensesTable({
 
   const filteredExpenses = expenses.filter(
     (expense) =>
-      expense.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (expense.category || "").toLowerCase().includes(searchQuery.toLowerCase()),
+      safeSearchValue(expense.description).includes(searchQuery.toLowerCase()) ||
+      safeSearchValue(expense.category).includes(searchQuery.toLowerCase()),
   )
 
   const sortedExpenses = [...filteredExpenses].sort((a, b) =>
@@ -117,8 +123,8 @@ export function ExpensesTable({
   }, [currentPage, totalPages])
 
   const stats = {
-    approved: expenses.filter((e) => e.status === "approved").reduce((sum, e) => sum + e.amount, 0),
-    pending: expenses.filter((e) => e.status === "pending").reduce((sum, e) => sum + e.amount, 0),
+    approved: expenses.filter((e) => e.status === "approved").reduce((sum, e) => sum + safeAmount(e.amount), 0),
+    pending: expenses.filter((e) => e.status === "pending").reduce((sum, e) => sum + safeAmount(e.amount), 0),
   }
 
   const handleAddExpense = (e: React.FormEvent) => {
@@ -127,7 +133,7 @@ export function ExpensesTable({
     const payload: Omit<Expense, "id"> = {
       description: formData.description,
       category: formData.category,
-      amount: Number.parseFloat(formData.amount),
+      amount: safeAmount(Number.parseFloat(formData.amount)),
       date: formData.date,
       status: existing?.status || "pending",
       submittedBy: formData.submittedBy,
@@ -176,7 +182,7 @@ export function ExpensesTable({
 
   const downloadExpensesCSV = () => {
     const headers = ["Description", "Category", "Amount", "Date", "Status", "Submitted By"]
-    const rows = expenses.map((e) => [e.description, e.category, e.amount, e.date, e.status, e.submittedBy])
+    const rows = expenses.map((e) => [e.description, e.category, safeAmount(e.amount), e.date, e.status, e.submittedBy])
     const csv = [headers, ...rows].map((row) => row.join(",")).join("\n")
     const blob = new Blob([csv], { type: "text/csv" })
     const url = window.URL.createObjectURL(blob)
@@ -190,7 +196,7 @@ export function ExpensesTable({
     addApprovalRequest({
       request: `Expense: ${expense.description}`,
       owner: expense.submittedBy || "Finance",
-      amount: formatNaira(expense.amount),
+      amount: formatNaira(safeAmount(expense.amount)),
       module: "Accounting",
     })
     alert("Approval requested. Review it in Operations → Approvals.")

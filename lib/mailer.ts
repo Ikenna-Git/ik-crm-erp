@@ -1,6 +1,9 @@
 import nodemailer from "nodemailer"
 
 const REQUIRED_SMTP_ENVS = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM"] as const
+const SMTP_CONNECTION_TIMEOUT_MS = 10_000
+const SMTP_GREETING_TIMEOUT_MS = 10_000
+const SMTP_SOCKET_TIMEOUT_MS = 15_000
 
 export type MailSendResult = {
   sent: boolean
@@ -37,6 +40,9 @@ export const sendTransactionalEmail = async ({
       host: process.env.SMTP_HOST,
       port: Number(process.env.SMTP_PORT || 587),
       secure: Number(process.env.SMTP_PORT || 587) === 465,
+      connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+      greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
+      socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,

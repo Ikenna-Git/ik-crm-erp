@@ -62,6 +62,12 @@ type Props = {
 const formatNaira = (amount: number) =>
   new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", minimumFractionDigits: 0 }).format(amount * 805)
 
+const safeSearchValue = (value: unknown) => (typeof value === "string" ? value : "").toLowerCase()
+const safeAmount = (value: unknown) => {
+  const parsed = typeof value === "number" ? value : Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
 export function InvoicesTable({
   searchQuery,
   invoices: providedInvoices,
@@ -92,8 +98,8 @@ export function InvoicesTable({
 
   const filteredInvoices = invoices.filter(
     (invoice) =>
-      invoice.number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      invoice.client.toLowerCase().includes(searchQuery.toLowerCase()),
+      safeSearchValue(invoice.number).includes(searchQuery.toLowerCase()) ||
+      safeSearchValue(invoice.client).includes(searchQuery.toLowerCase()),
   )
 
   const sortedInvoices = [...filteredInvoices].sort((a, b) =>
@@ -108,9 +114,9 @@ export function InvoicesTable({
   }, [currentPage, totalPages])
 
   const stats = {
-    paid: invoices.filter((i) => i.status === "paid").reduce((sum, i) => sum + i.amount, 0),
-    pending: invoices.filter((i) => i.status === "sent").reduce((sum, i) => sum + i.amount, 0),
-    overdue: invoices.filter((i) => i.status === "overdue").reduce((sum, i) => sum + i.amount, 0),
+    paid: invoices.filter((i) => i.status === "paid").reduce((sum, i) => sum + safeAmount(i.amount), 0),
+    pending: invoices.filter((i) => i.status === "sent").reduce((sum, i) => sum + safeAmount(i.amount), 0),
+    overdue: invoices.filter((i) => i.status === "overdue").reduce((sum, i) => sum + safeAmount(i.amount), 0),
   }
 
   const handleAddInvoice = (e: React.FormEvent) => {
@@ -119,7 +125,7 @@ export function InvoicesTable({
     const payload: Omit<Invoice, "id"> = {
       number: formData.number,
       client: formData.client,
-      amount: Number.parseFloat(formData.amount),
+      amount: safeAmount(Number.parseFloat(formData.amount)),
       status: existing?.status || "draft",
       date: formData.date,
       dueDate: formData.dueDate,
@@ -164,7 +170,7 @@ export function InvoicesTable({
 
   const downloadInvoicesCSV = () => {
     const headers = ["Invoice", "Client", "Amount", "Status", "Due Date"]
-    const rows = invoices.map((i) => [i.number, i.client, i.amount, i.status, i.dueDate])
+    const rows = invoices.map((i) => [i.number, i.client, safeAmount(i.amount), i.status, i.dueDate])
     const csv = [headers, ...rows].map((row) => row.join(",")).join("\n")
     const blob = new Blob([csv], { type: "text/csv" })
     const url = window.URL.createObjectURL(blob)
@@ -178,7 +184,7 @@ export function InvoicesTable({
     addApprovalRequest({
       request: `Invoice ${invoice.number}`,
       owner: "Accounting",
-      amount: formatNaira(invoice.amount),
+      amount: formatNaira(safeAmount(invoice.amount)),
       module: "Accounting",
     })
     alert("Approval requested. Review it in Operations → Approvals.")
