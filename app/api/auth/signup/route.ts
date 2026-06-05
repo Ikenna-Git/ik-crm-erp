@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { completeCredentialsSignup } from "@/lib/credentials-signup"
-
-const allowCredentialsFallback =
-  process.env.NODE_ENV !== "production" || process.env.NEXTAUTH_ALLOW_FALLBACK === "true"
+import { allowDevAuthFallback } from "@/lib/runtime-flags"
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +11,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!process.env.DATABASE_URL) {
-      if (allowCredentialsFallback) {
+      if (allowDevAuthFallback) {
         return NextResponse.json({
           success: true,
           fallback: true,

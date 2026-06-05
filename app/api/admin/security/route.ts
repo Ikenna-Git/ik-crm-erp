@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
-import { canViewFounderControls, getFounderSuperAdminEmail, isAdmin } from "@/lib/authz"
+import { canViewFounderControls, getFounderSuperAdminEmail } from "@/lib/authz"
+import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable admin security." }, { status: 503 })
@@ -10,10 +10,7 @@ export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
 
   try {
-    const { org, user } = await getUserFromRequest(request)
-    if (!isAdmin(user.role)) {
-      return NextResponse.json({ error: "Not authorized" }, { status: 403 })
-    }
+    const { org, user } = await requireAdminRequest(request)
     const showFounderControls = canViewFounderControls(user.role)
 
     const [users, recentAuditEvents] = await Promise.all([
@@ -54,7 +51,6 @@ export async function GET(request: Request) {
       recentAuditEvents,
     })
   } catch (error) {
-    console.error("Admin security fetch failed", error)
-    return NextResponse.json({ error: "Failed to load admin security" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load admin security")
   }
 }

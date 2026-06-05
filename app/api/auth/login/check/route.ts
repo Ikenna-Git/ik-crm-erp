@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma, withPrismaRetry } from "@/lib/prisma"
 import { FOUNDER_SUPER_ADMIN_EMAIL } from "@/lib/authz"
 import { verifyPassword } from "@/lib/password"
-
-const allowCredentialsFallback =
-  process.env.NODE_ENV !== "production" || process.env.NEXTAUTH_ALLOW_FALLBACK === "true"
+import { allowDevAuthFallback } from "@/lib/runtime-flags"
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,7 +15,7 @@ export async function POST(request: NextRequest) {
     const normalizedEmail = email.toLowerCase().trim()
 
     if (!process.env.DATABASE_URL) {
-      return NextResponse.json({ requires2FA: false, fallback: allowCredentialsFallback })
+      return NextResponse.json({ requires2FA: false, fallback: allowDevAuthFallback })
     }
 
     const user = await withPrismaRetry("auth.loginCheck.findUser", () =>
@@ -79,7 +77,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Login precheck failed", error)
 
-    if (allowCredentialsFallback) {
+    if (allowDevAuthFallback) {
       return NextResponse.json({ requires2FA: false, fallback: true })
     }
 

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { getUserFromRequest } from "@/lib/request-user"
-import { canViewFounderControls, getFounderSuperAdminEmail, isAdmin, isSuperAdmin } from "@/lib/authz"
+import { canViewFounderControls, getFounderSuperAdminEmail, isSuperAdmin } from "@/lib/authz"
+import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable admin overview." }, { status: 503 })
@@ -19,10 +19,7 @@ export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
 
   try {
-    const { org, user } = await getUserFromRequest(request)
-    if (!isAdmin(user.role)) {
-      return NextResponse.json({ error: "Not authorized" }, { status: 403 })
-    }
+    const { org, user } = await requireAdminRequest(request)
     const showFounderControls = canViewFounderControls(user.role)
 
     const [
@@ -333,7 +330,6 @@ export async function GET(request: Request) {
         : null,
     })
   } catch (error) {
-    console.error("Admin overview failed", error)
-    return NextResponse.json({ error: "Failed to load admin overview" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load admin overview")
   }
 }
