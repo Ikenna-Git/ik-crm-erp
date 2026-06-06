@@ -4,6 +4,19 @@ Date: 2026-06-06
 Branch: `p0-core-runtime-bug-sweep`  
 Primary scope: accounting approvals, accounting runtime, operations approvals, invite/admin regression, login/dashboard regression, env-backed failure states, browser-storage persistence audit
 
+## Build Investigation
+
+| Item | Result |
+| --- | --- |
+| Investigated command | `rm -rf .next && npx prisma generate && npm run build` |
+| Initial symptom | Build appeared stuck at `Creating an optimized production build ...` when stopped early |
+| Diagnostic result | Not a deadlock or compile failure; webpack continued compiling and the build completed when given enough time |
+| Verified completion | `Compiled successfully in 65s`, then static page generation and trace collection completed |
+| Total observed wall time | roughly 140 seconds from build start to route output in this environment |
+| Root cause | Slow but valid webpack production build, not a persistence-audit regression |
+| Branch-caused defect | No confirmed branch-specific build defect found |
+| Remaining risk | Build can be misread as hung if stopped before the compile phase completes; allow at least 2 to 3 minutes before classifying as blocked |
+
 ## Test Matrix
 
 | Test Area | Route/Page | Expected Result | Actual Result | Bug Found | Fix Made | Evidence / Notes | Tester | Date |
@@ -81,6 +94,9 @@ Primary scope: accounting approvals, accounting runtime, operations approvals, i
 - Invoice approval state is distinct from invoice financial lifecycle status.
 - Expense approval decisions also update the `Expense.status` field so Operations counters and accounting views stay consistent.
 - Browser storage is now explicitly limited to UI-only behavior such as theme, onboarding progress, temporary local AI chat history, and access-code unlock flags. Core workflows must not depend on it.
+- Build status after investigation:
+  - `npm run build` passes on this branch
+  - `npm run lint` still fails because `eslint` is not installed in this repo state
 - Any live failure should record:
   - route/page
   - expected vs actual
