@@ -53,7 +53,6 @@ export function DashboardSidebar() {
   ]
 
   const handleLogout = () => {
-    localStorage.removeItem("user")
     signOut({ callbackUrl: "/" })
   }
 

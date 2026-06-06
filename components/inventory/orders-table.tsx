@@ -14,7 +14,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { addApprovalRequest } from "@/lib/approvals"
 
 export interface PurchaseOrder {
   id: string
@@ -184,13 +183,7 @@ export function OrdersTable({
   }
 
   const requestApproval = (order: PurchaseOrder) => {
-    addApprovalRequest({
-      request: `Purchase order ${order.orderNo}`,
-      owner: "Procurement",
-      amount: formatNaira(order.totalValue),
-      module: "Inventory",
-    })
-    alert("Approval requested. Review it in Operations → Approvals.")
+    alert(`Purchase order approval for ${order.orderNo} is not persisted yet in this release. Do not use this action as a source of truth.`)
   }
 
   return (

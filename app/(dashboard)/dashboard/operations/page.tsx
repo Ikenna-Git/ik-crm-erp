@@ -159,31 +159,6 @@ const compliancePack = [
   },
 ]
 
-const reportsSeed = [
-  {
-    id: "r1",
-    name: "Monthly payroll summary",
-    dataset: "HR",
-    metrics: "Payroll costs",
-    groupBy: "Month",
-    schedule: "Monthly",
-    notes: "Send to CFO and HR lead",
-    owner: "HR",
-    lastRun: "Not run yet",
-  },
-  {
-    id: "r2",
-    name: "Sales pipeline conversion",
-    dataset: "CRM",
-    metrics: "Win rate",
-    groupBy: "Stage",
-    schedule: "Weekly",
-    notes: "",
-    owner: "CRM",
-    lastRun: "Not run yet",
-  },
-]
-
 const emptyCommand = {
   stats: {
     contacts: 0,
@@ -197,13 +172,6 @@ const emptyCommand = {
   },
   decisions: [],
   recentActivity: [],
-}
-
-const STORAGE = {
-  workflows: "civis_ops_workflows",
-  integrations: "civis_ops_integrations",
-  reports: "civis_ops_reports",
-  webhooks: "civis_ops_webhooks",
 }
 
 const approvalStatusStyles: Record<string, string> = {
@@ -224,6 +192,7 @@ export default function OperationsPage() {
   const [approvalNotice, setApprovalNotice] = useState("")
   const [approvalBusy, setApprovalBusy] = useState("")
   const [integrations, setIntegrations] = useState(integrationsSeed)
+  const [integrationNotice, setIntegrationNotice] = useState("")
   const [insights, setInsights] = useState<typeof insightsSeed>([])
   const [auditLogs, setAuditLogs] = useState<typeof auditSeed>([])
   const [auditLoading, setAuditLoading] = useState(false)
@@ -233,7 +202,7 @@ export default function OperationsPage() {
   const [decisionError, setDecisionError] = useState("")
   const [rollbackBusy, setRollbackBusy] = useState("")
   const [compliance, setCompliance] = useState<typeof complianceSeed>([])
-  const [reports, setReports] = useState<typeof reportsSeed>([])
+  const [reportsNotice, setReportsNotice] = useState("")
   const [webhooks, setWebhooks] = useState<typeof webhookSeed>([])
   const [webhookError, setWebhookError] = useState("")
 
@@ -277,47 +246,6 @@ export default function OperationsPage() {
     url: "",
     events: "",
   })
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    localStorage.removeItem(STORAGE.workflows)
-    localStorage.removeItem(STORAGE.reports)
-    localStorage.removeItem(STORAGE.webhooks)
-    const load = <T,>(key: string, fallback: T, setter: (value: T) => void) => {
-      try {
-        const stored = localStorage.getItem(key)
-        if (stored) {
-          setter(JSON.parse(stored))
-          return
-        }
-        localStorage.setItem(key, JSON.stringify(fallback))
-      } catch {
-        setter(fallback)
-      }
-    }
-    load(STORAGE.workflows, [], setWorkflows)
-    load(STORAGE.reports, [], setReports)
-    load(STORAGE.webhooks, [], setWebhooks)
-
-    try {
-      const stored = localStorage.getItem(STORAGE.integrations)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed)) {
-          const merged = [
-            ...parsed,
-            ...integrationsSeed.filter((seed) => !parsed.some((item: { id: string }) => item.id === seed.id)),
-          ]
-          setIntegrations(merged)
-          localStorage.setItem(STORAGE.integrations, JSON.stringify(merged))
-          return
-        }
-      }
-      localStorage.setItem(STORAGE.integrations, JSON.stringify(integrationsSeed))
-    } catch {
-      setIntegrations(integrationsSeed)
-    }
-  }, [])
 
   useEffect(() => {
     const loadWorkflows = async () => {
@@ -462,26 +390,6 @@ export default function OperationsPage() {
     loadDecisionTrails()
   }, [])
 
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    localStorage.setItem(STORAGE.workflows, JSON.stringify(workflows))
-  }, [workflows])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    localStorage.setItem(STORAGE.integrations, JSON.stringify(integrations))
-  }, [integrations])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    localStorage.setItem(STORAGE.reports, JSON.stringify(reports))
-  }, [reports])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    localStorage.setItem(STORAGE.webhooks, JSON.stringify(webhooks))
-  }, [webhooks])
-
   const addWorkflow = async () => {
     if (!canManage) return
     const name = workflowForm.name.trim()
@@ -564,7 +472,7 @@ export default function OperationsPage() {
 
   const toggleIntegration = (id: string) => {
     if (!canManage) return
-    setIntegrations((prev) => prev.map((intg) => (intg.id === id ? { ...intg, connected: !intg.connected } : intg)))
+    setIntegrationNotice("Integration connection status is managed outside this UI. Use provider setup or environment configuration.")
   }
 
   const addWebhook = async () => {
@@ -627,27 +535,7 @@ export default function OperationsPage() {
 
   const saveReport = () => {
     if (!canManage) return
-    if (!reportForm.name) return
-    setReports((prev) => [
-      {
-        id: `r-${Date.now()}`,
-        name: reportForm.name,
-        dataset: reportForm.dataset,
-        metrics: reportForm.metrics,
-        groupBy: reportForm.groupBy,
-        schedule: reportForm.schedule,
-        notes: reportForm.notes,
-        owner: reportForm.dataset,
-        lastRun: "Not run yet",
-      },
-      ...prev,
-    ])
-    setReportForm({ name: "", dataset: "CRM", metrics: "Revenue", groupBy: "Month", schedule: "Monthly", notes: "" })
-  }
-
-  const runReport = (id: string) => {
-    const timestamp = new Date().toLocaleString()
-    setReports((prev) => prev.map((report) => (report.id === id ? { ...report, lastRun: timestamp } : report)))
+    setReportsNotice("Saved custom reports are not persisted yet in this release. Use the existing export flows instead.")
   }
 
   const rollbackDecision = async (id: string) => {
@@ -918,6 +806,7 @@ export default function OperationsPage() {
         </TabsContent>
 
         <TabsContent value="integrations" className="space-y-4">
+          {integrationNotice ? <p className="text-xs text-muted-foreground">{integrationNotice}</p> : null}
           <div className="grid md:grid-cols-2 gap-4">
             {integrations.map((intg) => (
               <Card key={intg.id}>
@@ -927,8 +816,8 @@ export default function OperationsPage() {
                     <p className="text-sm text-muted-foreground">{intg.category}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Badge variant="outline" className={intg.connected ? "text-green-600" : "text-muted-foreground"}>
-                      {intg.connected ? "Connected" : "Not connected"}
+                    <Badge variant="outline" className="text-muted-foreground">
+                      Environment-backed
                     </Badge>
                     <Button
                       variant="outline"
@@ -936,7 +825,7 @@ export default function OperationsPage() {
                       onClick={() => toggleIntegration(intg.id)}
                       disabled={!canManage}
                     >
-                      {intg.connected ? "Disconnect" : "Connect"}
+                      Setup outside UI
                     </Button>
                   </div>
                 </CardContent>
@@ -1078,7 +967,7 @@ export default function OperationsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Custom Report Builder</CardTitle>
-              <CardDescription>Select data, metrics, and schedule delivery.</CardDescription>
+              <CardDescription>Select data and metrics. Saved custom reports are not persisted in this release.</CardDescription>
             </CardHeader>
             <CardContent className="grid md:grid-cols-2 gap-4">
               <Input
@@ -1114,29 +1003,19 @@ export default function OperationsPage() {
               <Button className="w-fit" onClick={saveReport} disabled={!canManage}>
                 Save Report
               </Button>
+              {reportsNotice ? <p className="text-xs text-muted-foreground md:col-span-2">{reportsNotice}</p> : null}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
               <CardTitle>Saved Reports</CardTitle>
-              <CardDescription>Scheduled or on-demand reports.</CardDescription>
+              <CardDescription>No persisted saved-report backend is wired in this release.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {reports.map((report) => (
-                <div key={report.id} className="flex items-center justify-between border-b border-border pb-3 last:border-0">
-                  <div>
-                    <p className="font-medium">{report.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {report.dataset || report.owner} • {report.metrics || "Metrics"} • {report.groupBy || "Group"} • {report.schedule}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">Last run: {report.lastRun || "Not run yet"}</p>
-                  </div>
-                  <Button size="sm" variant="outline" className="bg-transparent" onClick={() => runReport(report.id)}>
-                    Run
-                  </Button>
-                </div>
-              ))}
+              <p className="text-sm text-muted-foreground">
+                Use the export actions in Accounting, CRM, Analytics, or Compliance instead of browser-saved report definitions.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>
