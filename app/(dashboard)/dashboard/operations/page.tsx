@@ -9,11 +9,23 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Plus, CheckSquare, Lock, Globe, FileText, DownloadCloud, AlertTriangle, Link2, Copy } from "lucide-react"
-import { ApprovalRequest, approvalsStorageKey, getApprovals } from "@/lib/approvals"
 import { getSessionHeaders } from "@/lib/user-settings"
 import { useSession } from "next-auth/react"
 import { useCachedFetch } from "@/hooks/use-cached-fetch"
 import { formatNaira } from "@/lib/currency"
+
+type ApprovalItem = {
+  id: string
+  sourceType: "invoice" | "expense"
+  sourceId: string
+  request: string
+  owner: string
+  amount: number
+  status: "pending" | "approved" | "rejected"
+  sourceStatus?: string | null
+  createdAt: string
+  updatedAt: string
+}
 
 const timelineSeed = [
   { id: "t1", title: "Invoice INV-2025-014 paid", detail: "Acme Corp • ₦1,250,000", time: "2 hours ago", type: "finance" },
@@ -32,36 +44,6 @@ const workflowRunsSeed = [
   { id: "run-1", name: "Overdue invoice reminder", status: "Success", owner: "Finance Bot", time: "Today 09:15" },
   { id: "run-2", name: "Low stock reorder", status: "Queued", owner: "Inventory Bot", time: "Yesterday 18:02" },
   { id: "run-3", name: "New hire onboarding", status: "Paused", owner: "HR Ops", time: "Yesterday 09:40" },
-]
-
-const approvalsSeed: ApprovalRequest[] = [
-  {
-    id: "a1",
-    request: "Payroll January",
-    owner: "HR",
-    amount: "₦3,500,000",
-    status: "pending",
-    module: "HR",
-    createdAt: "2025-01-10T09:00:00Z",
-  },
-  {
-    id: "a2",
-    request: "Purchase order PO-2025-011",
-    owner: "Procurement",
-    amount: "₦850,000",
-    status: "pending",
-    module: "Inventory",
-    createdAt: "2025-01-11T11:30:00Z",
-  },
-  {
-    id: "a3",
-    request: "Expense reimbursement",
-    owner: "Finance",
-    amount: "₦120,000",
-    status: "approved",
-    module: "Accounting",
-    createdAt: "2025-01-09T16:45:00Z",
-  },
 ]
 
 const integrationsSeed = [
@@ -221,7 +203,6 @@ const STORAGE = {
   workflows: "civis_ops_workflows",
   integrations: "civis_ops_integrations",
   reports: "civis_ops_reports",
-  approvals: approvalsStorageKey,
   webhooks: "civis_ops_webhooks",
 }
 
@@ -237,7 +218,11 @@ export default function OperationsPage() {
   const canManage = role === "ORG_OWNER" || role === "ADMIN" || role === "SUPER_ADMIN"
   const [workflows, setWorkflows] = useState<typeof workflowSeed>([])
   const [workflowError, setWorkflowError] = useState("")
-  const [approvals, setApprovals] = useState<ApprovalRequest[]>([])
+  const [approvals, setApprovals] = useState<ApprovalItem[]>([])
+  const [approvalsLoading, setApprovalsLoading] = useState(false)
+  const [approvalError, setApprovalError] = useState("")
+  const [approvalNotice, setApprovalNotice] = useState("")
+  const [approvalBusy, setApprovalBusy] = useState("")
   const [integrations, setIntegrations] = useState(integrationsSeed)
   const [insights, setInsights] = useState<typeof insightsSeed>([])
   const [auditLogs, setAuditLogs] = useState<typeof auditSeed>([])
@@ -298,7 +283,6 @@ export default function OperationsPage() {
     localStorage.removeItem(STORAGE.workflows)
     localStorage.removeItem(STORAGE.reports)
     localStorage.removeItem(STORAGE.webhooks)
-    localStorage.removeItem(STORAGE.approvals)
     const load = <T,>(key: string, fallback: T, setter: (value: T) => void) => {
       try {
         const stored = localStorage.getItem(key)
@@ -314,7 +298,6 @@ export default function OperationsPage() {
     load(STORAGE.workflows, [], setWorkflows)
     load(STORAGE.reports, [], setReports)
     load(STORAGE.webhooks, [], setWebhooks)
-    setApprovals(getApprovals([]))
 
     try {
       const stored = localStorage.getItem(STORAGE.integrations)
@@ -357,6 +340,31 @@ export default function OperationsPage() {
       }
     }
     loadWorkflows()
+  }, [])
+
+  useEffect(() => {
+    const loadApprovals = async () => {
+      try {
+        setApprovalsLoading(true)
+        setApprovalError("")
+        const res = await fetch("/api/ops/approvals", { headers: { ...getSessionHeaders() } })
+        if (res.status === 503) {
+          setApprovalError("Approvals are unavailable until the database is connected.")
+          setApprovals([])
+          return
+        }
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data?.error || "Failed to load approvals")
+        setApprovals(Array.isArray(data?.approvals) ? data.approvals : [])
+      } catch (err: any) {
+        console.warn("Approvals load failed", err)
+        setApprovalError(err?.message || "Failed to load approvals")
+        setApprovals([])
+      } finally {
+        setApprovalsLoading(false)
+      }
+    }
+    loadApprovals()
   }, [])
 
   useEffect(() => {
@@ -471,11 +479,6 @@ export default function OperationsPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    localStorage.setItem(STORAGE.approvals, JSON.stringify(approvals))
-  }, [approvals])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
     localStorage.setItem(STORAGE.webhooks, JSON.stringify(webhooks))
   }, [webhooks])
 
@@ -523,9 +526,40 @@ export default function OperationsPage() {
     }
   }
 
-  const updateApproval = (id: string, status: "approved" | "rejected") => {
+  const updateApproval = async (approval: ApprovalItem, status: "approved" | "rejected") => {
     if (!canManage) return
-    setApprovals((prev) => prev.map((ap) => (ap.id === id ? { ...ap, status } : ap)))
+    try {
+      setApprovalBusy(approval.id)
+      setApprovalError("")
+      setApprovalNotice("")
+      const res = await fetch("/api/ops/approvals", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({
+          sourceType: approval.sourceType,
+          sourceId: approval.sourceId,
+          decision: status,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to update approval")
+      setApprovals((prev) =>
+        prev.map((item) =>
+          item.id === approval.id
+            ? {
+                ...item,
+                ...data.approval,
+              }
+            : item,
+        ),
+      )
+      setApprovalNotice(`${approval.request} marked as ${status}.`)
+    } catch (err: any) {
+      console.warn("Approval update failed", err)
+      setApprovalError(err?.message || "Failed to update approval")
+    } finally {
+      setApprovalBusy("")
+    }
   }
 
   const toggleIntegration = (id: string) => {
@@ -836,41 +870,49 @@ export default function OperationsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Approvals</CardTitle>
-              <CardDescription>Review and approve critical actions.</CardDescription>
+              <CardDescription>Review and approve critical accounting actions persisted in the database.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {approvals.map((ap) => (
-                <div key={ap.id} className="flex items-center justify-between border-b border-border pb-4 last:border-0">
-                  <div>
-                    <p className="font-medium">{ap.request}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {ap.owner} • {ap.amount} • {ap.module}
-                    </p>
+              {approvalError ? <p className="text-xs text-destructive">{approvalError}</p> : null}
+              {approvalNotice ? <p className="text-xs text-primary">{approvalNotice}</p> : null}
+              {approvalsLoading ? (
+                <p className="text-sm text-muted-foreground">Loading approvals...</p>
+              ) : approvals.length ? (
+                approvals.map((ap) => (
+                  <div key={ap.id} className="flex items-center justify-between border-b border-border pb-4 last:border-0">
+                    <div>
+                      <p className="font-medium">{ap.request}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {ap.owner} • {formatNaira(ap.amount)} • {ap.sourceType}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className={approvalStatusStyles[ap.status]}>
+                        {ap.status}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        className="bg-green-600 text-white hover:bg-green-700"
+                        onClick={() => updateApproval(ap, "approved")}
+                        disabled={!canManage || approvalBusy === ap.id}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-red-500 text-red-600 hover:bg-red-50 dark:border-red-500/70 dark:text-red-300 dark:hover:bg-red-950/30"
+                        onClick={() => updateApproval(ap, "rejected")}
+                        disabled={!canManage || approvalBusy === ap.id}
+                      >
+                        Reject
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className={approvalStatusStyles[ap.status]}>
-                      {ap.status}
-                    </Badge>
-                    <Button
-                      size="sm"
-                      className="bg-green-600 text-white hover:bg-green-700"
-                      onClick={() => updateApproval(ap.id, "approved")}
-                      disabled={!canManage}
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-red-500 text-red-600 hover:bg-red-50 dark:border-red-500/70 dark:text-red-300 dark:hover:bg-red-950/30"
-                      onClick={() => updateApproval(ap.id, "rejected")}
-                      disabled={!canManage}
-                    >
-                      Reject
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">No approval requests yet for this workspace.</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

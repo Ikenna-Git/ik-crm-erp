@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { requireModuleAccess, handleAccessRouteError } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
 import { createDecisionTrail, invoiceSnapshot } from "@/lib/decision-trails"
+import { getApprovalStateMapForOrg } from "@/lib/approval-requests"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable Accounting data." }, { status: 503 })
@@ -11,11 +12,19 @@ export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org } = await requireModuleAccess(request, "accounting", "view")
-    const invoices = await prisma.invoice.findMany({
-      where: { orgId: org.id },
-      orderBy: { updatedAt: "desc" },
+    const [invoices, approvalStates] = await Promise.all([
+      prisma.invoice.findMany({
+        where: { orgId: org.id },
+        orderBy: { updatedAt: "desc" },
+      }),
+      getApprovalStateMapForOrg(org.id),
+    ])
+    return NextResponse.json({
+      invoices: invoices.map((invoice) => ({
+        ...invoice,
+        approvalStatus: approvalStates[`invoice:${invoice.id}`]?.status || null,
+      })),
     })
-    return NextResponse.json({ invoices })
   } catch (error) {
     return handleAccessRouteError(error, "Failed to load invoices")
   }
@@ -52,7 +61,13 @@ export async function POST(request: Request) {
       metadata: { number: invoice.invoiceNumber, amount: invoice.amount, status: invoice.status },
     })
 
-    return NextResponse.json({ invoice })
+    const approvalStates = await getApprovalStateMapForOrg(org.id)
+    return NextResponse.json({
+      invoice: {
+        ...invoice,
+        approvalStatus: approvalStates[`invoice:${invoice.id}`]?.status || null,
+      },
+    })
   } catch (error) {
     return handleAccessRouteError(error, "Failed to create invoice")
   }
@@ -70,7 +85,10 @@ export async function PATCH(request: Request) {
     const normalizedStatus = typeof status === "string" ? status.toUpperCase() : undefined
     const safeStatus =
       (normalizedStatus && ["DRAFT", "SENT", "PAID", "OVERDUE"].includes(normalizedStatus) ? normalizedStatus : undefined) as any
-    const previous = await prisma.invoice.findUnique({ where: { id } })
+    const previous = await prisma.invoice.findFirst({ where: { id, orgId: org.id } })
+    if (!previous) {
+      return NextResponse.json({ error: "Invoice not found in this workspace" }, { status: 404 })
+    }
     const invoice = await prisma.invoice.update({
       where: { id },
       data: {
@@ -102,7 +120,13 @@ export async function PATCH(request: Request) {
       metadata: { number: invoice.invoiceNumber, amount: invoice.amount, status: invoice.status },
     })
 
-    return NextResponse.json({ invoice })
+    const approvalStates = await getApprovalStateMapForOrg(org.id)
+    return NextResponse.json({
+      invoice: {
+        ...invoice,
+        approvalStatus: approvalStates[`invoice:${invoice.id}`]?.status || null,
+      },
+    })
   } catch (error) {
     return handleAccessRouteError(error, "Failed to update invoice")
   }
@@ -116,6 +140,10 @@ export async function DELETE(request: Request) {
     const id = searchParams.get("id")
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 })
+    }
+    const existing = await prisma.invoice.findFirst({ where: { id, orgId: org.id } })
+    if (!existing) {
+      return NextResponse.json({ error: "Invoice not found in this workspace" }, { status: 404 })
     }
     const deleted = await prisma.invoice.delete({ where: { id } })
     await createAuditLog({
