@@ -117,7 +117,7 @@ export const getUserFromRequest = async (request: Request) => {
           )
         : existingUser
 
-    if (!isSuperAdmin(nextRole)) {
+    if (!isSuperAdmin(nextRole, user.email)) {
       const orgStatusMessage = getOrgStatusMessage(user.org.status, user.org.statusReason)
       if (orgStatusMessage) {
         throw new RequestUserError(orgStatusMessage, 403)
@@ -151,7 +151,7 @@ export const getUserFromRequest = async (request: Request) => {
     }),
   )
 
-  if (!isSuperAdmin(user.role)) {
+  if (!isSuperAdmin(user.role, user.email)) {
     const orgStatusMessage = getOrgStatusMessage(org.status, org.statusReason)
     if (orgStatusMessage) {
       throw new RequestUserError(orgStatusMessage, 403)

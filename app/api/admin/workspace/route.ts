@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
-import { canManageWorkspaceSettings, isSuperAdmin } from "@/lib/authz"
+import { canManageWorkspaceSettings, canViewFounderControls } from "@/lib/authz"
 import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
 
 const dbUnavailable = () =>
@@ -12,10 +12,21 @@ export async function GET(request: Request) {
 
   try {
     const { org, user } = await requireAdminRequest(request)
+    const showFounderControls = canViewFounderControls(user.role, user.email)
 
     const [userCount, adminCount, crmFieldCount] = await Promise.all([
-      prisma.user.count({ where: { orgId: org.id } }),
-      prisma.user.count({ where: { orgId: org.id, role: { in: ["ORG_OWNER", "ADMIN", "SUPER_ADMIN"] } } }),
+      prisma.user.count({
+        where: {
+          orgId: org.id,
+          ...(showFounderControls ? {} : { role: { not: "SUPER_ADMIN" } }),
+        },
+      }),
+      prisma.user.count({
+        where: {
+          orgId: org.id,
+          role: { in: showFounderControls ? ["ORG_OWNER", "ADMIN", "SUPER_ADMIN"] : ["ORG_OWNER", "ADMIN"] },
+        },
+      }),
       prisma.crmField.count({ where: { orgId: org.id, archived: false } }),
     ])
 
@@ -27,9 +38,9 @@ export async function GET(request: Request) {
         crmFieldCount,
       },
       permissions: {
-        canManageWorkspace: canManageWorkspaceSettings(user.role),
-        canManageBilling: canManageWorkspaceSettings(user.role),
-        isPlatformSuperAdmin: isSuperAdmin(user.role),
+        canManageWorkspace: canManageWorkspaceSettings(user.role, user.email),
+        canManageBilling: canManageWorkspaceSettings(user.role, user.email),
+        isPlatformSuperAdmin: showFounderControls,
       },
     })
   } catch (error) {

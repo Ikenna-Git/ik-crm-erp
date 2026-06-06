@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { canViewFounderControls, getFounderSuperAdminEmail } from "@/lib/authz"
+import { canViewFounderControls, getFounderSuperAdminEmail, getAssignableRoles } from "@/lib/authz"
 import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
 
 const dbUnavailable = () =>
@@ -11,11 +11,15 @@ export async function GET(request: Request) {
 
   try {
     const { org, user } = await requireAdminRequest(request)
-    const showFounderControls = canViewFounderControls(user.role)
+    const showFounderControls = canViewFounderControls(user.role, user.email)
+    const visiblePrivilegedRoles = getAssignableRoles(user.role, user.email)
 
     const [users, recentAuditEvents] = await Promise.all([
       prisma.user.findMany({
-        where: { orgId: org.id },
+        where: {
+          orgId: org.id,
+          ...(showFounderControls ? {} : { role: { in: visiblePrivilegedRoles } }),
+        },
         orderBy: [{ role: "asc" }, { createdAt: "asc" }],
         select: {
           id: true,
@@ -34,8 +38,10 @@ export async function GET(request: Request) {
       }),
     ])
 
-    const privilegedUsers = users.filter(
-      (member) => member.role === "ORG_OWNER" || member.role === "ADMIN" || member.role === "SUPER_ADMIN",
+    const privilegedUsers = users.filter((member) =>
+      showFounderControls
+        ? member.role === "ORG_OWNER" || member.role === "ADMIN" || member.role === "SUPER_ADMIN"
+        : member.role === "ORG_OWNER" || member.role === "ADMIN",
     )
     const twoFactorCoverage = users.length ? Math.round((users.filter((member) => member.twoFactorEnabled).length / users.length) * 100) : 0
 

@@ -166,7 +166,7 @@ export default function AdminOverviewPage() {
   }
 
   const { actor, workspace, opsCenter, platform } = data
-  const showFounderControls = actor.role === "SUPER_ADMIN"
+  const showFounderControls = Boolean(actor.founderEmail)
 
   return (
     <div className="space-y-6">

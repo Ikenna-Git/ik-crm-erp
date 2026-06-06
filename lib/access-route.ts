@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { ACCESS_MODULE_LABELS, type AccessLevel, type AccessModule, hasModuleAccess } from "@/lib/access-control"
-import { canManageWorkspaceSettings, isAdmin, isSuperAdmin } from "@/lib/authz"
+import { canManageWorkspaceSettings, canViewFounderControls, isAdmin } from "@/lib/authz"
 import { getUserFromRequest, isRequestUserError, RequestUserError } from "@/lib/request-user"
 
 type RequestContext = Awaited<ReturnType<typeof getUserFromRequest>>
@@ -32,14 +32,14 @@ export const requireAdminRequest = async (
   const context = await requireAuthenticatedRequest(request)
 
   if (options?.requireSuperAdmin) {
-    if (!isSuperAdmin(context.user.role)) {
+    if (!canViewFounderControls(context.user.role, context.user.email)) {
       throw new RequestUserError("Super admin access required", 403)
     }
     return context
   }
 
   if (options?.requireWorkspaceOwner) {
-    if (!canManageWorkspaceSettings(context.user.role)) {
+    if (!canManageWorkspaceSettings(context.user.role, context.user.email)) {
       throw new RequestUserError("Organization owner access required", 403)
     }
     return context
