@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { requireModuleAccess, handleAccessRouteError } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
 import { createDecisionTrail, expenseSnapshot } from "@/lib/decision-trails"
+import { getApprovalStateMapForOrg } from "@/lib/approval-requests"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable Accounting data." }, { status: 503 })
@@ -11,11 +12,19 @@ export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org } = await requireModuleAccess(request, "accounting", "view")
-    const expenses = await prisma.expense.findMany({
-      where: { orgId: org.id },
-      orderBy: { updatedAt: "desc" },
+    const [expenses, approvalStates] = await Promise.all([
+      prisma.expense.findMany({
+        where: { orgId: org.id },
+        orderBy: { updatedAt: "desc" },
+      }),
+      getApprovalStateMapForOrg(org.id),
+    ])
+    return NextResponse.json({
+      expenses: expenses.map((expense) => ({
+        ...expense,
+        approvalStatus: approvalStates[`expense:${expense.id}`]?.status || null,
+      })),
     })
-    return NextResponse.json({ expenses })
   } catch (error) {
     return handleAccessRouteError(error, "Failed to load expenses")
   }
@@ -52,7 +61,13 @@ export async function POST(request: Request) {
       metadata: { description: expense.description, amount: expense.amount, status: expense.status },
     })
 
-    return NextResponse.json({ expense })
+    const approvalStates = await getApprovalStateMapForOrg(org.id)
+    return NextResponse.json({
+      expense: {
+        ...expense,
+        approvalStatus: approvalStates[`expense:${expense.id}`]?.status || null,
+      },
+    })
   } catch (error) {
     return handleAccessRouteError(error, "Failed to create expense")
   }
@@ -70,7 +85,10 @@ export async function PATCH(request: Request) {
     const normalizedStatus = typeof status === "string" ? status.toUpperCase() : undefined
     const safeStatus =
       (normalizedStatus && ["PENDING", "APPROVED", "REJECTED"].includes(normalizedStatus) ? normalizedStatus : undefined) as any
-    const previous = await prisma.expense.findUnique({ where: { id } })
+    const previous = await prisma.expense.findFirst({ where: { id, orgId: org.id } })
+    if (!previous) {
+      return NextResponse.json({ error: "Expense not found in this workspace" }, { status: 404 })
+    }
     const expense = await prisma.expense.update({
       where: { id },
       data: {
@@ -102,7 +120,13 @@ export async function PATCH(request: Request) {
       metadata: { description: expense.description, amount: expense.amount, status: expense.status },
     })
 
-    return NextResponse.json({ expense })
+    const approvalStates = await getApprovalStateMapForOrg(org.id)
+    return NextResponse.json({
+      expense: {
+        ...expense,
+        approvalStatus: approvalStates[`expense:${expense.id}`]?.status || null,
+      },
+    })
   } catch (error) {
     return handleAccessRouteError(error, "Failed to update expense")
   }
@@ -116,6 +140,10 @@ export async function DELETE(request: Request) {
     const id = searchParams.get("id")
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 })
+    }
+    const existing = await prisma.expense.findFirst({ where: { id, orgId: org.id } })
+    if (!existing) {
+      return NextResponse.json({ error: "Expense not found in this workspace" }, { status: 404 })
     }
     const deleted = await prisma.expense.delete({ where: { id } })
     await createAuditLog({

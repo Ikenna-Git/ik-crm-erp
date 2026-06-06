@@ -15,7 +15,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { addApprovalRequest } from "@/lib/approvals"
 
 export interface Invoice {
   id: string
@@ -23,6 +22,7 @@ export interface Invoice {
   client: string
   amount: number
   status: "draft" | "sent" | "paid" | "overdue"
+  approvalStatus?: "pending" | "approved" | "rejected" | null
   date?: string
   dueDate?: string
 }
@@ -32,6 +32,9 @@ const statusColors = {
   sent: "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-500/20 dark:text-blue-200 dark:border-blue-500/40",
   draft: "bg-gray-100 text-gray-800 border-gray-200 dark:bg-slate-700/40 dark:text-slate-200 dark:border-slate-500/40",
   overdue: "bg-red-100 text-red-800 border-red-200 dark:bg-red-500/20 dark:text-red-200 dark:border-red-500/40",
+  pending: "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-500/20 dark:text-yellow-200 dark:border-yellow-500/40",
+  approved: "bg-green-100 text-green-800 border-green-200 dark:bg-green-500/20 dark:text-green-200 dark:border-green-500/40",
+  rejected: "bg-red-100 text-red-800 border-red-200 dark:bg-red-500/20 dark:text-red-200 dark:border-red-500/40",
 }
 
 const invoiceClients = ["Acme Corp", "Northwind", "Globex", "Venture Labs", "Nimbus", "Zenith"]
@@ -56,6 +59,7 @@ type Props = {
   onAddInvoice?: (data: Omit<Invoice, "id">) => void
   onUpdateInvoice?: (id: string, data: Partial<Invoice>) => void
   onDeleteInvoice?: (id: string) => void
+  onRequestApproval?: (invoice: Invoice) => Promise<void> | void
   showAmounts?: boolean
 }
 
@@ -72,7 +76,9 @@ export function InvoicesTable({
   searchQuery,
   invoices: providedInvoices,
   onAddInvoice,
+  onUpdateInvoice,
   onDeleteInvoice,
+  onRequestApproval,
   showAmounts = true,
 }: Props) {
   const [invoices, setInvoices] = useState<Invoice[]>(providedInvoices ?? [])
@@ -115,7 +121,9 @@ export function InvoicesTable({
 
   const stats = {
     paid: invoices.filter((i) => i.status === "paid").reduce((sum, i) => sum + safeAmount(i.amount), 0),
-    pending: invoices.filter((i) => i.status === "sent").reduce((sum, i) => sum + safeAmount(i.amount), 0),
+    pending: invoices
+      .filter((i) => i.approvalStatus === "pending" || i.status === "sent")
+      .reduce((sum, i) => sum + safeAmount(i.amount), 0),
     overdue: invoices.filter((i) => i.status === "overdue").reduce((sum, i) => sum + safeAmount(i.amount), 0),
   }
 
@@ -181,13 +189,7 @@ export function InvoicesTable({
   }
 
   const requestApproval = (invoice: Invoice) => {
-    addApprovalRequest({
-      request: `Invoice ${invoice.number}`,
-      owner: "Accounting",
-      amount: formatNaira(safeAmount(invoice.amount)),
-      module: "Accounting",
-    })
-    alert("Approval requested. Review it in Operations → Approvals.")
+    onRequestApproval?.(invoice)
   }
 
   return (
@@ -246,53 +248,56 @@ export function InvoicesTable({
                 </tr>
               </thead>
               <tbody>
-                {pagedInvoices.map((invoice) => (
-                  <tr key={invoice.id} className="border-b border-border hover:bg-muted/50 transition">
-                    <td className="py-4 px-4 font-medium">{invoice.number}</td>
-                    <td className="py-4 px-4">{invoice.client}</td>
-                    <td className="py-4 px-4 font-semibold">{showAmounts ? formatNaira(invoice.amount) : "••••"}</td>
-                    <td className="py-4 px-4">
-                      <Badge variant="outline" className={statusColors[invoice.status]}>
-                        {invoice.status}
-                      </Badge>
-                    </td>
-                    <td className="py-4 px-4 text-muted-foreground">{invoice.dueDate || "—"}</td>
-                    <td className="py-4 px-4">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="p-2">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => alert(JSON.stringify(invoice, null, 2))}>
-                            <Eye className="w-4 h-4 mr-2" />
-                            View details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditInvoice(invoice)}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => downloadInvoicesCSV()}>
-                            <Download className="w-4 h-4 mr-2" />
-                            Download PDF
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => requestApproval(invoice)}>
-                            <CheckSquare className="w-4 h-4 mr-2" />
-                            Request approval
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => handleDeleteInvoice(invoice.id)}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                ))}
+                {pagedInvoices.map((invoice) => {
+                  const displayStatus = invoice.approvalStatus || invoice.status
+                  return (
+                    <tr key={invoice.id} className="border-b border-border hover:bg-muted/50 transition">
+                      <td className="py-4 px-4 font-medium">{invoice.number}</td>
+                      <td className="py-4 px-4">{invoice.client}</td>
+                      <td className="py-4 px-4 font-semibold">{showAmounts ? formatNaira(invoice.amount) : "••••"}</td>
+                      <td className="py-4 px-4">
+                        <Badge variant="outline" className={statusColors[displayStatus]}>
+                          {displayStatus}
+                        </Badge>
+                      </td>
+                      <td className="py-4 px-4 text-muted-foreground">{invoice.dueDate || "—"}</td>
+                      <td className="py-4 px-4">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="p-2">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => alert(JSON.stringify(invoice, null, 2))}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              View details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditInvoice(invoice)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => downloadInvoicesCSV()}>
+                              <Download className="w-4 h-4 mr-2" />
+                              Download PDF
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => requestApproval(invoice)}>
+                              <CheckSquare className="w-4 h-4 mr-2" />
+                              Request approval
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => handleDeleteInvoice(invoice.id)}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
