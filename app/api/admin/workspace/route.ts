@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
-import { canManageWorkspaceSettings, isSuperAdmin } from "@/lib/authz"
+import { canManageWorkspaceSettings, canViewFounderControls } from "@/lib/authz"
 import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
 
 const dbUnavailable = () =>
@@ -27,9 +27,9 @@ export async function GET(request: Request) {
         crmFieldCount,
       },
       permissions: {
-        canManageWorkspace: canManageWorkspaceSettings(user.role),
-        canManageBilling: canManageWorkspaceSettings(user.role),
-        isPlatformSuperAdmin: isSuperAdmin(user.role),
+        canManageWorkspace: canManageWorkspaceSettings(user.role, user.email),
+        canManageBilling: canManageWorkspaceSettings(user.role, user.email),
+        isPlatformSuperAdmin: canViewFounderControls(user.role, user.email),
       },
     })
   } catch (error) {

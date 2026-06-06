@@ -11,7 +11,7 @@ export async function GET(request: Request) {
 
   try {
     const { org, user } = await requireAdminRequest(request)
-    const showFounderControls = canViewFounderControls(user.role)
+    const showFounderControls = canViewFounderControls(user.role, user.email)
 
     const [users, recentAuditEvents] = await Promise.all([
       prisma.user.findMany({

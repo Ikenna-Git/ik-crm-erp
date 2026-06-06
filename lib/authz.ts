@@ -8,14 +8,18 @@ export const isOrgOwner = (role?: string | null) => role === "ORG_OWNER"
 
 export const isAdmin = (role?: string | null) => role === "ADMIN" || role === "ORG_OWNER" || role === "SUPER_ADMIN"
 
-export const isSuperAdmin = (role?: string | null) => role === "SUPER_ADMIN"
-
-export const canViewFounderControls = (role?: string | null) => isSuperAdmin(role)
-
-export const canManageWorkspaceSettings = (role?: string | null) => role === "ORG_OWNER" || role === "SUPER_ADMIN"
+export const hasSuperAdminRole = (role?: string | null) => role === "SUPER_ADMIN"
 
 export const isFounderSuperAdminEmail = (email?: string | null) =>
   Boolean(email && email.trim().toLowerCase() === getFounderSuperAdminEmail())
+
+export const isSuperAdmin = (role?: string | null, email?: string | null) =>
+  hasSuperAdminRole(role) && isFounderSuperAdminEmail(email)
+
+export const canViewFounderControls = (role?: string | null, email?: string | null) => isSuperAdmin(role, email)
+
+export const canManageWorkspaceSettings = (role?: string | null, email?: string | null) =>
+  role === "ORG_OWNER" || isSuperAdmin(role, email)
 
 export const canAssignRole = ({
   actorRole,
@@ -44,7 +48,7 @@ export const canAssignRole = ({
     return false
   }
 
-  if (isSuperAdmin(actorRole)) {
+  if (isSuperAdmin(actorRole, actorEmail)) {
     return true
   }
 
@@ -74,13 +78,13 @@ export const canDeleteUser = ({
   if (targetUserId && actorUserId && targetUserId === actorUserId) return false
   if (isFounderSuperAdminEmail(targetEmail)) return false
   if (targetRole === "SUPER_ADMIN") return false
-  if (isSuperAdmin(actorRole)) return true
+  if (isSuperAdmin(actorRole, actorEmail)) return true
   if (actorRole === "ORG_OWNER") return targetRole === "USER" || targetRole === "ADMIN"
   return targetRole === "USER"
 }
 
-export const getAssignableRoles = (actorRole?: string | null): Role[] => {
-  if (isSuperAdmin(actorRole)) return ["USER", "ADMIN", "ORG_OWNER"]
+export const getAssignableRoles = (actorRole?: string | null, actorEmail?: string | null): Role[] => {
+  if (isSuperAdmin(actorRole, actorEmail)) return ["USER", "ADMIN", "ORG_OWNER"]
   if (actorRole === "ORG_OWNER") return ["USER", "ADMIN"]
   if (actorRole === "ADMIN") return ["USER"]
   return ["USER"]

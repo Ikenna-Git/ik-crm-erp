@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { addNotification } from "@/lib/notifications"
+import { canViewFounderControls, FOUNDER_SUPER_ADMIN_EMAIL } from "@/lib/authz"
 import {
   DEFAULT_NOTIFICATION_SETTINGS,
   DEFAULT_DIGEST_SETTINGS,
@@ -36,14 +37,12 @@ const aiProviders = [
 export default function SettingsPage() {
   const { data: session } = useSession()
   const actorRole = session?.user?.role
+  const actorHasFounderControls = canViewFounderControls(session?.user?.role, session?.user?.email)
+  const founderEmail = FOUNDER_SUPER_ADMIN_EMAIL
   const inviteRoles =
-    actorRole === "SUPER_ADMIN" ? ["user", "admin", "org_owner"] : actorRole === "ORG_OWNER" ? ["user", "admin"] : ["user"]
+    actorHasFounderControls ? ["user", "admin", "org_owner"] : actorRole === "ORG_OWNER" ? ["user", "admin"] : ["user"]
   const manageableRoles =
-    actorRole === "SUPER_ADMIN"
-      ? ["USER", "ADMIN", "ORG_OWNER", "SUPER_ADMIN"]
-      : actorRole === "ORG_OWNER"
-        ? ["USER", "ADMIN"]
-        : ["USER"]
+    actorHasFounderControls ? ["USER", "ADMIN", "ORG_OWNER"] : actorRole === "ORG_OWNER" ? ["USER", "ADMIN"] : ["USER"]
   const [profile, setProfile] = useState(() => seedProfileFromUser(session?.user))
 
   const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES)
@@ -884,9 +883,9 @@ export default function SettingsPage() {
                 <p className="text-sm text-muted-foreground">No team members yet.</p>
               )}
               {teamUsers.map((member) => {
-                const locked =
-                  (member.role === "SUPER_ADMIN" && session?.user?.role !== "SUPER_ADMIN") ||
-                  (member.role === "ORG_OWNER" && session?.user?.role !== "SUPER_ADMIN")
+                const isFounder = member.email?.toLowerCase?.() === founderEmail
+                const isLockedElevatedRole = member.role === "SUPER_ADMIN" && !isFounder
+                const locked = member.role === "SUPER_ADMIN" || (member.role === "ORG_OWNER" && !actorHasFounderControls)
                 return (
                   <div
                     key={member.id}
@@ -899,7 +898,11 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-2">
                       {(member.role === "SUPER_ADMIN" || member.role === "ORG_OWNER") && (
                         <Badge variant="outline" className="bg-transparent">
-                          {member.role === "SUPER_ADMIN" ? "Super Admin" : "Org Owner"}
+                          {member.role === "SUPER_ADMIN"
+                            ? isFounder
+                              ? "Founder"
+                              : "Locked elevated role"
+                            : "Org Owner"}
                         </Badge>
                       )}
                       <Select

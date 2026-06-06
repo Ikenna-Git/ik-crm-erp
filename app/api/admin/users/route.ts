@@ -69,7 +69,7 @@ export async function GET(request: Request) {
     })
     return NextResponse.json({
       users: users.map(mapAdminUser),
-      assignableRoles: getAssignableRoles(user.role),
+      assignableRoles: getAssignableRoles(user.role, user.email),
       accessProfiles: ACCESS_PROFILES,
     })
   } catch (error) {
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
     const title = String(body?.title || "").trim()
     const normalized = String(body?.role || "USER").trim().toUpperCase() as Role
     const accessProfile = normalizeAccessProfile(body?.accessProfile || getDefaultAccessProfileForRole(normalized))
-    const assignableRoles = getAssignableRoles(actor.role)
+    const assignableRoles = getAssignableRoles(actor.role, actor.email)
 
     if (!name || !email) {
       return NextResponse.json({ error: "name and email required" }, { status: 400 })
