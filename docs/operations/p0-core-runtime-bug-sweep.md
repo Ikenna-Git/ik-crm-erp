@@ -2,7 +2,7 @@
 
 Date: 2026-06-06  
 Branch: `p0-core-runtime-bug-sweep`  
-Primary scope: accounting approvals, accounting runtime, operations approvals, invite/admin regression, login/dashboard regression, env-backed failure states
+Primary scope: accounting approvals, accounting runtime, operations approvals, invite/admin regression, login/dashboard regression, env-backed failure states, browser-storage persistence audit
 
 ## Test Matrix
 
@@ -27,6 +27,11 @@ Primary scope: accounting approvals, accounting runtime, operations approvals, i
 | Org owner founder block | `/admin`, `/admin/system` | Org owner cannot see Founder Desk or system pages |  |  |  | UI and API must both block |  |  |
 | Org-scoped user list | `/admin/users`, `/api/admin/users` | Org owner sees same-org users only; founder user excluded |  |  |  | Validate after latest org-boundary fix |  |  |
 | Platform APIs blocked for org owner | `/api/admin/orgs`, `/api/admin/platform-status` | Non-founder gets forbidden/blocked |  |  |  | Recheck after latest boundary fix |  |  |
+| Operations integrations state | `/dashboard/operations` integrations tab | UI must not imply persisted connect/disconnect state without backend | Local toggle implied saved integration state before fix | Yes | Removed fake toggle persistence; UI now reports environment-backed setup only | Render env/provider is source of truth |  |  |
+| Saved report state | `/dashboard/operations` reports tab | UI must not imply report persistence without backend | Local saved report state before fix | Yes | Removed fake saved-report persistence; UI now shows explicit not-persisted notice | Do not treat this UI as source of truth |  |  |
+| Playbook launch/update persistence | `/dashboard/playbooks` | Launch/progress/pause reflect API-backed state only | Local fallback and fake optimistic state before fix | Yes | Removed local fallback and fake progression; state now updates only from API responses | Refresh must keep same run status |  |  |
+| Workspace settings persistence | `/dashboard/settings` workspace/security sections | UI must only report fields actually persisted | Local fake save state before fix | Yes | Workspace name now persists through `/api/admin/workspace`; non-persisted fields show explicit notice | Security toggles still require backend work before claiming persistence |  |  |
+| Browser identity mirror | dashboard layout/header/sidebar | Session identity must come from NextAuth/session, not local browser storage | Browser `localStorage("user")` was being treated as identity source | Yes | Removed local identity mirror writes and reads; header updates now follow session + in-memory event | Prevents stale browser-only identity drift |  |  |
 | SMTP missing-config behavior | invite/email actions | Missing SMTP config fails clearly, not silently |  |  |  | Message should explain config/admin action needed |  |  |
 | Cloudinary missing-config behavior | upload flows | Missing Cloudinary config fails clearly, not silently |  |  |  | No fake upload success |  |  |
 | Upstash missing-config behavior | auth/portal/rate-limited routes | Missing shared limiter fails safely with clear behavior |  |  |  | No fake “protected” state |  |  |
@@ -69,8 +74,13 @@ Primary scope: accounting approvals, accounting runtime, operations approvals, i
 ## Notes
 
 - Approval persistence in this branch is DB-backed through `AuditLog` entries plus source-record updates for expenses.
+- There is no dedicated `ApprovalRequest` Prisma model in the current schema. Approval workflow persistence currently relies on:
+  - `AuditLog` rows for approval request/decision history
+  - source-record status updates where applicable, such as `Expense.status`
+- The old browser-only approvals helper (`lib/approvals.ts`) has been removed from the runtime path and deleted.
 - Invoice approval state is distinct from invoice financial lifecycle status.
 - Expense approval decisions also update the `Expense.status` field so Operations counters and accounting views stay consistent.
+- Browser storage is now explicitly limited to UI-only behavior such as theme, onboarding progress, temporary local AI chat history, and access-code unlock flags. Core workflows must not depend on it.
 - Any live failure should record:
   - route/page
   - expected vs actual

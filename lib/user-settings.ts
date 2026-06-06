@@ -163,34 +163,20 @@ export const getSessionHeaders = (userOverride?: { email?: string | null; name?:
     if (userOverride.name) headers["x-user-name"] = userOverride.name
     return headers
   }
-  if (typeof window === "undefined") return {}
-  try {
-    const raw = localStorage.getItem("user")
-    if (!raw) return {}
-    const user = JSON.parse(raw)
-    const headers: Record<string, string> = {}
-    if (user?.email) headers["x-user-email"] = user.email
-    if (user?.name) headers["x-user-name"] = user.name
-    return headers
-  } catch {
-    return {}
-  }
+  return {}
 }
 
 export const syncLocalUser = (profile: UserProfile) => {
   if (typeof window === "undefined") return
   try {
-    const raw = localStorage.getItem("user")
-    const existing = raw ? JSON.parse(raw) : { role: "user" }
-    const next = {
-      ...existing,
-      name: profile.name || existing.name,
-      email: profile.email || existing.email,
-      accessProfile: existing.accessProfile || "GENERAL",
-      moduleAccess: existing.moduleAccess || null,
-    }
-    localStorage.setItem("user", JSON.stringify(next))
-    window.dispatchEvent(new CustomEvent(userUpdatedEventName, { detail: next }))
+    window.dispatchEvent(
+      new CustomEvent(userUpdatedEventName, {
+        detail: {
+          name: profile.name,
+          email: profile.email,
+        },
+      }),
+    )
   } catch {
     // ignore storage errors
   }

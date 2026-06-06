@@ -47,7 +47,6 @@ export default function DashboardLayout({
       accessProfile: session.user.accessProfile || "GENERAL",
       moduleAccess: session.user.moduleAccess || null,
     }
-    localStorage.setItem("user", JSON.stringify(payload))
     window.dispatchEvent(new CustomEvent(userUpdatedEventName, { detail: payload }))
   }, [session])
 

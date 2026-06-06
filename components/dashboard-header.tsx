@@ -2,30 +2,19 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Bell, User, Sparkles } from "lucide-react"
+import { User, Sparkles } from "lucide-react"
+import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { NotificationCenter } from "@/components/notification-center"
 import { UnifiedSearch } from "@/components/unified-search"
-import {
-  clearNotifications,
-  getNotifications,
-  markAllNotificationsRead,
-  markNotificationRead,
-  notificationsEventName,
-  type NotificationItem,
-} from "@/lib/notifications"
 import { userUpdatedEventName } from "@/lib/user-settings"
 
 export function DashboardHeader() {
+  const { data: session } = useSession()
   const [userName, setUserName] = useState("")
   const [timestamp, setTimestamp] = useState("")
-  const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [online, setOnline] = useState(true)
-
-  const unreadCount = notifications.filter((item) => !item.read).length
 
   const formatTimestamp = (value: string) => {
     const date = new Date(value)
@@ -33,45 +22,23 @@ export function DashboardHeader() {
   }
 
   useEffect(() => {
-    const loadUser = () => {
-      try {
-        const raw = localStorage.getItem("user")
-        if (!raw) {
-          setUserName("User")
-          return
-        }
-        const parsed = JSON.parse(raw)
-        const fallback = parsed?.email ? parsed.email.split("@")[0] : "User"
-        setUserName(parsed?.name || fallback)
-      } catch {
-        setUserName("User")
-      }
+    const setFromUser = (user?: { name?: string | null; email?: string | null }) => {
+      const fallback = user?.email ? user.email.split("@")[0] : "User"
+      setUserName(user?.name || fallback)
     }
-    loadUser()
-    window.addEventListener(userUpdatedEventName, loadUser)
-    window.addEventListener("storage", loadUser)
-    return () => {
-      window.removeEventListener(userUpdatedEventName, loadUser)
-      window.removeEventListener("storage", loadUser)
-    }
-  }, [])
 
-  useEffect(() => {
-    const refreshNotifications = async () => {
-      const items = await getNotifications()
-      setNotifications(items)
+    setFromUser(session?.user)
+
+    const handleUserUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<{ name?: string; email?: string }>).detail
+      setFromUser(detail)
     }
-    refreshNotifications()
-    const handleUpdate = () => {
-      refreshNotifications()
-    }
-    window.addEventListener(notificationsEventName, handleUpdate)
-    window.addEventListener("storage", handleUpdate)
+
+    window.addEventListener(userUpdatedEventName, handleUserUpdate)
     return () => {
-      window.removeEventListener(notificationsEventName, handleUpdate)
-      window.removeEventListener("storage", handleUpdate)
+      window.removeEventListener(userUpdatedEventName, handleUserUpdate)
     }
-  }, [])
+  }, [session?.user])
 
   useEffect(() => {
     const updateClock = () => {

@@ -16,7 +16,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { addApprovalRequest } from "@/lib/approvals"
 
 export interface PayrollRecord {
   id: string
@@ -213,13 +212,7 @@ export function PayrollTable({
   }
 
   const requestApproval = (record: PayrollRecord) => {
-    addApprovalRequest({
-      request: `Payroll ${record.period}`,
-      owner: "HR",
-      amount: formatNaira(record.netPay),
-      module: "HR",
-    })
-    alert("Approval requested. Review it in Operations → Approvals.")
+    alert(`Payroll approval for ${record.period} is not persisted yet in this release. Do not use this action as a source of truth.`)
   }
 
   const handleDeletePayroll = (id: string) => {

@@ -70,6 +70,14 @@ export async function PATCH(request: Request) {
     const safeStatus =
       normalizedStatus && ["ACTIVE", "PAUSED", "COMPLETED"].includes(normalizedStatus) ? normalizedStatus : undefined
 
+    const existing = await prisma.playbookRun.findFirst({
+      where: { id, orgId: org.id },
+      select: { id: true },
+    })
+    if (!existing) {
+      return NextResponse.json({ error: "Playbook run not found in this workspace" }, { status: 404 })
+    }
+
     const run = await prisma.playbookRun.update({
       where: { id },
       data: {

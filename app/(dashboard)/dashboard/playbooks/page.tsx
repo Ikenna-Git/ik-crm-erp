@@ -87,31 +87,8 @@ const templates: PlaybookTemplate[] = [
   },
 ]
 
-const runSeed: PlaybookRun[] = [
-  {
-    id: "run-1",
-    templateId: "tpl-2",
-    name: "January Close",
-    category: "Accounting",
-    status: "Active",
-    progress: 45,
-    startedAt: "3 days ago",
-  },
-  {
-    id: "run-2",
-    templateId: "tpl-1",
-    name: "Q1 Pipeline Launch",
-    category: "CRM",
-    status: "Paused",
-    progress: 20,
-    startedAt: "Last week",
-  },
-]
-
-const STORAGE_KEY = "civis_playbook_runs"
-
 export default function PlaybooksPage() {
-  const [runs, setRuns] = useState<PlaybookRun[]>(runSeed)
+  const [runs, setRuns] = useState<PlaybookRun[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<PlaybookTemplate | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -142,31 +119,13 @@ export default function PlaybooksPage() {
         }
       } catch (err: any) {
         setError(err?.message || "Failed to load playbooks")
-        if (typeof window !== "undefined") {
-          try {
-            const stored = localStorage.getItem(STORAGE_KEY)
-            if (stored) {
-              const parsed = JSON.parse(stored)
-              if (Array.isArray(parsed)) {
-                setRuns(parsed)
-                return
-              }
-            }
-          } catch {
-            setRuns(runSeed)
-          }
-        }
+        setRuns([])
       } finally {
         setLoading(false)
       }
     }
     loadRuns()
   }, [])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(runs))
-  }, [runs])
 
   useEffect(() => {
     if (!dialogOpen) {
@@ -202,18 +161,6 @@ export default function PlaybooksPage() {
       ])
     } catch (err: any) {
       setError(err?.message || "Failed to launch playbook")
-      setRuns((prev) => [
-        {
-          id: `run-${Date.now()}`,
-          templateId: template.id,
-          name: template.name,
-          category: template.category,
-          status: "Active",
-          progress: 10,
-          startedAt: "Just now",
-        },
-        ...prev,
-      ])
     }
   }
 
@@ -222,38 +169,53 @@ export default function PlaybooksPage() {
     if (!target) return
     const nextProgress = Math.min(target.progress + 20, 100)
     const nextStatus = nextProgress >= 100 ? "COMPLETED" : target.status.toUpperCase()
-    setRuns((prev) =>
-      prev.map((run) =>
-        run.id === id
-          ? {
-              ...run,
-              progress: nextProgress,
-              status: nextProgress >= 100 ? "Completed" : run.status,
-            }
-          : run,
-      ),
-    )
     try {
-      await fetch("/api/playbooks", {
+      setError("")
+      const res = await fetch("/api/playbooks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
         body: JSON.stringify({ id, progress: nextProgress, status: nextStatus }),
       })
-    } catch {
-      // keep optimistic update
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to update playbook")
+      setRuns((prev) =>
+        prev.map((run) =>
+          run.id === id
+            ? {
+                ...run,
+                progress: data.run.progress,
+                status: data.run.status?.charAt(0) + data.run.status?.slice(1).toLowerCase(),
+              }
+            : run,
+        ),
+      )
+    } catch (err: any) {
+      setError(err?.message || "Failed to update playbook")
     }
   }
 
   const pauseRun = async (id: string) => {
-    setRuns((prev) => prev.map((run) => (run.id === id ? { ...run, status: "Paused" } : run)))
     try {
-      await fetch("/api/playbooks", {
+      setError("")
+      const res = await fetch("/api/playbooks", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
         body: JSON.stringify({ id, status: "PAUSED" }),
       })
-    } catch {
-      // keep optimistic update
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to update playbook")
+      setRuns((prev) =>
+        prev.map((run) =>
+          run.id === id
+            ? {
+                ...run,
+                status: data.run.status?.charAt(0) + data.run.status?.slice(1).toLowerCase(),
+              }
+            : run,
+        ),
+      )
+    } catch (err: any) {
+      setError(err?.message || "Failed to update playbook")
     }
   }
 
