@@ -54,6 +54,8 @@ export default function SettingsPage() {
   const [error, setError] = useState("")
   const [digestStatus, setDigestStatus] = useState("")
   const [digestSaving, setDigestSaving] = useState(false)
+  const [securityStatus, setSecurityStatus] = useState("")
+  const [orgStatus, setOrgStatus] = useState("")
 
   const [security, setSecurity] = useState({
     twoFactor: true,
@@ -90,11 +92,6 @@ export default function SettingsPage() {
 
   const [showPasswords, setShowPasswords] = useState(false)
 
-  const storageKeys = {
-    security: "civis_settings_security",
-    org: "civis_settings_org",
-  }
-
   useEffect(() => {
     if (!session?.user) return
     setProfile((current) => ({
@@ -105,15 +102,6 @@ export default function SettingsPage() {
   }, [session?.user?.email, session?.user?.name])
 
   useEffect(() => {
-    if (typeof window === "undefined") return
-    const load = (key: string, setter: (v: any) => void) => {
-      try {
-        const raw = localStorage.getItem(key)
-        if (raw) setter(JSON.parse(raw))
-      } catch (err) {
-        console.warn("Failed to load settings", err)
-      }
-    }
     const loadUserSettings = async () => {
       try {
         setLoading(true)
@@ -140,9 +128,29 @@ export default function SettingsPage() {
       }
     }
     loadUserSettings()
-    load(storageKeys.security, setSecurity)
-    load(storageKeys.org, setOrg)
   }, [])
+
+  useEffect(() => {
+    const loadWorkspace = async () => {
+      if (!session?.user?.role) return
+      if (!["SUPER_ADMIN", "ORG_OWNER", "ADMIN"].includes(session.user.role)) return
+      try {
+        const res = await fetch("/api/admin/workspace", {
+          headers: { ...getSessionHeaders(session?.user) },
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data?.error || "Failed to load workspace")
+        setOrg((current) => ({
+          ...current,
+          name: data?.org?.name || current.name,
+          currency: data?.org?.currency || current.currency,
+        }))
+      } catch (err: any) {
+        setOrgStatus(err?.message || "Failed to load workspace settings")
+      }
+    }
+    loadWorkspace()
+  }, [session])
 
   useEffect(() => {
     const loadTeam = async () => {
@@ -167,15 +175,6 @@ export default function SettingsPage() {
     }
     loadTeam()
   }, [session])
-
-  const persist = (key: string, value: any) => {
-    if (typeof window === "undefined") return
-    try {
-      localStorage.setItem(key, JSON.stringify(value))
-    } catch (err) {
-      console.warn("Failed to save settings", err)
-    }
-  }
 
   const pushChangeNotification = async (title: string, description: string, emailOptIn = notifications.email) => {
     await addNotification({
@@ -296,13 +295,28 @@ export default function SettingsPage() {
   }
 
   const handleSecuritySave = () => {
-    persist(storageKeys.security, security)
-    pushChangeNotification("Security updated", "Security settings saved.")
+    setSecurityStatus("These security toggles are not persisted in this release. Use password change and the 2FA setup flow instead.")
   }
 
   const handleOrgSave = () => {
-    persist(storageKeys.org, org)
-    pushChangeNotification("Organization updated", "Organization settings saved.")
+    const update = async () => {
+      try {
+        setOrgStatus("")
+        const res = await fetch("/api/admin/workspace", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", ...getSessionHeaders(session?.user) },
+          body: JSON.stringify({ name: org.name }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data?.error || "Failed to update organization")
+        setOrg((current) => ({ ...current, name: data?.org?.name || current.name }))
+        setOrgStatus("Workspace name saved. Industry, base currency, and fiscal year fields are not persisted in this release.")
+        await pushChangeNotification("Organization updated", "Workspace name updated.")
+      } catch (err: any) {
+        setOrgStatus(err?.message || "Failed to update organization")
+      }
+    }
+    update()
   }
 
   const handleInvite = async () => {
@@ -514,6 +528,7 @@ export default function SettingsPage() {
                   </Button>
                 </div>
               </div>
+              {securityStatus ? <p className="text-xs text-muted-foreground">{securityStatus}</p> : null}
               <Separator />
               <div className="grid gap-4 md:grid-cols-4 md:items-end">
                 <div className="md:col-span-3 grid gap-4 md:grid-cols-3">
@@ -836,6 +851,7 @@ export default function SettingsPage() {
               <Button className="w-fit" onClick={handleOrgSave}>
                 Save organization
               </Button>
+              {orgStatus ? <p className="text-xs text-muted-foreground">{orgStatus}</p> : null}
 
               <Separator />
               <div className="space-y-2">

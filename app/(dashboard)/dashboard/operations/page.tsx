@@ -9,11 +9,23 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Plus, CheckSquare, Lock, Globe, FileText, DownloadCloud, AlertTriangle, Link2, Copy } from "lucide-react"
-import { ApprovalRequest, approvalsStorageKey, getApprovals } from "@/lib/approvals"
 import { getSessionHeaders } from "@/lib/user-settings"
 import { useSession } from "next-auth/react"
 import { useCachedFetch } from "@/hooks/use-cached-fetch"
 import { formatNaira } from "@/lib/currency"
+
+type ApprovalItem = {
+  id: string
+  sourceType: "invoice" | "expense"
+  sourceId: string
+  request: string
+  owner: string
+  amount: number
+  status: "pending" | "approved" | "rejected"
+  sourceStatus?: string | null
+  createdAt: string
+  updatedAt: string
+}
 
 const timelineSeed = [
   { id: "t1", title: "Invoice INV-2025-014 paid", detail: "Acme Corp • ₦1,250,000", time: "2 hours ago", type: "finance" },
@@ -32,36 +44,6 @@ const workflowRunsSeed = [
   { id: "run-1", name: "Overdue invoice reminder", status: "Success", owner: "Finance Bot", time: "Today 09:15" },
   { id: "run-2", name: "Low stock reorder", status: "Queued", owner: "Inventory Bot", time: "Yesterday 18:02" },
   { id: "run-3", name: "New hire onboarding", status: "Paused", owner: "HR Ops", time: "Yesterday 09:40" },
-]
-
-const approvalsSeed: ApprovalRequest[] = [
-  {
-    id: "a1",
-    request: "Payroll January",
-    owner: "HR",
-    amount: "₦3,500,000",
-    status: "pending",
-    module: "HR",
-    createdAt: "2025-01-10T09:00:00Z",
-  },
-  {
-    id: "a2",
-    request: "Purchase order PO-2025-011",
-    owner: "Procurement",
-    amount: "₦850,000",
-    status: "pending",
-    module: "Inventory",
-    createdAt: "2025-01-11T11:30:00Z",
-  },
-  {
-    id: "a3",
-    request: "Expense reimbursement",
-    owner: "Finance",
-    amount: "₦120,000",
-    status: "approved",
-    module: "Accounting",
-    createdAt: "2025-01-09T16:45:00Z",
-  },
 ]
 
 const integrationsSeed = [
@@ -177,31 +159,6 @@ const compliancePack = [
   },
 ]
 
-const reportsSeed = [
-  {
-    id: "r1",
-    name: "Monthly payroll summary",
-    dataset: "HR",
-    metrics: "Payroll costs",
-    groupBy: "Month",
-    schedule: "Monthly",
-    notes: "Send to CFO and HR lead",
-    owner: "HR",
-    lastRun: "Not run yet",
-  },
-  {
-    id: "r2",
-    name: "Sales pipeline conversion",
-    dataset: "CRM",
-    metrics: "Win rate",
-    groupBy: "Stage",
-    schedule: "Weekly",
-    notes: "",
-    owner: "CRM",
-    lastRun: "Not run yet",
-  },
-]
-
 const emptyCommand = {
   stats: {
     contacts: 0,
@@ -217,14 +174,6 @@ const emptyCommand = {
   recentActivity: [],
 }
 
-const STORAGE = {
-  workflows: "civis_ops_workflows",
-  integrations: "civis_ops_integrations",
-  reports: "civis_ops_reports",
-  approvals: approvalsStorageKey,
-  webhooks: "civis_ops_webhooks",
-}
-
 const approvalStatusStyles: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-500/20 dark:text-yellow-200 dark:border-yellow-500/40",
   approved: "bg-green-100 text-green-800 border-green-200 dark:bg-green-500/20 dark:text-green-200 dark:border-green-500/40",
@@ -237,8 +186,13 @@ export default function OperationsPage() {
   const canManage = role === "ORG_OWNER" || role === "ADMIN" || role === "SUPER_ADMIN"
   const [workflows, setWorkflows] = useState<typeof workflowSeed>([])
   const [workflowError, setWorkflowError] = useState("")
-  const [approvals, setApprovals] = useState<ApprovalRequest[]>([])
+  const [approvals, setApprovals] = useState<ApprovalItem[]>([])
+  const [approvalsLoading, setApprovalsLoading] = useState(false)
+  const [approvalError, setApprovalError] = useState("")
+  const [approvalNotice, setApprovalNotice] = useState("")
+  const [approvalBusy, setApprovalBusy] = useState("")
   const [integrations, setIntegrations] = useState(integrationsSeed)
+  const [integrationNotice, setIntegrationNotice] = useState("")
   const [insights, setInsights] = useState<typeof insightsSeed>([])
   const [auditLogs, setAuditLogs] = useState<typeof auditSeed>([])
   const [auditLoading, setAuditLoading] = useState(false)
@@ -248,7 +202,7 @@ export default function OperationsPage() {
   const [decisionError, setDecisionError] = useState("")
   const [rollbackBusy, setRollbackBusy] = useState("")
   const [compliance, setCompliance] = useState<typeof complianceSeed>([])
-  const [reports, setReports] = useState<typeof reportsSeed>([])
+  const [reportsNotice, setReportsNotice] = useState("")
   const [webhooks, setWebhooks] = useState<typeof webhookSeed>([])
   const [webhookError, setWebhookError] = useState("")
 
@@ -294,49 +248,6 @@ export default function OperationsPage() {
   })
 
   useEffect(() => {
-    if (typeof window === "undefined") return
-    localStorage.removeItem(STORAGE.workflows)
-    localStorage.removeItem(STORAGE.reports)
-    localStorage.removeItem(STORAGE.webhooks)
-    localStorage.removeItem(STORAGE.approvals)
-    const load = <T,>(key: string, fallback: T, setter: (value: T) => void) => {
-      try {
-        const stored = localStorage.getItem(key)
-        if (stored) {
-          setter(JSON.parse(stored))
-          return
-        }
-        localStorage.setItem(key, JSON.stringify(fallback))
-      } catch {
-        setter(fallback)
-      }
-    }
-    load(STORAGE.workflows, [], setWorkflows)
-    load(STORAGE.reports, [], setReports)
-    load(STORAGE.webhooks, [], setWebhooks)
-    setApprovals(getApprovals([]))
-
-    try {
-      const stored = localStorage.getItem(STORAGE.integrations)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed)) {
-          const merged = [
-            ...parsed,
-            ...integrationsSeed.filter((seed) => !parsed.some((item: { id: string }) => item.id === seed.id)),
-          ]
-          setIntegrations(merged)
-          localStorage.setItem(STORAGE.integrations, JSON.stringify(merged))
-          return
-        }
-      }
-      localStorage.setItem(STORAGE.integrations, JSON.stringify(integrationsSeed))
-    } catch {
-      setIntegrations(integrationsSeed)
-    }
-  }, [])
-
-  useEffect(() => {
     const loadWorkflows = async () => {
       try {
         setWorkflowError("")
@@ -357,6 +268,31 @@ export default function OperationsPage() {
       }
     }
     loadWorkflows()
+  }, [])
+
+  useEffect(() => {
+    const loadApprovals = async () => {
+      try {
+        setApprovalsLoading(true)
+        setApprovalError("")
+        const res = await fetch("/api/ops/approvals", { headers: { ...getSessionHeaders() } })
+        if (res.status === 503) {
+          setApprovalError("Approvals are unavailable until the database is connected.")
+          setApprovals([])
+          return
+        }
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data?.error || "Failed to load approvals")
+        setApprovals(Array.isArray(data?.approvals) ? data.approvals : [])
+      } catch (err: any) {
+        console.warn("Approvals load failed", err)
+        setApprovalError(err?.message || "Failed to load approvals")
+        setApprovals([])
+      } finally {
+        setApprovalsLoading(false)
+      }
+    }
+    loadApprovals()
   }, [])
 
   useEffect(() => {
@@ -454,31 +390,6 @@ export default function OperationsPage() {
     loadDecisionTrails()
   }, [])
 
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    localStorage.setItem(STORAGE.workflows, JSON.stringify(workflows))
-  }, [workflows])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    localStorage.setItem(STORAGE.integrations, JSON.stringify(integrations))
-  }, [integrations])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    localStorage.setItem(STORAGE.reports, JSON.stringify(reports))
-  }, [reports])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    localStorage.setItem(STORAGE.approvals, JSON.stringify(approvals))
-  }, [approvals])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    localStorage.setItem(STORAGE.webhooks, JSON.stringify(webhooks))
-  }, [webhooks])
-
   const addWorkflow = async () => {
     if (!canManage) return
     const name = workflowForm.name.trim()
@@ -523,14 +434,45 @@ export default function OperationsPage() {
     }
   }
 
-  const updateApproval = (id: string, status: "approved" | "rejected") => {
+  const updateApproval = async (approval: ApprovalItem, status: "approved" | "rejected") => {
     if (!canManage) return
-    setApprovals((prev) => prev.map((ap) => (ap.id === id ? { ...ap, status } : ap)))
+    try {
+      setApprovalBusy(approval.id)
+      setApprovalError("")
+      setApprovalNotice("")
+      const res = await fetch("/api/ops/approvals", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({
+          sourceType: approval.sourceType,
+          sourceId: approval.sourceId,
+          decision: status,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to update approval")
+      setApprovals((prev) =>
+        prev.map((item) =>
+          item.id === approval.id
+            ? {
+                ...item,
+                ...data.approval,
+              }
+            : item,
+        ),
+      )
+      setApprovalNotice(`${approval.request} marked as ${status}.`)
+    } catch (err: any) {
+      console.warn("Approval update failed", err)
+      setApprovalError(err?.message || "Failed to update approval")
+    } finally {
+      setApprovalBusy("")
+    }
   }
 
   const toggleIntegration = (id: string) => {
     if (!canManage) return
-    setIntegrations((prev) => prev.map((intg) => (intg.id === id ? { ...intg, connected: !intg.connected } : intg)))
+    setIntegrationNotice("Integration connection status is managed outside this UI. Use provider setup or environment configuration.")
   }
 
   const addWebhook = async () => {
@@ -593,27 +535,7 @@ export default function OperationsPage() {
 
   const saveReport = () => {
     if (!canManage) return
-    if (!reportForm.name) return
-    setReports((prev) => [
-      {
-        id: `r-${Date.now()}`,
-        name: reportForm.name,
-        dataset: reportForm.dataset,
-        metrics: reportForm.metrics,
-        groupBy: reportForm.groupBy,
-        schedule: reportForm.schedule,
-        notes: reportForm.notes,
-        owner: reportForm.dataset,
-        lastRun: "Not run yet",
-      },
-      ...prev,
-    ])
-    setReportForm({ name: "", dataset: "CRM", metrics: "Revenue", groupBy: "Month", schedule: "Monthly", notes: "" })
-  }
-
-  const runReport = (id: string) => {
-    const timestamp = new Date().toLocaleString()
-    setReports((prev) => prev.map((report) => (report.id === id ? { ...report, lastRun: timestamp } : report)))
+    setReportsNotice("Saved custom reports are not persisted yet in this release. Use the existing export flows instead.")
   }
 
   const rollbackDecision = async (id: string) => {
@@ -836,46 +758,55 @@ export default function OperationsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Approvals</CardTitle>
-              <CardDescription>Review and approve critical actions.</CardDescription>
+              <CardDescription>Review and approve critical accounting actions persisted in the database.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {approvals.map((ap) => (
-                <div key={ap.id} className="flex items-center justify-between border-b border-border pb-4 last:border-0">
-                  <div>
-                    <p className="font-medium">{ap.request}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {ap.owner} • {ap.amount} • {ap.module}
-                    </p>
+              {approvalError ? <p className="text-xs text-destructive">{approvalError}</p> : null}
+              {approvalNotice ? <p className="text-xs text-primary">{approvalNotice}</p> : null}
+              {approvalsLoading ? (
+                <p className="text-sm text-muted-foreground">Loading approvals...</p>
+              ) : approvals.length ? (
+                approvals.map((ap) => (
+                  <div key={ap.id} className="flex items-center justify-between border-b border-border pb-4 last:border-0">
+                    <div>
+                      <p className="font-medium">{ap.request}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {ap.owner} • {formatNaira(ap.amount)} • {ap.sourceType}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className={approvalStatusStyles[ap.status]}>
+                        {ap.status}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        className="bg-green-600 text-white hover:bg-green-700"
+                        onClick={() => updateApproval(ap, "approved")}
+                        disabled={!canManage || approvalBusy === ap.id}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-red-500 text-red-600 hover:bg-red-50 dark:border-red-500/70 dark:text-red-300 dark:hover:bg-red-950/30"
+                        onClick={() => updateApproval(ap, "rejected")}
+                        disabled={!canManage || approvalBusy === ap.id}
+                      >
+                        Reject
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className={approvalStatusStyles[ap.status]}>
-                      {ap.status}
-                    </Badge>
-                    <Button
-                      size="sm"
-                      className="bg-green-600 text-white hover:bg-green-700"
-                      onClick={() => updateApproval(ap.id, "approved")}
-                      disabled={!canManage}
-                    >
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-red-500 text-red-600 hover:bg-red-50 dark:border-red-500/70 dark:text-red-300 dark:hover:bg-red-950/30"
-                      onClick={() => updateApproval(ap.id, "rejected")}
-                      disabled={!canManage}
-                    >
-                      Reject
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">No approval requests yet for this workspace.</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="integrations" className="space-y-4">
+          {integrationNotice ? <p className="text-xs text-muted-foreground">{integrationNotice}</p> : null}
           <div className="grid md:grid-cols-2 gap-4">
             {integrations.map((intg) => (
               <Card key={intg.id}>
@@ -885,8 +816,8 @@ export default function OperationsPage() {
                     <p className="text-sm text-muted-foreground">{intg.category}</p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Badge variant="outline" className={intg.connected ? "text-green-600" : "text-muted-foreground"}>
-                      {intg.connected ? "Connected" : "Not connected"}
+                    <Badge variant="outline" className="text-muted-foreground">
+                      Environment-backed
                     </Badge>
                     <Button
                       variant="outline"
@@ -894,7 +825,7 @@ export default function OperationsPage() {
                       onClick={() => toggleIntegration(intg.id)}
                       disabled={!canManage}
                     >
-                      {intg.connected ? "Disconnect" : "Connect"}
+                      Setup outside UI
                     </Button>
                   </div>
                 </CardContent>
@@ -1036,7 +967,7 @@ export default function OperationsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Custom Report Builder</CardTitle>
-              <CardDescription>Select data, metrics, and schedule delivery.</CardDescription>
+              <CardDescription>Select data and metrics. Saved custom reports are not persisted in this release.</CardDescription>
             </CardHeader>
             <CardContent className="grid md:grid-cols-2 gap-4">
               <Input
@@ -1072,29 +1003,19 @@ export default function OperationsPage() {
               <Button className="w-fit" onClick={saveReport} disabled={!canManage}>
                 Save Report
               </Button>
+              {reportsNotice ? <p className="text-xs text-muted-foreground md:col-span-2">{reportsNotice}</p> : null}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
               <CardTitle>Saved Reports</CardTitle>
-              <CardDescription>Scheduled or on-demand reports.</CardDescription>
+              <CardDescription>No persisted saved-report backend is wired in this release.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {reports.map((report) => (
-                <div key={report.id} className="flex items-center justify-between border-b border-border pb-3 last:border-0">
-                  <div>
-                    <p className="font-medium">{report.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {report.dataset || report.owner} • {report.metrics || "Metrics"} • {report.groupBy || "Group"} • {report.schedule}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">Last run: {report.lastRun || "Not run yet"}</p>
-                  </div>
-                  <Button size="sm" variant="outline" className="bg-transparent" onClick={() => runReport(report.id)}>
-                    Run
-                  </Button>
-                </div>
-              ))}
+              <p className="text-sm text-muted-foreground">
+                Use the export actions in Accounting, CRM, Analytics, or Compliance instead of browser-saved report definitions.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>

@@ -15,7 +15,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { addApprovalRequest } from "@/lib/approvals"
 
 export interface Expense {
   id: string
@@ -24,6 +23,7 @@ export interface Expense {
   amount: number
   date?: string
   status?: "approved" | "pending" | "rejected"
+  approvalStatus?: "pending" | "approved" | "rejected" | null
   submittedBy?: string
 }
 
@@ -65,6 +65,7 @@ type Props = {
   onAddExpense?: (data: Omit<Expense, "id">) => void
   onUpdateExpense?: (id: string, data: Partial<Expense>) => void
   onDeleteExpense?: (id: string) => void
+  onRequestApproval?: (expense: Expense) => Promise<void> | void
   showAmounts?: boolean
 }
 
@@ -81,7 +82,9 @@ export function ExpensesTable({
   searchQuery,
   expenses: providedExpenses,
   onAddExpense,
+  onUpdateExpense,
   onDeleteExpense,
+  onRequestApproval,
   showAmounts = true,
 }: Props) {
   const [expenses, setExpenses] = useState<Expense[]>(providedExpenses ?? [])
@@ -123,8 +126,12 @@ export function ExpensesTable({
   }, [currentPage, totalPages])
 
   const stats = {
-    approved: expenses.filter((e) => e.status === "approved").reduce((sum, e) => sum + safeAmount(e.amount), 0),
-    pending: expenses.filter((e) => e.status === "pending").reduce((sum, e) => sum + safeAmount(e.amount), 0),
+    approved: expenses
+      .filter((e) => (e.approvalStatus || e.status || "pending") === "approved")
+      .reduce((sum, e) => sum + safeAmount(e.amount), 0),
+    pending: expenses
+      .filter((e) => (e.approvalStatus || e.status || "pending") === "pending")
+      .reduce((sum, e) => sum + safeAmount(e.amount), 0),
   }
 
   const handleAddExpense = (e: React.FormEvent) => {
@@ -193,13 +200,7 @@ export function ExpensesTable({
   }
 
   const requestApproval = (expense: Expense) => {
-    addApprovalRequest({
-      request: `Expense: ${expense.description}`,
-      owner: expense.submittedBy || "Finance",
-      amount: formatNaira(safeAmount(expense.amount)),
-      module: "Accounting",
-    })
-    alert("Approval requested. Review it in Operations → Approvals.")
+    onRequestApproval?.(expense)
   }
 
   return (
@@ -257,60 +258,63 @@ export function ExpensesTable({
                 </tr>
               </thead>
               <tbody>
-                {pagedExpenses.map((expense) => (
-                  <tr key={expense.id} className="border-b border-border hover:bg-muted/50 transition">
-                    <td className="py-4 px-4">
-                      <div>
-                        <p className="font-medium">{expense.description}</p>
-                        <p className="text-xs text-muted-foreground">{expense.submittedBy || "—"}</p>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${categoryColors[expense.category] || "bg-gray-100 text-gray-800 dark:bg-slate-700/40 dark:text-slate-200"}`}
-                      >
-                        {expense.category}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 font-semibold">{showAmounts ? formatNaira(expense.amount) : "••••"}</td>
-                    <td className="py-4 px-4">
-                      <Badge variant="outline" className={statusColors[expense.status || "pending"]}>
-                        {expense.status || "pending"}
-                      </Badge>
-                    </td>
-                    <td className="py-4 px-4 text-muted-foreground">{expense.date || "—"}</td>
-                    <td className="py-4 px-4">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="p-2">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => alert(JSON.stringify(expense, null, 2))}>
-                            <Eye className="w-4 h-4 mr-2" />
-                            View details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditExpense(expense)}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => requestApproval(expense)}>
-                            <CheckSquare className="w-4 h-4 mr-2" />
-                            Request approval
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => handleDeleteExpense(expense.id)}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                ))}
+                {pagedExpenses.map((expense) => {
+                  const displayStatus = expense.approvalStatus || expense.status || "pending"
+                  return (
+                    <tr key={expense.id} className="border-b border-border hover:bg-muted/50 transition">
+                      <td className="py-4 px-4">
+                        <div>
+                          <p className="font-medium">{expense.description}</p>
+                          <p className="text-xs text-muted-foreground">{expense.submittedBy || "—"}</p>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${categoryColors[expense.category] || "bg-gray-100 text-gray-800 dark:bg-slate-700/40 dark:text-slate-200"}`}
+                        >
+                          {expense.category}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 font-semibold">{showAmounts ? formatNaira(expense.amount) : "••••"}</td>
+                      <td className="py-4 px-4">
+                        <Badge variant="outline" className={statusColors[displayStatus]}>
+                          {displayStatus}
+                        </Badge>
+                      </td>
+                      <td className="py-4 px-4 text-muted-foreground">{expense.date || "—"}</td>
+                      <td className="py-4 px-4">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="p-2">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => alert(JSON.stringify(expense, null, 2))}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              View details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditExpense(expense)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => requestApproval(expense)}>
+                              <CheckSquare className="w-4 h-4 mr-2" />
+                              Request approval
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => handleDeleteExpense(expense.id)}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

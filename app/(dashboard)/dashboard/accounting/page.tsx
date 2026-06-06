@@ -197,6 +197,10 @@ export default function AccountingPage() {
     client: safeString(inv?.clientName, "Unknown client"),
     amount: safeNumber(inv?.amount),
     status: String(inv?.status || "DRAFT").toLowerCase() as Invoice["status"],
+    approvalStatus:
+      inv?.approvalStatus === "pending" || inv?.approvalStatus === "approved" || inv?.approvalStatus === "rejected"
+        ? inv.approvalStatus
+        : null,
     date: safeDateString(inv?.issueDate) || safeDateString(inv?.createdAt),
     dueDate: safeDateString(inv?.dueDate),
   })
@@ -208,6 +212,10 @@ export default function AccountingPage() {
     amount: safeNumber(exp?.amount),
     date: safeDateString(exp?.date),
     status: String(exp?.status || "PENDING").toLowerCase() as Expense["status"],
+    approvalStatus:
+      exp?.approvalStatus === "pending" || exp?.approvalStatus === "approved" || exp?.approvalStatus === "rejected"
+        ? exp.approvalStatus
+        : null,
     submittedBy: safeString(exp?.submittedBy, "System"),
   })
 
@@ -500,6 +508,62 @@ export default function AccountingPage() {
     }
   }
 
+  const requestApproval = async (sourceType: "invoice" | "expense", sourceId: string) => {
+    const res = await fetch("/api/ops/approvals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+      body: JSON.stringify({ sourceType, sourceId }),
+    })
+    const data = await parseJsonSafe(res)
+    if (!res.ok) {
+      throw new Error(data?.error || "Failed to request approval")
+    }
+    return data?.approval || null
+  }
+
+  const handleRequestInvoiceApproval = async (invoice: Invoice) => {
+    try {
+      setError("")
+      setImportNotice("")
+      const approval = await requestApproval("invoice", invoice.id)
+      setInvoices((prev) =>
+        prev.map((item) =>
+          item.id === invoice.id
+            ? {
+                ...item,
+                approvalStatus: approval?.status || "pending",
+              }
+            : item,
+        ),
+      )
+      setImportNotice(`Approval requested for ${invoice.number}. Review it in Operations → Approvals.`)
+    } catch (err: any) {
+      setError(err?.message || "Failed to request invoice approval")
+    }
+  }
+
+  const handleRequestExpenseApproval = async (expense: Expense) => {
+    try {
+      setError("")
+      setImportNotice("")
+      const approval = await requestApproval("expense", expense.id)
+      setExpenses((prev) =>
+        prev.map((item) =>
+          item.id === expense.id
+            ? {
+                ...item,
+                approvalStatus: approval?.status || "pending",
+                status: approval?.status === "approved" || approval?.status === "rejected" ? approval.status : item.status,
+              }
+            : item,
+        ),
+      )
+      setImportNotice(`Approval requested for ${expense.description}. Review it in Operations → Approvals.`)
+    } catch (err: any) {
+      setError(err?.message || "Failed to request expense approval")
+    }
+  }
+
   const [exportEmail, setExportEmail] = useState("ikchils@gmail.com")
   const handleExportReports = async (target: "desktop" | "email") => {
     try {
@@ -588,6 +652,7 @@ export default function AccountingPage() {
           <p className="text-muted-foreground mt-1">Manage invoices, expenses, and financial reports</p>
           {loading && <p className="text-xs text-muted-foreground">Loading...</p>}
           {error ? <p className="text-xs text-destructive mt-1">{error}</p> : null}
+          {importNotice ? <p className="text-xs text-primary mt-1">{importNotice}</p> : null}
         </div>
         <div className="flex gap-2 flex-wrap justify-end">
           <Dialog>
@@ -847,6 +912,7 @@ export default function AccountingPage() {
               onAddInvoice={createInvoice}
               onUpdateInvoice={handleUpdateInvoice}
               onDeleteInvoice={handleDeleteInvoice}
+              onRequestApproval={handleRequestInvoiceApproval}
             />
           </SectionErrorBoundary>
         </TabsContent>
@@ -861,6 +927,7 @@ export default function AccountingPage() {
               onAddExpense={createExpense}
               onUpdateExpense={handleUpdateExpense}
               onDeleteExpense={handleDeleteExpense}
+              onRequestApproval={handleRequestExpenseApproval}
             />
           </SectionErrorBoundary>
         </TabsContent>
