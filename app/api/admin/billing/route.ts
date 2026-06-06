@@ -30,10 +30,21 @@ export async function GET(request: Request) {
 
   try {
     const { org, user } = await requireAdminRequest(request)
+    const showFounderControls = canViewFounderControls(user.role, user.email)
 
     const [seatUsage, privilegedUserCount] = await Promise.all([
-      prisma.user.count({ where: { orgId: org.id } }),
-      prisma.user.count({ where: { orgId: org.id, role: { in: ["ORG_OWNER", "ADMIN", "SUPER_ADMIN"] } } }),
+      prisma.user.count({
+        where: {
+          orgId: org.id,
+          ...(showFounderControls ? {} : { role: { not: "SUPER_ADMIN" } }),
+        },
+      }),
+      prisma.user.count({
+        where: {
+          orgId: org.id,
+          role: { in: showFounderControls ? ["ORG_OWNER", "ADMIN", "SUPER_ADMIN"] : ["ORG_OWNER", "ADMIN"] },
+        },
+      }),
     ])
 
     return NextResponse.json({
@@ -48,8 +59,8 @@ export async function GET(request: Request) {
         nextBillingDate: org.nextBillingDate,
         trialEndsAt: org.trialEndsAt,
         paymentProvider: org.paymentProvider || "",
-        paymentCustomerRef: canViewFounderControls(user.role, user.email) ? org.paymentCustomerRef || "" : "",
-        paymentSubscriptionRef: canViewFounderControls(user.role, user.email) ? org.paymentSubscriptionRef || "" : "",
+        paymentCustomerRef: showFounderControls ? org.paymentCustomerRef || "" : "",
+        paymentSubscriptionRef: showFounderControls ? org.paymentSubscriptionRef || "" : "",
       },
       summary: {
         seatsUsed: seatUsage,
@@ -58,8 +69,8 @@ export async function GET(request: Request) {
       },
       permissions: {
         canManageBilling: canManageWorkspaceSettings(user.role, user.email),
-        canEditProviderRefs: canViewFounderControls(user.role, user.email),
-        isPlatformSuperAdmin: canViewFounderControls(user.role, user.email),
+        canEditProviderRefs: showFounderControls,
+        isPlatformSuperAdmin: showFounderControls,
       },
       options: {
         plans: BILLING_PLANS.map((value) => ({ value, label: BILLING_PLAN_LABELS[value] })),
@@ -78,6 +89,7 @@ export async function PATCH(request: Request) {
 
   try {
     const { org, user } = await requireAdminRequest(request, { requireWorkspaceOwner: true })
+    const showFounderControls = canViewFounderControls(user.role, user.email)
 
     const body = await request.json()
     const billingEmail = String(body?.billingEmail || "").trim()
@@ -85,7 +97,7 @@ export async function PATCH(request: Request) {
       billingEmail: billingEmail || null,
     }
 
-    if (canViewFounderControls(user.role, user.email)) {
+    if (showFounderControls) {
       updateData.billingPlan = normalizeBillingPlan(body?.billingPlan || org.billingPlan)
       updateData.billingStatus = normalizeBillingStatus(body?.billingStatus || org.billingStatus)
       updateData.billingCycle = normalizeBillingCycle(body?.billingCycle || org.billingCycle)
@@ -130,8 +142,8 @@ export async function PATCH(request: Request) {
         nextBillingDate: updated.nextBillingDate,
         trialEndsAt: updated.trialEndsAt,
         paymentProvider: updated.paymentProvider || "",
-        paymentCustomerRef: canViewFounderControls(user.role, user.email) ? updated.paymentCustomerRef || "" : "",
-        paymentSubscriptionRef: canViewFounderControls(user.role, user.email) ? updated.paymentSubscriptionRef || "" : "",
+        paymentCustomerRef: showFounderControls ? updated.paymentCustomerRef || "" : "",
+        paymentSubscriptionRef: showFounderControls ? updated.paymentSubscriptionRef || "" : "",
       },
     })
   } catch (error) {

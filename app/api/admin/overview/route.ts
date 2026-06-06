@@ -39,8 +39,19 @@ export async function GET(request: Request) {
       totalUsers,
       recentOrgs,
     ] = await Promise.all([
-      prisma.user.count({ where: { orgId: org.id } }),
-      prisma.user.count({ where: { orgId: org.id, role: { in: ["ORG_OWNER", "ADMIN", "SUPER_ADMIN"] } } }),
+      prisma.user.count({
+        where: {
+          orgId: org.id,
+          ...(showFounderControls ? {} : { role: { not: "SUPER_ADMIN" }, email: { not: getFounderSuperAdminEmail() } }),
+        },
+      }),
+      prisma.user.count({
+        where: {
+          orgId: org.id,
+          role: { in: showFounderControls ? ["ORG_OWNER", "ADMIN", "SUPER_ADMIN"] : ["ORG_OWNER", "ADMIN"] },
+          ...(showFounderControls ? {} : { email: { not: getFounderSuperAdminEmail() } }),
+        },
+      }),
       prisma.user.count({ where: { orgId: org.id, twoFactorEnabled: true } }),
       prisma.contact.count({ where: { orgId: org.id } }),
       prisma.employee.count({ where: { orgId: org.id } }),

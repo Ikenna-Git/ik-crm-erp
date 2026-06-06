@@ -17,6 +17,7 @@ This bug exists if any non-founder user can do any of the following:
 - see founder-only navigation such as `/admin/system`
 - open founder-only APIs such as `/api/admin/orgs` or `/api/admin/platform-status`
 - see users from another org in `/admin/users`
+- see the founder/super-admin user in a normal workspace team list
 - act on users outside their own org
 - receive or retain `SUPER_ADMIN` outside founder-only logic
 - land in the default or founder org without an invite that actually belongs there
@@ -51,6 +52,7 @@ This bug exists if any non-founder user can do any of the following:
 - can manage same-org `USER` and `ADMIN` accounts
 - cannot create or assign `SUPER_ADMIN`
 - cannot access founder-only surfaces
+- cannot see founder/super-admin users in the workspace team list
 
 ### Founder `SUPER_ADMIN`
 
@@ -114,6 +116,7 @@ For `ADMIN` and `ORG_OWNER` only:
 1. Open `/admin/users`.
 2. Confirm only same-org users are shown.
 3. Confirm no users from another org appear.
+4. Confirm the founder/super-admin user does not appear in the workspace team list.
 4. Confirm role actions match the actor’s allowed scope:
    - `ADMIN` can manage `USER`
    - `ORG_OWNER` can manage `USER` and `ADMIN`
@@ -189,6 +192,7 @@ After any DB correction:
 - non-founder users do not see founder-only navigation
 - non-founder users cannot access `/admin/system`
 - `/api/admin/users` is org-scoped
+- `/api/admin/users` excludes founder/super-admin rows for non-founder actors
 - `/api/admin/orgs` is blocked for non-founder users
 - `/api/admin/platform-status` is blocked for non-founder users
 - role-based actions match the intended workspace role only
@@ -207,6 +211,7 @@ After any DB correction:
 | `/api/admin/orgs` non-founder | Blocked |  |  |  |  |  |
 | `/api/admin/platform-status` non-founder | Blocked |  |  |  |  |  |
 | `/api/admin/users` scope | Same-org users only |  |  |  |  |  |
+| Founder excluded from workspace team | No founder/super-admin row for non-founder actor |  |  |  |  |  |
 | Invite acceptance org binding | `user.orgId === invite.orgId` |  |  |  |  |  |
 | Invite acceptance role binding | User gets invited role only |  |  |  |  |  |
 | `SUPER_ADMIN` leakage check | No non-founder `SUPER_ADMIN` created |  |  |  |  |  |

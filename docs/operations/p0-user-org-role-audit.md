@@ -16,6 +16,8 @@ Review users where:
 - `orgId` matches the founder/default org but the user should belong to another workspace
 - the user was invited into one org but currently belongs to another
 - the user has workspace-admin access but should only be `USER`
+- the founder/super-admin user appears in a normal workspace team list for an `ORG_OWNER` or `ADMIN`
+- a workspace admin session can see users from outside its own org
 
 ## Core checks
 
@@ -76,6 +78,7 @@ Minimum report fields:
 - invite orgId
 - invite email
 - invite consumed state
+- whether the user appeared in another org’s `/api/admin/users` response
 
 ## Safe correction workflow
 
@@ -86,6 +89,7 @@ Only after confirming the intended workspace and intended role:
 3. correct `role` if it is too powerful or otherwise wrong
 4. do not assign `SUPER_ADMIN` unless the account is the true founder account
 5. preserve an audit note outside the DB migration path if your team keeps an ops log
+6. if a founder/super-admin row was attached to a normal workspace, move that row back to the correct founder org before retesting workspace admin visibility
 
 ## After correction
 

@@ -21,6 +21,61 @@ export const canViewFounderControls = (role?: string | null, email?: string | nu
 export const canManageWorkspaceSettings = (role?: string | null, email?: string | null) =>
   role === "ORG_OWNER" || isSuperAdmin(role, email)
 
+export const isPlatformSuperAdminUser = (user?: { role?: string | null; email?: string | null } | null) =>
+  isSuperAdmin(user?.role, user?.email)
+
+export const canAccessPlatformAdmin = (user?: { role?: string | null; email?: string | null } | null) =>
+  isPlatformSuperAdminUser(user)
+
+export const canAccessWorkspaceAdmin = (user?: { role?: string | null; email?: string | null } | null) =>
+  Boolean(user && isAdmin(user.role))
+
+export const canViewWorkspaceUser = ({
+  actorOrgId,
+  actorRole,
+  actorEmail,
+  targetOrgId,
+  targetRole,
+  targetEmail,
+}: {
+  actorOrgId?: string | null
+  actorRole?: string | null
+  actorEmail?: string | null
+  targetOrgId?: string | null
+  targetRole?: string | null
+  targetEmail?: string | null
+}) => {
+  if (!actorOrgId || !targetOrgId || actorOrgId !== targetOrgId) return false
+  if (isSuperAdmin(actorRole, actorEmail)) return true
+  if (targetRole === "SUPER_ADMIN") return false
+  if (isFounderSuperAdminEmail(targetEmail)) return false
+  return true
+}
+
+export const canManageOrgUsers = ({
+  actorOrgId,
+  actorRole,
+  actorEmail,
+  targetOrgId,
+  targetRole,
+  targetEmail,
+}: {
+  actorOrgId?: string | null
+  actorRole?: string | null
+  actorEmail?: string | null
+  targetOrgId?: string | null
+  targetRole?: string | null
+  targetEmail?: string | null
+}) =>
+  canViewWorkspaceUser({
+    actorOrgId,
+    actorRole,
+    actorEmail,
+    targetOrgId,
+    targetRole,
+    targetEmail,
+  }) && canAssignRole({ actorRole, actorEmail, targetRole, targetEmail, nextRole: (targetRole || "USER") as Role })
+
 export const canAssignRole = ({
   actorRole,
   actorEmail,
