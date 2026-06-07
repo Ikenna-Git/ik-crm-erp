@@ -6,6 +6,7 @@ import { getUserFromRequest, isRequestUserError } from "@/lib/request-user"
 import { createAuditLog } from "@/lib/audit"
 import { prisma } from "@/lib/prisma"
 import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
+import { hasModuleAccess } from "@/lib/access-control"
 
 type AiMode = "qna" | "summary" | "email" | "tour"
 type AiAction = {
@@ -644,12 +645,18 @@ export async function POST(request: Request) {
       name: fallbackName,
       email: fallbackEmail,
     }
+    let accessSubject: { role?: string | null; accessProfile?: string | null; moduleAccess?: unknown } | null = null
     let hasDbUser = false
 
     try {
       const resolved = await getUserFromRequest(request)
       org = { id: resolved.org.id, name: resolved.org.name }
       user = { id: resolved.user.id, name: resolved.user.name || fallbackName, email: resolved.user.email }
+      accessSubject = {
+        role: resolved.user.role,
+        accessProfile: resolved.user.accessProfile,
+        moduleAccess: resolved.user.moduleAccess,
+      }
       hasDbUser = true
     } catch (error) {
       if (isRequestUserError(error)) {
@@ -672,8 +679,8 @@ export async function POST(request: Request) {
     const incoming = Array.isArray(body?.messages) ? normalizeMessages(body.messages) : []
     const lastUserMessage = [...incoming].reverse().find((msg) => msg.role === "user")?.content || ""
     const previousAssistantMessage = [...incoming].reverse().find((msg) => msg.role === "assistant")?.content || ""
-    const hrUnlocked = request.headers.get("x-hr-sensitive-unlocked") === "true"
-    const financeUnlocked = request.headers.get("x-finance-sensitive-unlocked") === "true"
+    const hrUnlocked = accessSubject ? hasModuleAccess(accessSubject, "hr", "manage") : false
+    const financeUnlocked = accessSubject ? hasModuleAccess(accessSubject, "accounting", "manage") : false
 
     if (requestedMode === "qna") {
       let followupResolution: DataResolution | null = null

@@ -62,6 +62,7 @@ type Props = {
   onDeleteInvoice?: (id: string) => void
   onRequestApproval?: (invoice: Invoice) => Promise<void> | void
   showAmounts?: boolean
+  canManage?: boolean
 }
 
 const formatNaira = (amount: number) =>
@@ -94,6 +95,7 @@ export function InvoicesTable({
   onDeleteInvoice,
   onRequestApproval,
   showAmounts = true,
+  canManage = false,
 }: Props) {
   const [invoices, setInvoices] = useState<Invoice[]>(providedInvoices ?? [])
   const [currentPage, setCurrentPage] = useState(1)
@@ -239,11 +241,17 @@ export function InvoicesTable({
             <CardDescription>All customer invoices and billing records</CardDescription>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" className="flex items-center gap-2 bg-transparent" onClick={downloadInvoicesCSV}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex items-center gap-2 bg-transparent"
+              onClick={downloadInvoicesCSV}
+              disabled={!canManage}
+            >
               <Download className="w-4 h-4" />
               Export CSV
             </Button>
-            <Button size="sm" onClick={() => setShowModal(true)} className="flex items-center gap-2">
+            <Button size="sm" onClick={() => setShowModal(true)} className="flex items-center gap-2" disabled={!canManage}>
               <Plus className="w-4 h-4" />
               Add Invoice
             </Button>
@@ -278,38 +286,44 @@ export function InvoicesTable({
                       </td>
                       <td className="py-4 px-4 text-muted-foreground">{invoice.dueDate || "—"}</td>
                       <td className="py-4 px-4">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="p-2">
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setSelectedInvoice(invoice)}>
-                              <Eye className="w-4 h-4 mr-2" />
-                              View details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEditInvoice(invoice)}>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => downloadInvoicesCSV()}>
-                              <Download className="w-4 h-4 mr-2" />
-                              Download PDF
-                            </DropdownMenuItem>
-                            <DropdownMenuItem disabled={approvalAction.disabled} onClick={() => requestApproval(invoice)}>
-                              <CheckSquare className="w-4 h-4 mr-2" />
-                              {approvalAction.label}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => handleDeleteInvoice(invoice.id)}
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {canManage ? (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="p-2">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setSelectedInvoice(invoice)}>
+                                <Eye className="w-4 h-4 mr-2" />
+                                View details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditInvoice(invoice)}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => downloadInvoicesCSV()}>
+                                <Download className="w-4 h-4 mr-2" />
+                                Download PDF
+                              </DropdownMenuItem>
+                              <DropdownMenuItem disabled={approvalAction.disabled} onClick={() => requestApproval(invoice)}>
+                                <CheckSquare className="w-4 h-4 mr-2" />
+                                {approvalAction.label}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => handleDeleteInvoice(invoice.id)}
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        ) : (
+                          <Button variant="ghost" size="sm" className="p-2" disabled aria-label="Invoice actions unavailable">
+                            <X className="w-4 h-4" />
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   )
@@ -336,6 +350,8 @@ export function InvoicesTable({
         }}
         title={selectedInvoice?.number || "Invoice details"}
         description="Review invoice metadata in a readable panel."
+        locked={!canManage}
+        lockedDescription="Invoice details, approvals, and exports are only available to finance managers and workspace admins."
         sections={
           selectedInvoice
             ? [
@@ -357,7 +373,7 @@ export function InvoicesTable({
       />
 
       {/* Add Invoice Modal */}
-      {showModal && (
+      {showModal && canManage ? (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
@@ -425,7 +441,7 @@ export function InvoicesTable({
             </CardContent>
           </Card>
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

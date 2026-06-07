@@ -1,6 +1,6 @@
 # P0 Next Action Checklist
 
-Branch focus: `p0-full-launch-readiness-audit`
+Branch focus: `p0-launch-ux-world-class-sweep`
 
 ## 1. Live Validation Required Now
 
@@ -22,7 +22,12 @@ Branch focus: `p0-full-launch-readiness-audit`
 - [ ] Confirm CRM contact/company/deal CRUD survives refresh
 - [ ] Confirm no launch-facing screen still uses native `alert` / `confirm` / `prompt`
 - [ ] Confirm CRM/accounting/HR/inventory/projects detail views no longer show raw JSON popups
+- [ ] Confirm HR and Payroll no longer use browser-local unlock codes and stay redacted for non-manage roles
+- [ ] Confirm Accounting no longer uses browser-local unlock codes and hides detail/export actions for non-manage roles
+- [ ] Confirm accounting report exports are blocked server-side for non-manage roles
 - [ ] Confirm marketing campaign creation fails honestly instead of implying a saved draft
+- [ ] Confirm CRM Deal Fields modal scrolls and closes correctly on laptop-height screens
+- [ ] Confirm CRM field creation fails honestly when persistence is unavailable
 - [ ] Confirm workflows remain org-scoped
 - [ ] Confirm notifications persist through DB-backed flow
 - [ ] Confirm `/pricing` no longer implies live self-serve checkout
@@ -87,6 +92,7 @@ Blocked/manual items still remaining from the smoke run:
 
 ## 8. Launch Audit Evidence
 
+- [ ] Fill `docs/operations/p0-launch-ux-access-control-sweep.md`
 - [ ] Fill `docs/operations/p0-full-launch-readiness-audit.md`
 - [ ] Fill `docs/operations/p0-launch-blocker-register.md`
 - [ ] Fill `docs/operations/p0-go-live-decision.md`
@@ -95,5 +101,7 @@ Blocked/manual items still remaining from the smoke run:
 
 - [ ] Fill `docs/operations/p0-go-live-evidence.md`
 - [ ] Fill `docs/operations/p0-live-validation-log.md`
+- [ ] Fill `docs/product/world-class-product-review.md`
+- [ ] Fill `docs/product/top-0-1-percent-roadmap.md`
 - [ ] Decide merge recommendation: `YES / NO`
 - [ ] Decide deploy recommendation: `YES / NO`

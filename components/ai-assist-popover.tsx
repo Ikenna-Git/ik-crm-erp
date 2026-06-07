@@ -167,11 +167,6 @@ export function AiAssistPopover() {
 
     const headers: Record<string, string> = { "Content-Type": "application/json", ...getSessionHeaders() }
     headers["x-current-path"] = pathname
-    if (typeof window !== "undefined") {
-      headers["x-hr-sensitive-unlocked"] = localStorage.getItem("civis_payroll_unlocked") === "true" ? "true" : "false"
-      headers["x-finance-sensitive-unlocked"] =
-        localStorage.getItem("civis_finance_unlocked") === "true" ? "true" : "false"
-    }
 
     try {
       const res = await fetch("/api/ai/chat", {

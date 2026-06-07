@@ -324,13 +324,6 @@ export function ContactsTable({
     [baseColumns],
   )
 
-  const slugifyKey = (value: string) =>
-    value
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "")
-
   const fieldTypeHelp: Record<CrmFieldType, { hint: string; example: string }> = {
     TEXT: { hint: "Use text for free-form notes or labels.", example: "e.g. Lagos" },
     NUMBER: { hint: "Numbers only, no currency symbols.", example: "e.g. 12" },
@@ -500,21 +493,7 @@ export function ContactsTable({
         body: JSON.stringify(payload),
       })
       if (res.status === 503) {
-        const fallbackField: CrmField = {
-          id: `local-${Date.now()}`,
-          key: slugifyKey(fieldForm.name) || `field_${Date.now()}`,
-          name: fieldForm.name.trim(),
-          type: fieldForm.type,
-          options: payload.options,
-          required: fieldForm.required,
-        }
-        setFields((prev) => [...prev, fallbackField])
-        if (!view.order.includes(fallbackField.key)) {
-          applyViewUpdate({ ...view, order: [...view.order, fallbackField.key] })
-        }
-        setFieldForm({ name: "", type: "TEXT", options: "", required: false })
-        setEditingFieldId(null)
-        setFieldsError("Saved locally only. Connect the database to persist CRM fields.")
+        setFieldsError("CRM field persistence is unavailable until the database connection is restored.")
         return
       }
       const data = await res.json().catch(() => ({}))
@@ -527,7 +506,6 @@ export function ContactsTable({
       setFieldForm({ name: "", type: "TEXT", options: "", required: false })
       setEditingFieldId(null)
     } catch (err: any) {
-      console.warn("Failed to save field", err)
       setFieldsError(err?.message || "Failed to save field")
     }
   }
@@ -539,17 +517,17 @@ export function ContactsTable({
         headers: { ...getSessionHeaders() },
       })
       if (!res.ok) throw new Error("Failed to archive field")
-    } catch (err) {
-      console.warn("Failed to archive field", err)
-    } finally {
-      setFields((prev) => prev.filter((item) => item.id !== field.id))
-      const nextOrder = view.order.filter((key) => key !== field.key)
-      const nextHidden = view.hidden.filter((key) => key !== field.key)
-      applyViewUpdate({ order: nextOrder, hidden: nextHidden })
-      if (editingFieldId === field.id) {
-        setEditingFieldId(null)
-        setFieldForm({ name: "", type: "TEXT", options: "", required: false })
-      }
+    } catch (err: any) {
+      setFieldsError(err?.message || "Failed to archive field")
+      return
+    }
+    setFields((prev) => prev.filter((item) => item.id !== field.id))
+    const nextOrder = view.order.filter((key) => key !== field.key)
+    const nextHidden = view.hidden.filter((key) => key !== field.key)
+    applyViewUpdate({ order: nextOrder, hidden: nextHidden })
+    if (editingFieldId === field.id) {
+      setEditingFieldId(null)
+      setFieldForm({ name: "", type: "TEXT", options: "", required: false })
     }
   }
 

@@ -2,9 +2,10 @@
 
 import dynamic from "next/dynamic"
 import { useEffect, useState } from "react"
+import { useSession } from "next-auth/react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
-import { Plus, Download, Sparkles, Lock, Unlock } from "lucide-react"
+import { Plus, Download, Sparkles, Lock } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -23,6 +24,7 @@ import { SectionErrorBoundary } from "@/components/shared/section-error-boundary
 import { getSessionHeaders } from "@/lib/user-settings"
 import { formatNaira } from "@/lib/currency"
 import { toast } from "@/hooks/use-toast"
+import { hasModuleAccess } from "@/lib/access-control"
 
 const sectionLoader = (label: string) => () => <div className="text-sm text-muted-foreground">Loading {label}...</div>
 
@@ -111,6 +113,7 @@ const reportPacks = [
 ]
 
 export default function AccountingPage() {
+  const { data: session } = useSession()
   const searchQuery = ""
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
@@ -126,12 +129,6 @@ export default function AccountingPage() {
     status: "draft",
   })
 
-  const [financeUnlocked, setFinanceUnlocked] = useState(false)
-  const [financeCode, setFinanceCode] = useState("2468")
-  const [financeInput, setFinanceInput] = useState("")
-  const [financeNotice, setFinanceNotice] = useState("")
-  const [financeError, setFinanceError] = useState("")
-
   const [openExpenseDialog, setOpenExpenseDialog] = useState(false)
   const [expenseForm, setExpenseForm] = useState({
     description: "",
@@ -139,6 +136,7 @@ export default function AccountingPage() {
     category: "office-supplies",
     date: "",
   })
+  const canManageAccounting = hasModuleAccess(session?.user || {}, "accounting", "manage")
 
   const parseJsonSafe = async (res: Response) => {
     const text = await res.text()
@@ -307,41 +305,6 @@ export default function AccountingPage() {
   useEffect(() => {
     loadData()
   }, [])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const stored = localStorage.getItem("civis_finance_access_code")
-    if (stored) {
-      setFinanceCode(stored)
-    } else {
-      localStorage.setItem("civis_finance_access_code", "2468")
-    }
-    localStorage.setItem("civis_finance_unlocked", "false")
-  }, [])
-
-  const unlockFinance = () => {
-    if (financeInput.trim() !== financeCode) {
-      setFinanceError("Invalid access code.")
-      setFinanceNotice("")
-      return
-    }
-    setFinanceUnlocked(true)
-    if (typeof window !== "undefined") {
-      localStorage.setItem("civis_finance_unlocked", "true")
-    }
-    setFinanceInput("")
-    setFinanceError("")
-    setFinanceNotice("Finance view unlocked.")
-  }
-
-  const lockFinance = () => {
-    setFinanceUnlocked(false)
-    if (typeof window !== "undefined") {
-      localStorage.setItem("civis_finance_unlocked", "false")
-    }
-    setFinanceError("")
-    setFinanceNotice("Finance view locked.")
-  }
 
   const createInvoice = async (payload: Omit<Invoice, "id">) => {
     try {
@@ -680,7 +643,7 @@ export default function AccountingPage() {
         <div className="flex gap-2 flex-wrap justify-end">
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+              <Button variant="outline" className="flex items-center gap-2 bg-transparent" disabled={!canManageAccounting}>
                 <Download className="w-4 h-4" />
                 Export Reports
               </Button>
@@ -702,10 +665,15 @@ export default function AccountingPage() {
                   />
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Button className="flex-1" onClick={() => handleExportReports("desktop")}>
+                  <Button className="flex-1" onClick={() => handleExportReports("desktop")} disabled={!canManageAccounting}>
                     Export to desktop (CSV)
                   </Button>
-                  <Button variant="outline" className="flex-1" onClick={() => handleExportReports("email")}>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => handleExportReports("email")}
+                    disabled={!canManageAccounting}
+                  >
                     Email CSV report
                   </Button>
                 </div>
@@ -717,7 +685,7 @@ export default function AccountingPage() {
           </Dialog>
           <Dialog open={openExpenseDialog} onOpenChange={setOpenExpenseDialog}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+              <Button variant="outline" className="flex items-center gap-2 bg-transparent" disabled={!canManageAccounting}>
                 <Plus className="w-4 h-4" />
                 New Expense
               </Button>
@@ -783,7 +751,7 @@ export default function AccountingPage() {
           </Dialog>
           <Dialog open={openInvoiceDialog} onOpenChange={setOpenInvoiceDialog}>
             <DialogTrigger asChild>
-              <Button className="flex items-center gap-2">
+              <Button className="flex items-center gap-2" disabled={!canManageAccounting}>
                 <Plus className="w-4 h-4" />
                 New Invoice
               </Button>
@@ -886,33 +854,22 @@ export default function AccountingPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Lock className="w-5 h-5 text-primary" />
-            Finance Privacy Lock
+            Accounting Access
           </CardTitle>
-          <CardDescription>Protect financial amounts from casual viewing.</CardDescription>
+          <CardDescription>Sensitive amounts, detail views, exports, and record mutations are controlled by workspace role.</CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="finance-code">Access code</Label>
-            <Input
-              id="finance-code"
-              type="password"
-              placeholder="Enter access code"
-              value={financeInput}
-              onChange={(e) => setFinanceInput(e.target.value)}
-              className="max-w-xs"
-            />
-            {financeError ? <p className="text-xs text-destructive">{financeError}</p> : null}
-            {financeNotice ? <p className="text-xs text-primary">{financeNotice}</p> : null}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={unlockFinance} className="flex items-center gap-2">
-              <Unlock className="w-4 h-4" />
-              Unlock amounts
-            </Button>
-            <Button variant="outline" className="bg-transparent" onClick={lockFinance}>
-              Lock view
-            </Button>
-          </div>
+        <CardContent>
+          {canManageAccounting ? (
+            <div className="rounded-lg border border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+              This role can manage invoices, expenses, approvals, exports, and financial detail views for the current
+              workspace.
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border bg-muted/10 p-4 text-sm text-muted-foreground">
+              This role can open the accounting workspace shell, but financial amounts, exports, approvals, and record
+              details remain redacted until a finance manager or workspace admin grants manage access.
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -931,11 +888,12 @@ export default function AccountingPage() {
             <InvoicesTable
               searchQuery={searchQuery}
               invoices={invoices}
-              showAmounts={financeUnlocked}
+              showAmounts={canManageAccounting}
               onAddInvoice={createInvoice}
               onUpdateInvoice={handleUpdateInvoice}
               onDeleteInvoice={handleDeleteInvoice}
               onRequestApproval={handleRequestInvoiceApproval}
+              canManage={canManageAccounting}
             />
           </SectionErrorBoundary>
         </TabsContent>
@@ -946,11 +904,12 @@ export default function AccountingPage() {
             <ExpensesTable
               searchQuery={searchQuery}
               expenses={expenses}
-              showAmounts={financeUnlocked}
+              showAmounts={canManageAccounting}
               onAddExpense={createExpense}
               onUpdateExpense={handleUpdateExpense}
               onDeleteExpense={handleDeleteExpense}
               onRequestApproval={handleRequestExpenseApproval}
+              canManage={canManageAccounting}
             />
           </SectionErrorBoundary>
         </TabsContent>
@@ -975,10 +934,16 @@ export default function AccountingPage() {
                       <p className="text-xs text-muted-foreground mt-1">{pack.cadence} cadence</p>
                     </div>
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={() => handleExportReports("desktop")}>
+                      <Button size="sm" onClick={() => handleExportReports("desktop")} disabled={!canManageAccounting}>
                         Export CSV
                       </Button>
-                      <Button size="sm" variant="outline" className="bg-transparent" onClick={() => handleExportReports("email")}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="bg-transparent"
+                        onClick={() => handleExportReports("email")}
+                        disabled={!canManageAccounting}
+                      >
                         Send Email
                       </Button>
                     </div>
@@ -1000,14 +965,20 @@ export default function AccountingPage() {
                     <p className="font-medium">VAT Snapshot</p>
                     <p className="text-sm text-muted-foreground">7.5% VAT on taxable revenue.</p>
                     <div className="text-sm">
-                      <p>Taxable revenue: {financeUnlocked ? formatNaira(vatTaxable) : "Locked"}</p>
-                      <p>VAT due: {financeUnlocked ? formatNaira(vatDue) : "Locked"}</p>
+                      <p>Taxable revenue: {canManageAccounting ? formatNaira(vatTaxable) : "Restricted"}</p>
+                      <p>VAT due: {canManageAccounting ? formatNaira(vatDue) : "Restricted"}</p>
                     </div>
                     <div className="flex flex-wrap gap-2 pt-2">
-                      <Button size="sm" onClick={() => handleExportCompliance("vat", "desktop")}>
-                        Export VAT CSV
+                      <Button size="sm" onClick={() => handleExportCompliance("vat", "desktop")} disabled={!canManageAccounting}>
+                        Export CSV
                       </Button>
-                      <Button size="sm" variant="outline" className="bg-transparent" onClick={() => handleExportCompliance("vat", "email")}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="bg-transparent"
+                        onClick={() => handleExportCompliance("vat", "email")}
+                        disabled={!canManageAccounting}
+                      >
                         Email VAT CSV
                       </Button>
                     </div>
@@ -1018,10 +989,16 @@ export default function AccountingPage() {
                       Pull action logs, approval trails, and edits for compliance review.
                     </p>
                     <div className="flex flex-wrap gap-2 pt-2">
-                      <Button size="sm" onClick={() => handleExportCompliance("audit", "desktop")}>
+                      <Button size="sm" onClick={() => handleExportCompliance("audit", "desktop")} disabled={!canManageAccounting}>
                         Export audit log
                       </Button>
-                      <Button size="sm" variant="outline" className="bg-transparent" onClick={() => handleExportCompliance("audit", "email")}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="bg-transparent"
+                        onClick={() => handleExportCompliance("audit", "email")}
+                        disabled={!canManageAccounting}
+                      >
                         Email audit log
                       </Button>
                     </div>
@@ -1046,12 +1023,18 @@ export default function AccountingPage() {
                     <p className="font-medium">Invoices CSV</p>
                     <p className="text-sm text-muted-foreground">Use the template to match required columns.</p>
                   </div>
-                  <Button variant="outline" className="bg-transparent w-full" onClick={() => downloadTemplate("invoices")}>
+                  <Button
+                    variant="outline"
+                    className="bg-transparent w-full"
+                    onClick={() => downloadTemplate("invoices")}
+                    disabled={!canManageAccounting}
+                  >
                     Download invoice template
                   </Button>
                   <Input
                     type="file"
                     accept=".csv"
+                    disabled={!canManageAccounting}
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) handleImportInvoices(file)
@@ -1063,12 +1046,18 @@ export default function AccountingPage() {
                     <p className="font-medium">Expenses CSV</p>
                     <p className="text-sm text-muted-foreground">Use the template to match required columns.</p>
                   </div>
-                  <Button variant="outline" className="bg-transparent w-full" onClick={() => downloadTemplate("expenses")}>
+                  <Button
+                    variant="outline"
+                    className="bg-transparent w-full"
+                    onClick={() => downloadTemplate("expenses")}
+                    disabled={!canManageAccounting}
+                  >
                     Download expenses template
                   </Button>
                   <Input
                     type="file"
                     accept=".csv"
+                    disabled={!canManageAccounting}
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) handleImportExpenses(file)

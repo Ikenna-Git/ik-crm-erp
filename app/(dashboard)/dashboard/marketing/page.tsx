@@ -73,11 +73,13 @@ export default function MarketingPage() {
   const [campaignName, setCampaignName] = useState("")
   const [campaignSubject, setCampaignSubject] = useState("")
   const [selectedTemplate, setSelectedTemplate] = useState("")
+  const marketingUnavailableCopy =
+    "Campaign persistence, send workflows, and performance tracking are not live in this release yet."
 
   const handleCreateCampaign = () => {
     toast({
       title: "Campaign creation unavailable",
-      description: "Marketing campaign persistence is not implemented in this release yet.",
+      description: marketingUnavailableCopy,
       variant: "destructive",
     })
   }
@@ -90,12 +92,16 @@ export default function MarketingPage() {
           <p className="text-muted-foreground">
             Create and manage email campaigns to engage your audience.
           </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            This workspace currently exposes a preview-only marketing module. Live sending, saved drafts, and reports
+            stay unavailable until persistence and provider validation are completed.
+          </p>
         </div>
         <Dialog open={showNewCampaign} onOpenChange={setShowNewCampaign}>
           <DialogTrigger asChild>
-            <Button>
+            <Button variant="outline">
               <Plus className="h-4 w-4 mr-2" />
-              New Campaign
+              Preview Campaign Form
             </Button>
           </DialogTrigger>
           <DialogContent>
@@ -172,7 +178,7 @@ export default function MarketingPage() {
                       }>
                         {campaign.status}
                       </Badge>
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" disabled>
                         <Edit className="h-4 w-4" />
                       </Button>
                     </div>
@@ -199,11 +205,11 @@ export default function MarketingPage() {
                   </div>
                   {campaign.sent > 0 && (
                     <div className="mt-4 flex gap-2">
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" disabled>
                         <Eye className="h-4 w-4 mr-2" />
                         View Report
                       </Button>
-                      <Button variant="outline" size="sm">
+                      <Button variant="outline" size="sm" disabled>
                         <Send className="h-4 w-4 mr-2" />
                         Send Test
                       </Button>
@@ -227,12 +233,15 @@ export default function MarketingPage() {
                   <p className="text-sm text-muted-foreground mb-4">
                     {template.preview}
                   </p>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Template editing and preview rendering are still disabled in this release.
+                  </p>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="flex-1">
+                    <Button variant="outline" size="sm" className="flex-1" disabled>
                       <Edit className="h-4 w-4 mr-2" />
                       Edit
                     </Button>
-                    <Button variant="outline" size="sm" className="flex-1">
+                    <Button variant="outline" size="sm" className="flex-1" disabled>
                       <Eye className="h-4 w-4 mr-2" />
                       Preview
                     </Button>

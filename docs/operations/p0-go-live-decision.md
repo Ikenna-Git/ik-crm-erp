@@ -1,7 +1,7 @@
 # P0 Go-Live Decision
 
 Date: 2026-06-07  
-Branch: `p0-full-launch-readiness-audit`
+Branch: `p0-launch-ux-world-class-sweep`
 
 ## Decision Rules
 
@@ -31,6 +31,8 @@ Branch: `p0-full-launch-readiness-audit`
 | Operations workflows and approvals | Blocked | Live mutation checks still required |
 | Settings persistence honesty | Blocked | Profile/workspace/browser refresh evidence still required |
 | Pricing/billing honesty | Fixed in code, blocked for live evidence | Public page copy corrected, but Stripe readiness remains unverified |
+| HR / Accounting redaction | Fixed in code, blocked for live evidence | Browser-local unlock flows removed in favor of role-based restriction, but live role evidence still required |
+| CRM deal-field honesty and modal UX | Fixed in code, blocked for live evidence | Modal overflow and local-only save fallback addressed; browser proof still required |
 | Uploads / SMTP / Upstash / AI / Stripe | Blocked | Provider-backed validation not complete |
 | Backup / restore | Blocked | No evidence recorded |
 | Observability / alerting | Blocked | No verified alert delivery evidence recorded |

@@ -1,7 +1,7 @@
 # P0 Live Validation Log
 
 Date: 2026-06-07
-Branch: `p0-full-launch-readiness-audit`
+Branch: `p0-launch-ux-world-class-sweep`
 
 Use this file during each Render validation pass.
 
@@ -28,6 +28,9 @@ Use this file during each Render validation pass.
 - this branch also carries the verified prototype/debug UI sweep
 - public pricing copy now avoids implying live self-serve billing
 - portal approvals now fail closed once a client update is already approved or rejected
+- HR and Accounting now use role-based redaction instead of browser-local unlock codes
+- accounting report exports now require the correct module entitlement on the server
+- CRM deal-field creation no longer claims local-only persistence when the backend is unavailable
 - these items still require live browser verification after redeploy
 
 ## Session Header
@@ -63,6 +66,10 @@ Use this file during each Render validation pass.
 | Billing | Missing or test Stripe behavior |  | pricing/checkout | Safe failure or validated test flow |  |  | Manual/provider validation still required |  |  |
 | UI trust | No native browser dialogs in launch flows |  | dashboard/admin/public pages | No `alert` / `confirm` / `prompt` for real product actions |  |  | Manual/browser validation still required |  |  |
 | UI trust | No raw JSON detail popups |  | CRM/accounting/HR/inventory/projects | Details render in-app dialogs, not JSON alerts |  |  | Manual/browser validation still required |  |  |
+| Access control | HR redaction | non-manage HR viewer | `/dashboard/hr` | No browser-local unlock flow; salaries/details/actions remain restricted |  |  | Manual/browser validation still required |  |  |
+| Access control | Accounting redaction | non-manage accounting viewer | `/dashboard/accounting` | No browser-local unlock flow; details/exports/actions remain restricted |  |  | Manual/browser validation still required |  |  |
+| CRM quality | Deal Fields dialog | CRM user | `/dashboard/crm` | Dialog scrolls correctly; close control stays accessible |  |  | Manual/browser validation still required |  |  |
+| CRM honesty | Deal field save outage | CRM user | `/dashboard/crm` | Backend outage fails honestly with no local-only success |  |  | Manual/browser validation still required |  |  |
 | Billing | Pricing page is honest about non-live self-serve checkout | logged out | `/pricing` | Sign-up CTA only; no claim that public checkout is already live |  |  | Manual/browser validation still required |  |  |
 | Portal | Finalized update cannot be re-approved/re-rejected | portal user | `/portal/[code]` + `/api/portal/[code]/approvals` | Second decision blocked |  |  | Manual/browser validation still required |  |  |
 

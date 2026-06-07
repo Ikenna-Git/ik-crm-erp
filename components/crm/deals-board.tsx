@@ -99,13 +99,6 @@ export function DealsBoard({ deals, onAddDeal, onUpdateDeal }: DealsBoardProps) 
     CHECKBOX: { hint: "Yes/No toggle.", example: "Example: Requires approval" },
   }
 
-  const slugifyKey = (value: string) =>
-    value
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "")
-
   useEffect(() => {
     if (deals) {
       setDealList(deals)
@@ -179,18 +172,7 @@ export function DealsBoard({ deals, onAddDeal, onUpdateDeal }: DealsBoardProps) 
         body: JSON.stringify(payload),
       })
       if (res.status === 503) {
-        const fallbackField: CrmField = {
-          id: `local-${Date.now()}`,
-          key: slugifyKey(fieldForm.name) || `field_${Date.now()}`,
-          name: fieldForm.name.trim(),
-          type: fieldForm.type,
-          options: payload.options,
-          required: fieldForm.required,
-        }
-        setFields((prev) => [...prev, fallbackField])
-        setFieldForm({ name: "", type: "TEXT", options: "", required: false })
-        setEditingFieldId(null)
-        setFieldsError("Saved locally only. Connect the database to persist CRM fields.")
+        setFieldsError("CRM field persistence is unavailable until the database connection is restored.")
         return
       }
       const data = await res.json().catch(() => ({}))
@@ -200,7 +182,6 @@ export function DealsBoard({ deals, onAddDeal, onUpdateDeal }: DealsBoardProps) 
       setFieldForm({ name: "", type: "TEXT", options: "", required: false })
       setEditingFieldId(null)
     } catch (err: any) {
-      console.warn("Failed to save field", err)
       setFieldsError(err?.message || "Failed to save field")
     }
   }
@@ -212,14 +193,14 @@ export function DealsBoard({ deals, onAddDeal, onUpdateDeal }: DealsBoardProps) 
         headers: { ...getSessionHeaders() },
       })
       if (!res.ok) throw new Error("Failed to archive field")
-    } catch (err) {
-      console.warn("Failed to archive field", err)
-    } finally {
-      setFields((prev) => prev.filter((item) => item.id !== field.id))
-      if (editingFieldId === field.id) {
-        setEditingFieldId(null)
-        setFieldForm({ name: "", type: "TEXT", options: "", required: false })
-      }
+    } catch (err: any) {
+      setFieldsError(err?.message || "Failed to archive field")
+      return
+    }
+    setFields((prev) => prev.filter((item) => item.id !== field.id))
+    if (editingFieldId === field.id) {
+      setEditingFieldId(null)
+      setFieldForm({ name: "", type: "TEXT", options: "", required: false })
     }
   }
 
@@ -399,12 +380,14 @@ export function DealsBoard({ deals, onAddDeal, onUpdateDeal }: DealsBoardProps) 
       />
 
       <Dialog open={fieldDialogOpen} onOpenChange={setFieldDialogOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="flex max-h-[85vh] max-w-3xl flex-col overflow-hidden p-0">
           <DialogHeader>
-            <DialogTitle>Deal Fields</DialogTitle>
-            <DialogDescription>Define the fields your team needs on every opportunity.</DialogDescription>
+            <div className="border-b border-border px-6 pb-4 pt-6">
+              <DialogTitle>Deal Fields</DialogTitle>
+              <DialogDescription>Define the fields your team needs on every opportunity.</DialogDescription>
+            </div>
           </DialogHeader>
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid flex-1 gap-6 overflow-y-auto px-6 py-5 md:grid-cols-2">
             <div className="space-y-3">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Field name</label>
