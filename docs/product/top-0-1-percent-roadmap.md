@@ -1,52 +1,48 @@
-# Top 0.1 Percent Roadmap
+# Top 0.1% Roadmap
 
-Date: 2026-06-07  
-Branch: `p0-launch-ux-world-class-sweep`
+Date: 2026-06-07
 
-## Immediate Launch Bar
+## Before Launch
+- Deterministic AI navigation and logout commands
+- "What can I do here?", "what is blocked?", "summarise this page", and "what should I do next?" assistant layer
+- Civis Pulse with real priorities, blockers, trust signals, and next actions
+- Locked HR and Accounting details enforced in UI and API responses
+- Honest preview-only Marketing module
+- Honest pricing that routes to sign-up instead of implying live self-serve checkout
+- Founder trust/status panel with route guard, org isolation, backup, restore, and fake-data evidence signals
+- Complete live validation for invites, approvals, CRM persistence, provider-backed flows, and role boundaries
 
-1. Finish every live validation item still marked blocked in the operations runbooks.
-2. Keep all non-persisted or provider-dependent features explicitly honest in UI copy and action states.
-3. Maintain server-side enforcement for route guards, exports, approvals, and admin/org boundaries.
+## Next 7 Days
+- AI action buttons for high-confidence tasks
+- Guided onboarding assistant for new workspaces
+- CRM follow-up assistant with clearer created/skipped explanations
+- Import/export walkthroughs and better CSV guidance
+- Audit log UI for founders and workspace admins
+- Role matrix UI for workspace permission reviews
+- Real persistence for settings areas still marked unsupported
 
 ## Next 30 Days
-
-1. Add browser-driven role regression coverage for:
-   - founder vs org owner vs normal user
-   - invite acceptance and role/org attachment
-   - accounting approval request/approve/reject after refresh
-2. Add a shared restricted-state pattern for modules that are visible but not manageable.
-3. Add admin diagnostics for provider status:
-   - SMTP
-   - Cloudinary
-   - Upstash
-   - AI providers
-   - Stripe
-4. Remove remaining preview-only module ambiguity:
-   - marketing campaigns
-   - advanced operations integrations
-   - any disabled billing action
-
-## Next 60 Days
-
-1. Ship true marketing persistence and campaign delivery.
-2. Ship validated self-serve billing with test/live evidence and webhook resilience.
-3. Add fine-grained redacted summary modes for HR and Accounting instead of all-or-nothing manage access.
-4. Add richer audit trails and user-facing “last updated by / last synced” feedback across critical records.
+- AI workflow builder for safe operational automations
+- Unified activity timeline across CRM, Accounting, HR, and Operations
+- Natural-language reporting backed by real structured queries
+- Deal health scoring and next-best-action suggestions
+- Approval risk summaries and escalation signals
+- Customer portal assistant and status authoring help
+- Billing and subscription self-serve once provider validation is complete
+- Mobile optimisation and tighter responsive polish
+- Marketplace / integration catalog groundwork
 
 ## Next 90 Days
+- Agentic CRM/ERP copilot with approval gates
+- Autonomous task execution with visible human approval checkpoints
+- Policy engine for finance, HR, and ops workflows
+- Enterprise audit and compliance pack
+- Customer portal builder
+- Cross-module automation builder
 
-1. Complete design-system polish:
-   - consistent dialog/sheet sizing and scroll behavior
-   - stronger empty/error/loading states
-   - tighter visual hierarchy across dashboard modules
-2. Add automated release scorecards generated from smoke + browser evidence.
-3. Add recovery/operator flows for failed imports, provider outages, and permission denials.
-
-## Product Standard To Hold
-
-- No fake success.
-- No client-only trust for business-critical state.
-- No hidden role escalation.
-- No preview-only action that looks like a real saved mutation.
-- No launch claim without evidence.
+## Non-Negotiables
+- No fake success
+- No pretending configuration exists when it does not
+- No client-only business persistence
+- No locked-data leakage
+- No permission bypass through AI or UI polish

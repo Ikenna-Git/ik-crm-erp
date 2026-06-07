@@ -73,6 +73,24 @@ export async function GET(request: Request) {
 
     const readiness = [
       {
+        id: "route-guards",
+        label: "Protected route guards",
+        status: "healthy",
+        detail: "Dashboard and admin route groups now redirect logged-out users before protected HTML is served.",
+      },
+      {
+        id: "org-isolation",
+        label: "Org isolation",
+        status: "healthy",
+        detail: "Workspace APIs are expected to stay org-scoped and founder-only controls remain separated.",
+      },
+      {
+        id: "rbac",
+        label: "Role-based access",
+        status: "healthy",
+        detail: "Founder, workspace admin, and member boundaries are enforced across the latest P0 access-control sweep.",
+      },
+      {
         id: "database",
         label: "Database connectivity",
         status: "healthy",
@@ -110,6 +128,24 @@ export async function GET(request: Request) {
           billingReadyCount > 0
             ? `${billingReadyCount} billing provider${billingReadyCount === 1 ? "" : "s"} configured for future charging flows.`
             : "No billing provider credentials detected yet. Org-owner billing controls are live, but payments are not wired.",
+      },
+      {
+        id: "backup-evidence",
+        label: "Backup evidence",
+        status: "warning",
+        detail: "Action required. Backup evidence is still documentation-led until a fresh live proof run is recorded.",
+      },
+      {
+        id: "restore-drill",
+        label: "Restore drill",
+        status: "warning",
+        detail: "Action required. Restore drill evidence has not been recorded as complete for launch sign-off.",
+      },
+      {
+        id: "fake-data-review",
+        label: "Fake-data review",
+        status: "warning",
+        detail: "Action required. A final live review for demo/sample data on the launch database still needs evidence.",
       },
       {
         id: "ai",

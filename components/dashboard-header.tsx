@@ -64,10 +64,10 @@ export function DashboardHeader() {
   }, [])
 
   return (
-    <header className="border-b border-border bg-card px-6 py-4 flex items-center justify-between">
+    <header className="border-b border-border/70 bg-card/95 px-6 py-4 backdrop-blur supports-[backdrop-filter]:bg-card/85 flex items-center justify-between">
       <div className="flex-1">
-        <div className="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 max-w-xl">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+        <div className="flex items-center gap-3 rounded-2xl border border-border/80 bg-gradient-to-r from-background via-background to-muted/40 px-4 py-3 max-w-2xl shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
             <Sparkles className="w-5 h-5 text-primary" />
           </div>
           <div>
@@ -75,10 +75,10 @@ export function DashboardHeader() {
             <p className="text-xs text-muted-foreground">{timestamp || "Loading time..."}</p>
           </div>
           <div className="ml-auto hidden md:flex items-center gap-2 text-xs">
-            <span className="px-2.5 py-1 rounded-full bg-muted text-muted-foreground">
+            <span className="px-2.5 py-1 rounded-full border border-border bg-card text-muted-foreground">
               Sync: {online ? "Online" : "Offline"}
             </span>
-            <span className="px-2.5 py-1 rounded-full bg-muted text-muted-foreground">Mode: Live</span>
+            <span className="px-2.5 py-1 rounded-full border border-border bg-card text-muted-foreground">Mode: Live</span>
           </div>
         </div>
       </div>

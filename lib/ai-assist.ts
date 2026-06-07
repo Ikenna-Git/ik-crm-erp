@@ -1,6 +1,8 @@
 export type AiAssistInstruction = {
-  type: "navigate"
-  route: string
+  type: "navigate" | "logout"
+  route?: string
+  href?: string
+  label?: string
   selector?: string
   title?: string
   message?: string

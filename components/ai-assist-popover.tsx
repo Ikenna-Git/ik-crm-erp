@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
+import { signOut } from "next-auth/react"
 import { Bot, Navigation, Send, Sparkles, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -104,9 +105,10 @@ export function AiAssistPopover() {
   const pageCoach = useMemo(() => getPageCoach(pathname), [pathname])
 
   const onTargetPage = useMemo(() => {
-    if (!instruction?.route) return false
-    return pathname === instruction.route || pathname.startsWith(`${instruction.route}/`)
-  }, [instruction?.route, pathname])
+    const target = instruction?.href || instruction?.route
+    if (!target || instruction?.type !== "navigate") return false
+    return pathname === target || pathname.startsWith(`${target}/`)
+  }, [instruction?.href, instruction?.route, instruction?.type, pathname])
 
   useEffect(() => {
     const refresh = () => setInstruction(readAiAssistInstruction())
@@ -154,6 +156,23 @@ export function AiAssistPopover() {
     return () => window.clearTimeout(timer)
   }, [instruction, onTargetPage])
 
+  const handleInstructionAction = async (action?: AiAssistInstruction | null) => {
+    if (!action) return
+    if (action.type === "logout") {
+      clearAiAssistInstruction()
+      await signOut({ callbackUrl: "/" })
+      return
+    }
+    const target = action.href || action.route
+    if (!target) return
+    writeAiAssistInstruction(action)
+    if (pathname === target || pathname.startsWith(`${target}/`)) {
+      flashHighlight(action.selector)
+      return
+    }
+    router.push(target)
+  }
+
   const sendMessage = async (text: string) => {
     const trimmed = text.trim()
     if (!trimmed || loading) return
@@ -189,14 +208,13 @@ export function AiAssistPopover() {
       setMessages([...nextMessages, { role: "assistant", content: reply }])
 
       const actions = Array.isArray(data?.actions) ? (data.actions as AiAssistInstruction[]) : []
-      const navigateAction = actions.find((item) => item?.type === "navigate" && item.route)
-      if (navigateAction) {
-        writeAiAssistInstruction(navigateAction)
-        if (pathname === navigateAction.route || pathname.startsWith(`${navigateAction.route}/`)) {
-          flashHighlight(navigateAction.selector)
-        } else {
-          router.push(navigateAction.route)
-        }
+      const primaryAction = actions.find(
+        (item) =>
+          (item?.type === "navigate" && (item.route || item.href)) ||
+          item?.type === "logout",
+      )
+      if (primaryAction) {
+        await handleInstructionAction(primaryAction)
       }
     } catch (err: any) {
       const fallback = err?.message || "I ran into an error. Try again in a moment."
@@ -243,14 +261,13 @@ export function AiAssistPopover() {
             {instruction.message || "I can guide you and highlight where to work next."}
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
-            {!onTargetPage ? (
-              <Button
-                size="sm"
-                onClick={() => {
-                  router.push(instruction.route)
-                }}
-              >
-                Take me there
+            {instruction.type === "logout" ? (
+              <Button size="sm" onClick={() => handleInstructionAction(instruction)}>
+                {instruction.label || "Sign out"}
+              </Button>
+            ) : !onTargetPage ? (
+              <Button size="sm" onClick={() => handleInstructionAction(instruction)}>
+                {instruction.label || "Take me there"}
               </Button>
             ) : (
               <Button

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import { signOut } from "next-auth/react"
 import { Sparkles, Send, Wand2, ListChecks, Mail, Activity } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -20,12 +21,12 @@ type ChatAction = AiAssistInstruction
 
 const STORAGE_KEY = "civis_ai_chat"
 const quickPrompts = [
-  "Guide me through Civis as a new team lead.",
-  "Guide me on step 2 (CRM deep dive).",
-  "Summarize my CRM pipeline this week.",
-  "How do I add a custom field in CRM?",
-  "Draft a follow-up email to a lead.",
-  "What should I fix first in Ops?",
+  "Take me to pricing.",
+  "Open gallery.",
+  "What can I do here?",
+  "What should I do next?",
+  "Summarise this page.",
+  "Log me out.",
 ]
 
 const tourSteps = [
@@ -106,10 +107,19 @@ export default function CivisAIPage() {
       setMessages([...nextMessages, { role: "assistant", content: reply }])
 
       const actions = Array.isArray(data?.actions) ? (data.actions as ChatAction[]) : []
-      const navigateAction = actions.find((item) => item?.type === "navigate" && item.route)
-      if (navigateAction && data?.provider === "civis-nav-engine") {
-        writeAiAssistInstruction(navigateAction)
-        router.push(navigateAction.route)
+      const primaryAction = actions.find(
+        (item) => (item?.type === "navigate" && (item.route || item.href)) || item?.type === "logout",
+      )
+      if (primaryAction) {
+        if (primaryAction.type === "logout") {
+          await signOut({ callbackUrl: "/" })
+        } else {
+          const target = primaryAction.href || primaryAction.route
+          if (target) {
+            writeAiAssistInstruction(primaryAction)
+            router.push(target)
+          }
+        }
       }
     } catch (err: any) {
       setError(err?.message || "Civis AI is unavailable right now.")
@@ -204,13 +214,48 @@ export default function CivisAIPage() {
             Civis AI Concierge
           </h1>
           <p className="text-muted-foreground mt-1">
-            Ask questions, generate insights, and automate follow-ups with your branded assistant.
+            Deterministic navigation, page guidance, and provider-backed drafting in one assistant surface.
           </p>
         </div>
-        <Badge variant="outline" className="bg-transparent">
-          AI Assist
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className="bg-transparent">
+            Deterministic commands live
+          </Badge>
+          <Badge variant="secondary" className="bg-muted text-muted-foreground">
+            Generative drafting requires provider config
+          </Badge>
+        </div>
       </div>
+
+      <Card className="border-border/70 bg-gradient-to-br from-card via-card to-muted/30">
+        <CardHeader>
+          <CardTitle>What Civis AI can do right now</CardTitle>
+          <CardDescription>
+            Civis always handles navigation and setup guidance honestly. Drafting, richer summaries, and deeper generation
+            depend on provider configuration.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-border bg-background/70 p-4">
+            <p className="text-sm font-semibold">Always available</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Navigate the app, explain the current page, suggest next actions, and sign you out safely.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-border bg-background/70 p-4">
+            <p className="text-sm font-semibold">Provider-backed</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Email drafts, richer summaries, and conversational assistance improve when OpenAI, Anthropic, or Gemini is configured.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-border bg-background/70 p-4">
+            <p className="text-sm font-semibold">Non-negotiable rules</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              No fake navigation, no silent permission bypass, and no revealing locked HR or accounting data.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid lg:grid-cols-[2fr,1fr] gap-6">
         <Card className="h-full">

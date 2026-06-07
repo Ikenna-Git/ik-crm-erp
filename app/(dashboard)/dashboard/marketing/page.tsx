@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from "@/components/ui/label"
 import { Mail, Users, Send, BarChart3, Plus, Eye, Edit, Trash2 } from "lucide-react"
 import { toast } from "@/hooks/use-toast"
+import { FEATURE_STATE_COPY } from "@/lib/feature-state"
 
 const campaigns = [
   {
@@ -90,7 +91,7 @@ export default function MarketingPage() {
         <div>
           <h1 className="text-3xl font-bold">Email Marketing</h1>
           <p className="text-muted-foreground">
-            Create and manage email campaigns to engage your audience.
+            Preview how marketing could fit into Civis without pretending campaign delivery is production-ready.
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
             This workspace currently exposes a preview-only marketing module. Live sending, saved drafts, and reports
@@ -162,6 +163,13 @@ export default function MarketingPage() {
         </TabsList>
 
         <TabsContent value="campaigns" className="space-y-4">
+          <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">Preview data only</p>
+            <p className="mt-1">
+              The campaign cards below are sample layouts to show the intended product direction. They are not live
+              records from this workspace, and campaign sending remains disabled for launch.
+            </p>
+          </div>
           <div className="grid gap-4">
             {campaigns.map((campaign) => (
               <Card key={campaign.id}>
@@ -172,6 +180,7 @@ export default function MarketingPage() {
                       <CardDescription>{campaign.subject}</CardDescription>
                     </div>
                     <div className="flex items-center gap-2">
+                      <Badge variant="outline">Sample</Badge>
                       <Badge variant={
                         campaign.status === "active" ? "default" :
                         campaign.status === "scheduled" ? "secondary" : "outline"
@@ -261,25 +270,25 @@ export default function MarketingPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div>
-                    <h3 className="font-medium">All Contacts</h3>
-                    <p className="text-sm text-muted-foreground">2,450 subscribers</p>
-                  </div>
-                  <Button variant="outline" size="sm">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <div>
+                      <h3 className="font-medium">All Contacts</h3>
+                      <p className="text-sm text-muted-foreground">Sample segmentation only in this release.</p>
+                    </div>
+                  <Button variant="outline" size="sm" disabled>
                     <Users className="h-4 w-4 mr-2" />
-                    View List
+                    Preview only
                   </Button>
                 </div>
                 <div className="flex items-center justify-between p-4 border rounded-lg">
                   <div>
                     <h3 className="font-medium">Active Customers</h3>
-                    <p className="text-sm text-muted-foreground">1,230 subscribers</p>
+                    <p className="text-sm text-muted-foreground">{FEATURE_STATE_COPY.notAvailableThisRelease}</p>
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" disabled>
                     <Users className="h-4 w-4 mr-2" />
-                    View List
+                    Preview only
                   </Button>
                 </div>
               </div>
@@ -288,6 +297,9 @@ export default function MarketingPage() {
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">
+          <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+            Analytics cards remain illustrative until real campaign persistence and provider-backed delivery exist.
+          </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
