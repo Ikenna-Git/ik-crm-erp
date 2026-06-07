@@ -78,6 +78,19 @@ const safeAmount = (value: unknown) => {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+const getApprovalActionState = (expense: Expense) => {
+  if (expense.approvalStatus === "pending") {
+    return { disabled: true, label: "Approval pending" }
+  }
+  if (expense.approvalStatus === "approved" || expense.status === "approved") {
+    return { disabled: true, label: "Already approved" }
+  }
+  if (expense.approvalStatus === "rejected" || expense.status === "rejected") {
+    return { disabled: true, label: "Resubmit not implemented" }
+  }
+  return { disabled: false, label: "Request approval" }
+}
+
 export function ExpensesTable({
   searchQuery,
   expenses: providedExpenses,
@@ -260,6 +273,7 @@ export function ExpensesTable({
               <tbody>
                 {pagedExpenses.map((expense) => {
                   const displayStatus = expense.approvalStatus || expense.status || "pending"
+                  const approvalAction = getApprovalActionState(expense)
                   return (
                     <tr key={expense.id} className="border-b border-border hover:bg-muted/50 transition">
                       <td className="py-4 px-4">
@@ -298,9 +312,9 @@ export function ExpensesTable({
                               <Edit className="w-4 h-4 mr-2" />
                               Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => requestApproval(expense)}>
+                            <DropdownMenuItem disabled={approvalAction.disabled} onClick={() => requestApproval(expense)}>
                               <CheckSquare className="w-4 h-4 mr-2" />
-                              Request approval
+                              {approvalAction.label}
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-destructive"

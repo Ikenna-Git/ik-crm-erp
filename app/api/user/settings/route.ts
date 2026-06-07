@@ -9,7 +9,6 @@ import { DEFAULT_CRM_VIEWS, DEFAULT_ONBOARDING_TASKS } from "@/lib/user-settings
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable user settings." }, { status: 503 })
-const isDev = process.env.NODE_ENV !== "production"
 
 const DEFAULT_SETTINGS = {
   theme: "dark",
@@ -264,10 +263,6 @@ export async function GET(request: Request) {
     })
   } catch (error) {
     console.error("User settings fetch failed", error)
-    if (isDev) {
-      const fallback = buildFallbackSettingsPayload(getFallbackIdentity(request))
-      return NextResponse.json(fallback)
-    }
     return NextResponse.json({ error: "Failed to load user settings" }, { status: 500 })
   }
 }
@@ -374,19 +369,6 @@ export async function PATCH(request: Request) {
     })
   } catch (error) {
     console.error("User settings update failed", error)
-    if (isDev) {
-      const { profile = {}, preferences = {}, notifications = {}, kpis, digest = {}, onboarding, crmViews } = body || {}
-      const fallback = buildFallbackSettingsPayload(getFallbackIdentity(request), {
-        profile,
-        preferences,
-        notifications,
-        kpis,
-        digest,
-        onboarding,
-        crmViews,
-      })
-      return NextResponse.json(fallback)
-    }
     return NextResponse.json({ error: "Failed to update user settings" }, { status: 500 })
   }
 }

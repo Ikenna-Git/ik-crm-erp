@@ -72,6 +72,19 @@ const safeAmount = (value: unknown) => {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+const getApprovalActionState = (invoice: Invoice) => {
+  if (invoice.approvalStatus === "pending") {
+    return { disabled: true, label: "Approval pending" }
+  }
+  if (invoice.approvalStatus === "approved") {
+    return { disabled: true, label: "Already approved" }
+  }
+  if (invoice.approvalStatus === "rejected") {
+    return { disabled: true, label: "Resubmit not implemented" }
+  }
+  return { disabled: false, label: "Request approval" }
+}
+
 export function InvoicesTable({
   searchQuery,
   invoices: providedInvoices,
@@ -250,6 +263,7 @@ export function InvoicesTable({
               <tbody>
                 {pagedInvoices.map((invoice) => {
                   const displayStatus = invoice.approvalStatus || invoice.status
+                  const approvalAction = getApprovalActionState(invoice)
                   return (
                     <tr key={invoice.id} className="border-b border-border hover:bg-muted/50 transition">
                       <td className="py-4 px-4 font-medium">{invoice.number}</td>
@@ -281,9 +295,9 @@ export function InvoicesTable({
                               <Download className="w-4 h-4 mr-2" />
                               Download PDF
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => requestApproval(invoice)}>
+                            <DropdownMenuItem disabled={approvalAction.disabled} onClick={() => requestApproval(invoice)}>
                               <CheckSquare className="w-4 h-4 mr-2" />
-                              Request approval
+                              {approvalAction.label}
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-destructive"

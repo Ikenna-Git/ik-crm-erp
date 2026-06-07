@@ -13,6 +13,12 @@ const normalizeSourceType = (value: unknown): ApprovalSourceType | null =>
 const normalizeDecision = (value: unknown): ApprovalDecision | null =>
   value === "pending" || value === "approved" || value === "rejected" ? value : null
 
+const normalizeApprovalStatus = (value: unknown): ApprovalDecision | null => {
+  if (typeof value !== "string") return null
+  const normalized = value.toLowerCase()
+  return normalized === "pending" || normalized === "approved" || normalized === "rejected" ? normalized : null
+}
+
 const loadSourceRecord = async (orgId: string, sourceType: ApprovalSourceType, sourceId: string) => {
   if (sourceType === "invoice") {
     const invoice = await prisma.invoice.findFirst({
@@ -69,6 +75,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Approval source record not found in this workspace" }, { status: 404 })
     }
 
+    const approvalStateMap = await getApprovalStateMapForOrg(org.id)
+    const currentApproval = approvalStateMap[`${sourceType}:${sourceId}`]
+    const sourceStatus = normalizeApprovalStatus(source.sourceStatus)
+
+    if (currentApproval?.status === "pending") {
+      return NextResponse.json({ error: "Approval is already pending for this record." }, { status: 409 })
+    }
+
+    if (currentApproval?.status === "approved" || sourceStatus === "approved") {
+      return NextResponse.json({ error: "This record is already approved. Resubmission is not implemented." }, { status: 409 })
+    }
+
+    if (currentApproval?.status === "rejected" || sourceStatus === "rejected") {
+      return NextResponse.json({ error: "This record was rejected. Revise and resubmit is not implemented yet." }, { status: 409 })
+    }
+
     await createAuditLog({
       orgId: org.id,
       userId: user.id,
@@ -86,8 +108,8 @@ export async function POST(request: Request) {
       }),
     })
 
-    const approvalStateMap = await getApprovalStateMapForOrg(org.id)
-    return NextResponse.json({ approval: approvalStateMap[`${sourceType}:${sourceId}`] || null })
+    const nextApprovalStateMap = await getApprovalStateMapForOrg(org.id)
+    return NextResponse.json({ approval: nextApprovalStateMap[`${sourceType}:${sourceId}`] || null })
   } catch (error) {
     return handleAccessRouteError(error, "Failed to request approval")
   }
@@ -111,14 +133,28 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Approval source record not found in this workspace" }, { status: 404 })
     }
 
+    const approvalStateMap = await getApprovalStateMapForOrg(org.id)
+    const currentApproval = approvalStateMap[`${sourceType}:${sourceId}`]
+
+    if (!currentApproval) {
+      return NextResponse.json({ error: "No pending approval request exists for this record." }, { status: 404 })
+    }
+
+    if (currentApproval.status !== "pending") {
+      return NextResponse.json({ error: `This approval is already ${currentApproval.status}.` }, { status: 409 })
+    }
+
     let invoice = null
     let expense = null
 
     if (sourceType === "expense") {
-      expense = await prisma.expense.update({
-        where: { id: sourceId },
+      const updateResult = await prisma.expense.updateMany({
+        where: { id: sourceId, orgId: org.id },
         data: { status: decision === "approved" ? "APPROVED" : "REJECTED" },
       })
+      if (updateResult.count === 0) {
+        return NextResponse.json({ error: "Approval source record not found in this workspace" }, { status: 404 })
+      }
     }
 
     await createAuditLog({
@@ -138,16 +174,20 @@ export async function PATCH(request: Request) {
       }),
     })
 
-    const approvalStateMap = await getApprovalStateMapForOrg(org.id)
+    const nextApprovalStateMap = await getApprovalStateMapForOrg(org.id)
 
     if (sourceType === "invoice") {
       invoice = await prisma.invoice.findFirst({
         where: { id: sourceId, orgId: org.id },
       })
+    } else {
+      expense = await prisma.expense.findFirst({
+        where: { id: sourceId, orgId: org.id },
+      })
     }
 
     return NextResponse.json({
-      approval: approvalStateMap[`${sourceType}:${sourceId}`] || null,
+      approval: nextApprovalStateMap[`${sourceType}:${sourceId}`] || null,
       invoice,
       expense,
     })

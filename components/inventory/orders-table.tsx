@@ -182,10 +182,6 @@ export function OrdersTable({
     }
   }
 
-  const requestApproval = (order: PurchaseOrder) => {
-    alert(`Purchase order approval for ${order.orderNo} is not persisted yet in this release. Do not use this action as a source of truth.`)
-  }
-
   return (
     <div className="space-y-4">
       {/* Order Stats */}
@@ -260,9 +256,9 @@ export function OrdersTable({
                             <Edit className="w-4 h-4 mr-2" />
                             Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => requestApproval(order)}>
+                          <DropdownMenuItem disabled>
                             <CheckSquare className="w-4 h-4 mr-2" />
-                            Request approval
+                            Approval not implemented
                           </DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive" onClick={() => deleteOrder(order.id)}>
                             <Trash2 className="w-4 h-4 mr-2" />

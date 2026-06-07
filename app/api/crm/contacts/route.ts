@@ -98,7 +98,10 @@ export async function PATCH(request: Request) {
     const safeStatus =
       (normalizedStatus && ["LEAD", "PROSPECT", "CUSTOMER"].includes(normalizedStatus) ? normalizedStatus : undefined) as any
 
-    const previous = await prisma.contact.findUnique({ where: { id } })
+    const previous = await prisma.contact.findFirst({ where: { id, orgId: org.id } })
+    if (!previous) {
+      return NextResponse.json({ error: "Contact not found in this workspace" }, { status: 404 })
+    }
     const contact = await prisma.contact.update({
       where: { id },
       data: {
@@ -151,7 +154,11 @@ export async function DELETE(request: Request) {
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 })
     }
-    const deleted = await prisma.contact.delete({ where: { id } })
+    const deleted = await prisma.contact.findFirst({ where: { id, orgId: org.id } })
+    if (!deleted) {
+      return NextResponse.json({ error: "Contact not found in this workspace" }, { status: 404 })
+    }
+    await prisma.contact.delete({ where: { id } })
     await createAuditLog({
       orgId: org.id,
       userId: user.id,
