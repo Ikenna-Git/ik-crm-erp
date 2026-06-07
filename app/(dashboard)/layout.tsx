@@ -1,80 +1,19 @@
-"use client"
-
 import type React from "react"
+import { redirect } from "next/navigation"
+import { getServerSession } from "next-auth"
+import { DashboardLayoutShell } from "@/components/dashboard-layout-shell"
+import { authOptions } from "@/lib/auth"
 
-import { useEffect } from "react"
-import { usePathname, useRouter } from "next/navigation"
-import { useSession } from "next-auth/react"
-import { DashboardSidebar } from "@/components/dashboard-sidebar"
-import { DashboardHeader } from "@/components/dashboard-header"
-import { OfflineBanner } from "@/components/offline-banner"
-import { GuidedOnboarding } from "@/components/guided-onboarding"
-import { AiAssistPopover } from "@/components/ai-assist-popover"
-import { getDashboardModuleFromPath, getFirstAccessibleDashboardPath, hasModuleAccess } from "@/lib/access-control"
-import { userUpdatedEventName } from "@/lib/user-settings"
-
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const { data: session, status } = useSession()
-  const isAuthenticated = status === "authenticated"
-  const loading = status === "loading"
+  const session = await getServerSession(authOptions)
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/login")
-    }
-  }, [router, status])
-
-  useEffect(() => {
-    if (status !== "authenticated" || !session?.user || !pathname) return
-    const module = getDashboardModuleFromPath(pathname)
-    if (!module) return
-    if (hasModuleAccess(session.user, module, "view")) return
-    router.replace(getFirstAccessibleDashboardPath(session.user))
-  }, [pathname, router, session, status])
-
-  useEffect(() => {
-    if (!session?.user) return
-    const payload = {
-      name: session.user.name || "",
-      email: session.user.email || "",
-      role: session.user.role || "user",
-      accessProfile: session.user.accessProfile || "GENERAL",
-      moduleAccess: session.user.moduleAccess || null,
-    }
-    window.dispatchEvent(new CustomEvent(userUpdatedEventName, { detail: payload }))
-  }, [session])
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center space-y-4">
-          <div className="w-8 h-8 rounded-lg bg-primary mx-auto animate-pulse" />
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    )
+  if (!session?.user?.email) {
+    redirect("/login")
   }
 
-  if (!isAuthenticated) {
-    return null
-  }
-
-  return (
-    <div className="flex h-screen bg-background">
-      <DashboardSidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <OfflineBanner />
-        <DashboardHeader />
-        <main className="flex-1 overflow-auto">{children}</main>
-        <AiAssistPopover />
-        <GuidedOnboarding />
-      </div>
-    </div>
-  )
+  return <DashboardLayoutShell>{children}</DashboardLayoutShell>
 }

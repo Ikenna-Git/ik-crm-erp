@@ -3,6 +3,11 @@
 ## Immediate
 
 - [ ] Redeploy `main` on Render
+- [ ] Re-run `BASE_URL=https://ik-crm-erp.onrender.com P0_SMOKE_DEBUG=1 npm run p0:smoke`
+- [ ] Confirm logged-out `/dashboard` no longer returns `200`
+- [ ] Confirm logged-out `/admin` no longer returns `200`
+- [ ] Confirm logged-out `/admin/system` is blocked
+- [ ] Confirm `/api/admin/orgs` and `/api/admin/platform-status` still return `401/403` when logged out
 - [ ] Re-test `ikenna.chilokwu@getpayedmail.com`
 - [ ] Confirm the invited account cannot access founder-only pages
 - [ ] Confirm the invited account cannot see users outside its own org
