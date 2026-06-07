@@ -6,7 +6,7 @@ import { ArrowRight, CheckCircle2, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const proofStats = [
-  { value: "6", label: "core business work areas" },
+  { value: "6", label: "core operating work areas" },
   { value: "1", label: "founder-led control plane" },
   { value: "3", label: "AI provider paths supported" },
   { value: "24/7", label: "visibility into queues and issues" },
@@ -14,8 +14,8 @@ const proofStats = [
 
 const trustSignals = [
   "Founder-locked super-admin model",
-  "Workspace-scoped admin and invite flow",
-  "OpenAPI docs and internal admin controls",
+  "Workspace-scoped admin, invite, and approvals flow",
+  "Server-side route guards and org isolation",
   "Custom CRM fields, workflows, reports, and webhooks",
 ]
 
@@ -45,7 +45,7 @@ export function ProofShowcase() {
           </div>
           <p className="max-w-2xl text-base leading-7 text-muted-foreground">
             Civis now has the structure to talk about governance, admin control, workflows, portal sharing, API coverage,
-            and product breadth in a more credible way. This section is the bridge between raw features and buyer trust.
+            and product breadth in a credible way. This section is the bridge between raw features and buyer trust.
           </p>
         </div>
 

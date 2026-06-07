@@ -10,8 +10,10 @@ import { hasModuleAccess } from "@/lib/access-control"
 
 type AiMode = "qna" | "summary" | "email" | "tour"
 type AiAction = {
-  type: "navigate"
-  route: string
+  type: "navigate" | "logout"
+  route?: string
+  href?: string
+  label?: string
   selector?: string
   title?: string
   message?: string
@@ -35,6 +37,13 @@ type TourContext = {
 type DataResolution = {
   message: string
   action?: AiAction
+}
+
+type CommandRoute = {
+  match: RegExp
+  action: AiAction
+  requiresAdmin?: boolean
+  requiresModule?: Parameters<typeof hasModuleAccess>[1]
 }
 
 const isDev = process.env.NODE_ENV !== "production"
@@ -174,6 +183,8 @@ const moduleActions: Record<string, AiAction> = {
   overview: {
     type: "navigate",
     route: "/dashboard",
+    href: "/dashboard",
+    label: "Open Overview",
     selector: "[data-ai-anchor='overview-header']",
     title: "Overview",
     message: "This is your business pulse. Start here to see risks and priorities.",
@@ -181,6 +192,8 @@ const moduleActions: Record<string, AiAction> = {
   crm: {
     type: "navigate",
     route: "/dashboard/crm",
+    href: "/dashboard/crm",
+    label: "Open CRM",
     selector: "[data-ai-anchor='crm-header']",
     title: "CRM",
     message: "CRM is where you manage contacts, companies, and deal movement.",
@@ -188,6 +201,8 @@ const moduleActions: Record<string, AiAction> = {
   accounting: {
     type: "navigate",
     route: "/dashboard/accounting",
+    href: "/dashboard/accounting",
+    label: "Open Accounting",
     selector: "[data-ai-anchor='accounting-header']",
     title: "Accounting",
     message: "Accounting is where invoices, expenses, reports, and exports live.",
@@ -195,6 +210,8 @@ const moduleActions: Record<string, AiAction> = {
   hr: {
     type: "navigate",
     route: "/dashboard/hr",
+    href: "/dashboard/hr",
+    label: "Open HR",
     selector: "[data-ai-anchor='hr-header']",
     title: "HR",
     message: "HR handles employees, payroll controls, attendance, and leave tracking.",
@@ -202,6 +219,8 @@ const moduleActions: Record<string, AiAction> = {
   operations: {
     type: "navigate",
     route: "/dashboard/operations",
+    href: "/dashboard/operations",
+    label: "Open Operations",
     selector: "[data-ai-anchor='operations-header']",
     title: "Operations",
     message: "Operations manages workflows, webhooks, and playbook execution.",
@@ -209,23 +228,141 @@ const moduleActions: Record<string, AiAction> = {
   portal: {
     type: "navigate",
     route: "/dashboard/portal",
+    href: "/dashboard/portal",
+    label: "Open Client Portal",
     selector: "[data-ai-anchor='portal-header']",
     title: "Client Portal",
     message: "Client Portal is where you share status updates and documents.",
   },
+  gallery: {
+    type: "navigate",
+    route: "/dashboard/gallery",
+    href: "/dashboard/gallery",
+    label: "Open Gallery",
+    title: "Gallery",
+    message: "Gallery is where you manage uploaded media, proposals, and client-ready assets.",
+  },
+  inventory: {
+    type: "navigate",
+    route: "/dashboard/inventory",
+    href: "/dashboard/inventory",
+    label: "Open Inventory",
+    title: "Inventory",
+    message: "Inventory tracks products, stock levels, and purchase flow readiness.",
+  },
+  settings: {
+    type: "navigate",
+    route: "/dashboard/settings",
+    href: "/dashboard/settings",
+    label: "Open Settings",
+    title: "Settings",
+    message: "Settings is where you manage profile, workspace, notifications, and admin invitations.",
+  },
+  marketing: {
+    type: "navigate",
+    route: "/dashboard/marketing",
+    href: "/dashboard/marketing",
+    label: "Open Marketing",
+    title: "Marketing",
+    message: "Marketing is currently preview-only, so I will take you there with the right expectations.",
+  },
+  projects: {
+    type: "navigate",
+    route: "/dashboard/projects",
+    href: "/dashboard/projects",
+    label: "Open Projects",
+    title: "Projects",
+    message: "Projects is where you track delivery work, tasks, and deadlines.",
+  },
+  pricing: {
+    type: "navigate",
+    route: "/pricing",
+    href: "/pricing",
+    label: "Open Pricing",
+    title: "Pricing",
+    message: "Opening Pricing. Public self-serve checkout is not live yet, but you can review plans and start sign-up.",
+  },
+  admin: {
+    type: "navigate",
+    route: "/admin",
+    href: "/admin",
+    label: "Open Admin",
+    title: "Admin",
+    message: "Opening Admin. Founder-only platform controls stay locked unless your role permits them.",
+  },
 }
 
-const detectNavigationAction = (prompt: string): AiAction | null => {
+const commandRoutes: CommandRoute[] = [
+  { match: /\b(pricing|plan|plans|billing)\b/, action: moduleActions.pricing },
+  { match: /\b(gallery|media|assets)\b/, action: moduleActions.gallery, requiresModule: "gallery" },
+  { match: /\b(crm|contacts?|companies?|deals?)\b/, action: moduleActions.crm, requiresModule: "crm" },
+  { match: /\b(sales pipeline|pipeline)\b/, action: { ...moduleActions.crm, message: "Opening CRM. Start on the Deals board to review your sales pipeline." }, requiresModule: "crm" },
+  { match: /\b(accounting|invoice|invoices|expense|expenses|finance)\b/, action: moduleActions.accounting, requiresModule: "accounting" },
+  { match: /\b(hr|employee|employees|payroll|attendance|leave)\b/, action: { ...moduleActions.hr, message: "Opening HR. Payroll controls sit inside the HR workspace." }, requiresModule: "hr" },
+  { match: /\b(inventory|stock|product|products)\b/, action: moduleActions.inventory, requiresModule: "inventory" },
+  { match: /\b(marketing|campaign|campaigns)\b/, action: moduleActions.marketing, requiresModule: "marketing" },
+  { match: /\b(operations|playbooks?|workflow|workflows|webhooks?)\b/, action: moduleActions.operations, requiresModule: "operations" },
+  { match: /\b(portal|client portal)\b/, action: moduleActions.portal, requiresModule: "portal" },
+  { match: /\b(settings|preferences|workspace settings|profile settings)\b/, action: moduleActions.settings, requiresModule: "settings" },
+  { match: /\b(project|projects|tasks?)\b/, action: moduleActions.projects, requiresModule: "projects" },
+  { match: /\badmin\b/, action: moduleActions.admin, requiresAdmin: true, requiresModule: "admin" },
+]
+
+const getNavigationGuardFailure = (
+  action: CommandRoute,
+  subject: { role?: string | null; accessProfile?: string | null; moduleAccess?: unknown } | null,
+) => {
+  if (action.requiresAdmin && !subject?.role) {
+    return "You need to be signed in before I can open that page."
+  }
+  if (action.requiresAdmin && !hasModuleAccess(subject || {}, "admin", "view")) {
+    return "Admin access is blocked for this account. I can keep you in your workspace, but I won’t bypass permissions."
+  }
+  if (action.requiresModule && !hasModuleAccess(subject || {}, action.requiresModule, "view")) {
+    return "That page is blocked for your current workspace role. Ask a workspace admin if you need access."
+  }
+  return null
+}
+
+const detectNavigationAction = (
+  prompt: string,
+  subject: { role?: string | null; accessProfile?: string | null; moduleAccess?: unknown } | null,
+): DataResolution | null => {
   const value = prompt.toLowerCase()
-  const asksNavigation = /(take me|go to|open|where is|where can i find|show me where|navigate|how do i find)/.test(value)
+  const asksNavigation =
+    /(take me|go to|open|where is|where can i find|show me where|navigate|how do i find|switch to)/.test(value) ||
+    /^(overview|dashboard)$/i.test(prompt.trim())
   if (!asksNavigation) return null
 
-  if (/(crm|deal|contact|company|pipeline)/.test(value)) return moduleActions.crm
-  if (/(accounting|invoice|expense|financial|vat|report)/.test(value)) return moduleActions.accounting
-  if (/(hr|employee|payroll|attendance|leave|position)/.test(value)) return moduleActions.hr
-  if (/(operations|workflow|playbook|webhook)/.test(value)) return moduleActions.operations
-  if (/(portal|client portal|client update|share link)/.test(value)) return moduleActions.portal
-  return moduleActions.overview
+  if (/^(overview|dashboard)$/i.test(prompt.trim())) {
+    return { message: "Opening Overview.", action: moduleActions.overview }
+  }
+
+  const match = commandRoutes.find((entry) => entry.match.test(value))
+  if (!match) {
+    return { message: "I can open Overview, CRM, Accounting, HR, Inventory, Marketing, Gallery, Settings, Pricing, Operations, Projects, or Admin.", action: moduleActions.overview }
+  }
+
+  const blockedMessage = getNavigationGuardFailure(match, subject)
+  if (blockedMessage) return { message: blockedMessage }
+
+  return {
+    message: match.action.message || `Opening ${match.action.title || "that page"}.`,
+    action: match.action,
+  }
+}
+
+const detectLogoutAction = (prompt: string): DataResolution | null => {
+  if (!/\b(log ?me out|sign me out|logout|log out)\b/i.test(prompt)) return null
+  return {
+    message: "I can sign you out safely now.",
+    action: {
+      type: "logout",
+      label: "Sign out",
+      title: "Logout",
+      message: "Use this action to sign out of Civis securely.",
+    },
+  }
 }
 
 const isAffirmativePrompt = (prompt: string) =>
@@ -626,6 +763,273 @@ const resolveDataQuery = async (
   }
 }
 
+const resolvePageKey = (currentPath: string) => {
+  if (currentPath.startsWith("/dashboard/crm")) return "crm"
+  if (currentPath.startsWith("/dashboard/accounting")) return "accounting"
+  if (currentPath.startsWith("/dashboard/hr")) return "hr"
+  if (currentPath.startsWith("/dashboard/operations")) return "operations"
+  if (currentPath.startsWith("/dashboard/gallery")) return "gallery"
+  if (currentPath.startsWith("/dashboard/marketing")) return "marketing"
+  if (currentPath.startsWith("/dashboard/settings")) return "settings"
+  if (currentPath.startsWith("/dashboard/portal")) return "portal"
+  if (currentPath.startsWith("/dashboard/projects")) return "projects"
+  if (currentPath.startsWith("/dashboard/ai")) return "ai"
+  if (currentPath.startsWith("/admin")) return "admin"
+  return "overview"
+}
+
+const resolvePageHelp = ({
+  currentPath,
+  hrUnlocked,
+  financeUnlocked,
+  hasAiProvider,
+}: {
+  currentPath: string
+  hrUnlocked: boolean
+  financeUnlocked: boolean
+  hasAiProvider: boolean
+}): { canDo: string; blocked: string; setup: string; next: string; action?: AiAction } => {
+  const pageKey = resolvePageKey(currentPath)
+  switch (pageKey) {
+    case "crm":
+      return {
+        canDo: "You can add contacts, companies, and deals, review pipeline health, export CRM reports, and trigger follow-up generation.",
+        blocked: "If follow-up automation or deeper AI help is unavailable, Civis should say so clearly instead of inventing tasks.",
+        setup: "Start by adding contacts or importing a CSV, then create one company and one deal to unlock a meaningful pipeline view.",
+        next: "Review stale contacts, move active deals forward, and export the CRM snapshot if leadership needs an update.",
+        action: moduleActions.crm,
+      }
+    case "accounting":
+      return {
+        canDo: "You can review invoices, expenses, approvals, and report packs for this workspace.",
+        blocked: financeUnlocked
+          ? "Anything blocked here is more likely a provider or release limitation, not a finance permission issue."
+          : "Amounts, exports, approvals, and detail views stay redacted until you have Accounting manage access.",
+        setup: "Record one invoice and one expense, then run the approval flow before trusting exports or summaries.",
+        next: "Check overdue invoices first, then clear pending expenses and confirm approvals persist after refresh.",
+        action: moduleActions.accounting,
+      }
+    case "hr":
+      return {
+        canDo: "You can review employees, payroll, attendance, positions, and compliance packs from this page.",
+        blocked: hrUnlocked
+          ? "Anything blocked here is likely a release or configuration gap, not a role restriction."
+          : "Employee contact details, payroll amounts, exports, and row-level actions stay locked until HR manage access is granted.",
+        setup: "Add one employee, one payroll record, and one attendance record to validate that the HR workspace is grounded in real data.",
+        next: "Verify employee directory quality first, then review payroll and attendance before inviting more HR operators.",
+        action: moduleActions.hr,
+      }
+    case "operations":
+      return {
+        canDo: "You can monitor approvals, workflows, incidents, compliance packs, and command-centre signals.",
+        blocked: "Integrations and saved reports should stay honest if persistence or provider setup is not available yet.",
+        setup: "Confirm approval requests persist from Accounting, then verify workflows and webhook visibility with real org-scoped records.",
+        next: "Clear pending approvals, review workflow health, and check compliance gaps before launch demos.",
+        action: moduleActions.operations,
+      }
+    case "gallery":
+      return {
+        canDo: "You can upload media, rename items, share links, and organise customer-facing assets here.",
+        blocked: "Uploads fail safely if Cloudinary is not configured. Civis should never fake a successful upload.",
+        setup: "Connect Cloudinary first, then upload a single image and verify the file still works after refresh.",
+        next: "Add a branded proposal deck or screenshot set so the workspace has real assets for demos.",
+        action: moduleActions.gallery,
+      }
+    case "marketing":
+      return {
+        canDo: "You can review the marketing release preview, sample campaign structure, and readiness notes.",
+        blocked: "Campaign creation, sending, analytics, and template editing are preview-only in this release.",
+        setup: "There is no production marketing setup to complete yet. Keep this module framed as a preview during launch.",
+        next: "Use CRM and Operations for real launch flows. Treat Marketing as roadmap context only.",
+        action: moduleActions.marketing,
+      }
+    case "settings":
+      return {
+        canDo: "You can update profile, preferences, notifications, digest timing, and workspace settings that are truly persisted.",
+        blocked: "Unsupported security toggles or provider-backed settings should remain visibly non-persistent until the backend exists.",
+        setup: "Save profile and workspace name first, then test invites, digest email, and notification preferences with refresh.",
+        next: "Use settings to tighten workspace identity, invites, and notifications before customer demos.",
+        action: moduleActions.settings,
+      }
+    case "portal":
+      return {
+        canDo: "You can publish client updates, manage shared documents, and review portal-level status.",
+        blocked: "Portal data should stay org-scoped, and document sharing depends on upload configuration.",
+        setup: "Create one client portal, add a summary update, and attach one document after uploads are validated.",
+        next: "Use the portal for customer-facing proof after CRM and uploads are already stable.",
+        action: moduleActions.portal,
+      }
+    case "projects":
+      return {
+        canDo: "You can track tasks, project progress, and deadlines for delivery work.",
+        blocked: "Anything blocked here should be a permission or not-in-this-release state, not a fake saved action.",
+        setup: "Create one project with one task and one owner so the module has real execution data.",
+        next: "Check overdue tasks and link project work back to Ops priorities.",
+        action: moduleActions.projects,
+      }
+    case "ai":
+      return {
+        canDo: "You can use deterministic navigation, page guidance, setup help, follow-up generation, and provider-backed drafting when configured.",
+        blocked: hasAiProvider
+          ? "If a provider call fails, Civis should fall back gracefully without pretending the AI action completed."
+          : "Generative drafting and richer summaries require an AI provider key. Navigation and setup guidance still work without one.",
+        setup: "Configure an AI provider only if you want higher-quality drafting. The deterministic command layer works either way.",
+        next: "Try 'take me to gallery', 'what can I do here?', or 'what should I do next?' to validate the AI layer.",
+        action: { ...moduleActions.overview, title: "Civis AI" },
+      }
+    case "admin":
+      return {
+        canDo: "You can review workspace health, access boundaries, founder-only controls, and launch-readiness signals.",
+        blocked: "Founder-only pages and platform APIs stay blocked unless the real founder super-admin is signed in.",
+        setup: "Verify org boundaries, route guards, and provider readiness before you trust this for launch or investor demos.",
+        next: "Review Trust & Security, then verify the founder/org-owner separation live.",
+        action: moduleActions.admin,
+      }
+    default:
+      return {
+        canDo: "You can review KPIs, priorities, activity, and launch-readiness signals from the overview.",
+        blocked: "Any empty cards here mean the workspace needs more real records or provider validation, not fake sample data.",
+        setup: "Finish the onboarding checklist, then add CRM, accounting, and HR records so the dashboard becomes meaningful.",
+        next: "Start with the highest-priority Civis Pulse card, then move into CRM or Accounting based on what is blocked.",
+        action: moduleActions.overview,
+      }
+  }
+}
+
+const resolvePageCommand = async ({
+  currentPath,
+  prompt,
+  orgId,
+  hasDbUser,
+  hrUnlocked,
+  financeUnlocked,
+}: {
+  currentPath: string
+  prompt: string
+  orgId: string
+  hasDbUser: boolean
+  hrUnlocked: boolean
+  financeUnlocked: boolean
+}): Promise<DataResolution | null> => {
+  const value = prompt.toLowerCase()
+  const hasAiProvider = Boolean(process.env.OPENAI_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.GEMINI_API_KEY)
+  const help = resolvePageHelp({ currentPath, hrUnlocked, financeUnlocked, hasAiProvider })
+
+  if (/what can i do (here|on this page)|help on this page/.test(value)) {
+    return { message: help.canDo, action: help.action }
+  }
+
+  if (/what is blocked|what'?s blocked|what is unavailable|why is this blocked/.test(value)) {
+    return { message: help.blocked, action: help.action }
+  }
+
+  if (/help me set this up|how do i set this up|set this up/.test(value)) {
+    return { message: help.setup, action: help.action }
+  }
+
+  if (/what should i do next|next best action|what next/.test(value)) {
+    return { message: help.next, action: help.action }
+  }
+
+  if (!/summari[sz]e this page|summary of this page|summarise this screen|summarize this screen/.test(value)) {
+    return null
+  }
+
+  if (!hasDbUser) {
+    return {
+      message: "Live database context is unavailable right now, so I can only summarise the page structure and setup guidance rather than real workspace numbers.",
+      action: help.action,
+    }
+  }
+
+  const pageKey = resolvePageKey(currentPath)
+  if (pageKey === "crm") {
+    const [contacts, openDeals, companies] = await Promise.all([
+      prisma.contact.count({ where: { orgId } }),
+      prisma.deal.count({ where: { orgId, stage: { notIn: ["WON", "LOST"] } } }),
+      prisma.company.count({ where: { orgId } }),
+    ])
+    return {
+      message: `CRM summary: ${contacts} contacts, ${companies} companies, and ${openDeals} open deals. Use this page to clean records, move pipeline, and generate follow-up work without leaving the workspace.`,
+      action: moduleActions.crm,
+    }
+  }
+
+  if (pageKey === "accounting") {
+    const [invoiceCount, overdueInvoices, expenseCount, pendingExpenses] = await Promise.all([
+      prisma.invoice.count({ where: { orgId } }),
+      prisma.invoice.count({ where: { orgId, status: "OVERDUE" } }),
+      prisma.expense.count({ where: { orgId } }),
+      prisma.expense.count({ where: { orgId, status: "PENDING" } }),
+    ])
+    const lockNote = financeUnlocked ? "" : " Sensitive amounts and exports are still role-locked."
+    return {
+      message: `Accounting summary: ${invoiceCount} invoices, ${overdueInvoices} overdue, ${expenseCount} expenses, and ${pendingExpenses} pending approval.${lockNote}`,
+      action: moduleActions.accounting,
+    }
+  }
+
+  if (pageKey === "hr") {
+    const [employeeCount, payrollCount, attendanceCount, positionCount] = await Promise.all([
+      prisma.employee.count({ where: { orgId } }),
+      prisma.payrollRecord.count({ where: { orgId } }),
+      prisma.attendanceRecord.count({ where: { orgId } }),
+      prisma.position.count({ where: { orgId } }),
+    ])
+    const lockNote = hrUnlocked ? "" : " Payroll and personal employee details remain redacted for this role."
+    return {
+      message: `HR summary: ${employeeCount} employees, ${payrollCount} payroll records, ${attendanceCount} attendance entries, and ${positionCount} tracked positions.${lockNote}`,
+      action: moduleActions.hr,
+    }
+  }
+
+  if (pageKey === "operations") {
+    const [workflowCount, taskCount, portalCount] = await Promise.all([
+      prisma.automationWorkflow.count({ where: { orgId } }),
+      prisma.task.count({ where: { orgId, status: "OPEN" } }),
+      prisma.clientPortal.count({ where: { orgId, status: "ACTIVE" } }),
+    ])
+    return {
+      message: `Operations summary: ${workflowCount} active workflows, ${taskCount} open tasks, and ${portalCount} active client portals. Use this page to monitor approvals, workflow health, and compliance gaps.`,
+      action: moduleActions.operations,
+    }
+  }
+
+  if (pageKey === "gallery") {
+    const itemCount = await prisma.galleryItem.count({ where: { orgId } })
+    return {
+      message: `Gallery summary: ${itemCount} uploaded asset${itemCount === 1 ? "" : "s"} in this workspace. Uploads still depend on Cloudinary configuration being present.`,
+      action: moduleActions.gallery,
+    }
+  }
+
+  if (pageKey === "marketing") {
+    return {
+      message: "Marketing summary: this module is intentionally preview-only for launch. Use it to explain roadmap direction, not to run live campaigns or sending.",
+      action: moduleActions.marketing,
+    }
+  }
+
+  if (pageKey === "settings") {
+    return {
+      message: "Settings summary: this page persists profile, preferences, notifications, and supported workspace fields. Unsupported security-style toggles should stay visibly non-persistent until backend support exists.",
+      action: moduleActions.settings,
+    }
+  }
+
+  const [employees, contacts, openDeals, overdueInvoices, pendingExpenses] = await Promise.all([
+    prisma.employee.count({ where: { orgId } }),
+    prisma.contact.count({ where: { orgId } }),
+    prisma.deal.count({ where: { orgId, stage: { notIn: ["WON", "LOST"] } } }),
+    prisma.invoice.count({ where: { orgId, status: "OVERDUE" } }),
+    prisma.expense.count({ where: { orgId, status: "PENDING" } }),
+  ])
+  return {
+    message: `Overview summary: ${employees} employees, ${contacts} contacts, ${openDeals} open deals, ${overdueInvoices} overdue invoices, and ${pendingExpenses} pending expenses. This is the page to decide what needs attention first.`,
+    action: moduleActions.overview,
+  }
+}
+
 export async function POST(request: Request) {
   try {
     if (Number.isFinite(aiRateLimitPerMinute) && aiRateLimitPerMinute > 0) {
@@ -679,10 +1083,24 @@ export async function POST(request: Request) {
     const incoming = Array.isArray(body?.messages) ? normalizeMessages(body.messages) : []
     const lastUserMessage = [...incoming].reverse().find((msg) => msg.role === "user")?.content || ""
     const previousAssistantMessage = [...incoming].reverse().find((msg) => msg.role === "assistant")?.content || ""
+    const currentPath =
+      typeof body?.context?.currentPath === "string" && body.context.currentPath
+        ? body.context.currentPath
+        : request.headers.get("x-current-path") || "/dashboard"
     const hrUnlocked = accessSubject ? hasModuleAccess(accessSubject, "hr", "manage") : false
     const financeUnlocked = accessSubject ? hasModuleAccess(accessSubject, "accounting", "manage") : false
 
     if (requestedMode === "qna") {
+      const logoutResolution = detectLogoutAction(lastUserMessage)
+      if (logoutResolution) {
+        return NextResponse.json({
+          message: logoutResolution.message,
+          provider: "civis-session-engine",
+          mode: "qna",
+          actions: logoutResolution.action ? [logoutResolution.action] : [],
+        })
+      }
+
       let followupResolution: DataResolution | null = null
       try {
         followupResolution = await resolveConversationFollowup(
@@ -763,13 +1181,30 @@ export async function POST(request: Request) {
         })
       }
 
-      const navigationAction = detectNavigationAction(lastUserMessage)
+      const navigationAction = detectNavigationAction(lastUserMessage, accessSubject)
       if (navigationAction) {
         return NextResponse.json({
-          message: `Taking you to ${navigationAction.title}. I will highlight the section when you arrive.`,
+          message: navigationAction.message,
           provider: "civis-nav-engine",
           mode: "qna",
-          actions: [navigationAction],
+          actions: navigationAction.action ? [navigationAction.action] : [],
+        })
+      }
+
+      const pageCommand = await resolvePageCommand({
+        currentPath,
+        prompt: lastUserMessage,
+        orgId: org.id,
+        hasDbUser,
+        hrUnlocked,
+        financeUnlocked,
+      })
+      if (pageCommand) {
+        return NextResponse.json({
+          message: pageCommand.message,
+          provider: "civis-command-centre",
+          mode: "qna",
+          actions: pageCommand.action ? [pageCommand.action] : [],
         })
       }
 

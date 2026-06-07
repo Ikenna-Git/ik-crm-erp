@@ -7,15 +7,15 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
 const quickPoints = [
-  "CRM, finance, HR, projects, and client portal in one workspace",
-  "Founder keeps platform control while company admins manage their own teams",
-  "Built for growing teams that need clarity before complexity",
+  "CRM, finance, HR, projects, and client portal in one accountable workspace",
+  "Founder keeps platform control while each company admin stays inside their own org",
+  "Built for growing teams that need clarity, approvals, and trust before complexity",
 ]
 
 const proofCards = [
-  { label: "Founder control", value: "Locked to you" },
+  { label: "Founder control", value: "Platform locked" },
   { label: "Workspace admins", value: "Scoped by company" },
-  { label: "Client updates", value: "Portal-ready" },
+  { label: "Launch posture", value: "Honest by design" },
 ]
 
 export function Hero() {
@@ -34,11 +34,11 @@ export function Hero() {
 
           <div className="space-y-4">
             <h1 className="max-w-4xl text-4xl font-semibold leading-tight text-foreground sm:text-5xl lg:text-6xl">
-              Run sales, money, people, and operations from one clear workspace.
+              Run the operating system for your business from one calm, accountable workspace.
             </h1>
             <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
-              Civis helps you manage the day-to-day work of a growing company without drowning teams in ERP jargon. See
-              what needs attention, give each team the tools they need, and keep admin control where it belongs.
+              Civis brings CRM, approvals, finance, HR, projects, and admin control into one product that feels clear
+              enough for operators and credible enough for buyers, investors, and real teams.
             </p>
           </div>
 
@@ -54,7 +54,7 @@ export function Hero() {
           <div className="flex flex-col gap-4 sm:flex-row">
             <Button size="lg" asChild>
               <Link href="/signup" className="flex items-center gap-2">
-                Start with Civis
+                Start your workspace
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>

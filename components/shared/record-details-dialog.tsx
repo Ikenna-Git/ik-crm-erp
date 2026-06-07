@@ -35,10 +35,15 @@ export function RecordDetailsDialog({
   lockedTitle = "Details unavailable",
   lockedDescription = "Your current role can access this module, but not the underlying record details.",
 }: RecordDetailsDialogProps) {
+  const safeValue = (value: ReactNode) => {
+    if (value === null || value === undefined || value === "") return "—"
+    return value
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] w-[min(92vw,48rem)] flex-col overflow-hidden p-0">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[85vh] w-[min(92vw,52rem)] flex-col overflow-hidden p-0 sm:max-w-3xl">
+        <DialogHeader className="shrink-0">
           <div className="border-b border-border px-6 pb-4 pt-6">
             <DialogTitle>{locked ? lockedTitle : title}</DialogTitle>
             {locked ? (
@@ -68,7 +73,7 @@ export function RecordDetailsDialog({
                         <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                           {field.label}
                         </dt>
-                        <dd className="mt-1 break-words text-sm text-foreground">{field.value || "—"}</dd>
+                        <dd className="mt-1 break-words text-sm text-foreground">{safeValue(field.value)}</dd>
                       </div>
                     ))}
                   </dl>

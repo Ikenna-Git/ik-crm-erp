@@ -5,7 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { TrendingUp, Users, DollarSign, Package, AlertTriangle, ArrowUpRight, SlidersHorizontal } from "lucide-react"
+import { TrendingUp, Users, DollarSign, Package, AlertTriangle, ArrowUpRight, SlidersHorizontal, ShieldCheck, Wrench, Rocket } from "lucide-react"
 import { formatNaira } from "@/lib/currency"
 import { useCachedFetch } from "@/hooks/use-cached-fetch"
 import { getSessionHeaders } from "@/lib/user-settings"
@@ -15,6 +15,8 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Progress } from "@/components/ui/progress"
 import { useSession } from "next-auth/react"
 import { DEFAULT_ONBOARDING_TASKS, type OnboardingTask } from "@/lib/user-settings"
+import { PremiumEmptyState } from "@/components/shared/premium-empty-state"
+import { canViewFounderControls } from "@/lib/authz"
 
 const emptyCommand = {
   stats: {
@@ -50,6 +52,23 @@ const kpiIcons: Record<string, any> = {
   expensesMtd: Package,
   overdueInvoices: AlertTriangle,
   pendingExpenses: Package,
+}
+
+type DecisionItem = {
+  id: string
+  title: string
+  detail: string
+  impact: keyof typeof impactStyles
+  action: string
+  href: string
+}
+
+type RecentActivityItem = {
+  id: string
+  title: string
+  detail: string
+  time: string
+  status: keyof typeof activityStatusStyles
 }
 
 export default function DashboardPage() {
@@ -140,8 +159,10 @@ export default function DashboardPage() {
     return { ...kpi, value: display }
   })
 
-  const decisionFeed = Array.isArray(command.decisions) ? command.decisions : []
-  const recentActivity = Array.isArray(command.recentActivity) ? command.recentActivity : []
+  const decisionFeed: DecisionItem[] = Array.isArray(command.decisions) ? (command.decisions as DecisionItem[]) : []
+  const recentActivity: RecentActivityItem[] = Array.isArray(command.recentActivity)
+    ? (command.recentActivity as RecentActivityItem[])
+    : []
 
   const toggleKpi = (id: string) => {
     setKpiDraft((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]))
@@ -149,6 +170,93 @@ export default function DashboardPage() {
 
   const completedOnboarding = onboarding.filter((task) => task.done).length
   const onboardingProgress = onboarding.length ? Math.round((completedOnboarding / onboarding.length) * 100) : 0
+  const isFounderView = canViewFounderControls(session?.user?.role, session?.user?.email)
+  const todayPriorities = decisionFeed.slice(0, 3)
+  const setupBlockers = [
+    ...(commandState.error
+      ? [
+          {
+            title: "Ops command feed needs attention",
+            detail: commandState.error,
+            href: "/dashboard/operations",
+            cta: "Open Operations",
+          },
+        ]
+      : []),
+    ...(!commandHasSignal
+      ? [
+          {
+            title: "Workspace still needs real operating data",
+            detail: "Add contacts, deals, invoices, expenses, and tasks so Civis Pulse can rank live priorities.",
+            href: "/dashboard/crm",
+            cta: "Start in CRM",
+          },
+        ]
+      : []),
+    {
+      title: "Billing still needs live provider validation",
+      detail: "Pricing is launch-safe, but public self-serve checkout should still be treated as not live.",
+      href: "/pricing",
+      cta: "Review pricing",
+    },
+    {
+      title: "Backup and fake-data evidence still require sign-off",
+      detail: isFounderView
+        ? "Founder checks still need backup, restore drill, and fake-data review evidence."
+        : "Ask the founder/admin to finish backup, restore drill, and fake-data review evidence before launch sign-off.",
+      href: isFounderView ? "/admin/system" : "/dashboard/settings",
+      cta: isFounderView ? "Open Founder Desk" : "Open Settings",
+    },
+  ].slice(0, 3)
+  const suggestedNextActions = commandHasSignal
+    ? [
+        {
+          title: "Work the highest-risk item first",
+          detail: todayPriorities[0]?.detail || "Start with whichever queue is red, overdue, or blocked today.",
+          href: todayPriorities[0]?.href || "/dashboard/operations",
+          cta: todayPriorities[0]?.action || "Open queue",
+        },
+        {
+          title: "Confirm one end-to-end flow after every deploy",
+          detail: "Use approvals, CRM updates, or invite flow as proof that the system persists real state after refresh.",
+          href: "/dashboard/operations",
+          cta: "Check approvals",
+        },
+        {
+          title: "Use Civis AI for deterministic navigation",
+          detail: "Try 'take me to pricing', 'open gallery', or 'what should I do next?' to validate the command layer.",
+          href: "/dashboard/ai",
+          cta: "Open AI",
+        },
+      ]
+    : [
+        {
+          title: "Seed CRM first",
+          detail: "One contact, one company, and one deal make the dashboard much more useful immediately.",
+          href: "/dashboard/crm",
+          cta: "Open CRM",
+        },
+        {
+          title: "Record one invoice and one expense",
+          detail: "That unlocks a more trustworthy Accounting and Operations summary.",
+          href: "/dashboard/accounting",
+          cta: "Open Accounting",
+        },
+        {
+          title: "Invite one operator safely",
+          detail: "Use Settings or Admin to validate org-scoped onboarding without touching founder controls.",
+          href: "/dashboard/settings",
+          cta: "Open Settings",
+        },
+      ]
+  const trustStatus = [
+    { label: "Route guards", value: "Active", tone: "text-emerald-600" },
+    { label: "Org isolation", value: "Active", tone: "text-emerald-600" },
+    { label: "Role-based access", value: "Active", tone: "text-emerald-600" },
+    { label: "Backup evidence", value: "Action required", tone: "text-amber-600" },
+    { label: "Restore drill", value: "Action required", tone: "text-amber-600" },
+    { label: "Fake-data review", value: "Action required", tone: "text-amber-600" },
+  ]
 
   const toggleOnboardingTask = async (id: string) => {
     const current = onboarding
@@ -247,6 +355,91 @@ export default function DashboardPage() {
         </Dialog>
       </div>
 
+      <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <Card className="border-border/70 bg-gradient-to-br from-card via-card to-muted/30">
+          <CardHeader>
+            <CardTitle>Civis Pulse</CardTitle>
+            <CardDescription>What matters today, what is blocked, and what to do next.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 lg:grid-cols-3">
+            <div className="rounded-2xl border border-border bg-background/70 p-4">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+                <AlertTriangle className="h-4 w-4 text-primary" />
+                Today&apos;s priorities
+              </div>
+              <div className="space-y-3">
+                {todayPriorities.length ? (
+                  todayPriorities.map((item) => (
+                    <div key={item.id} className="rounded-xl border border-border p-3">
+                      <p className="text-sm font-medium">{item.title}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{item.detail}</p>
+                      <Button asChild variant="link" className="mt-2 h-auto p-0 text-primary">
+                        <Link href={item.href}>{item.action}</Link>
+                      </Button>
+                    </div>
+                  ))
+                ) : (
+                  <PremiumEmptyState
+                    title="Your workspace is still getting started."
+                    description="Once invoices, deals, tasks, or approvals exist, Civis Pulse will rank the work that needs attention first."
+                    icon={<Rocket className="h-5 w-5" />}
+                  />
+                )}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-border bg-background/70 p-4">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+                <Wrench className="h-4 w-4 text-primary" />
+                Setup blockers
+              </div>
+              <div className="space-y-3">
+                {setupBlockers.map((item) => (
+                  <div key={item.title} className="rounded-xl border border-border p-3">
+                    <p className="text-sm font-medium">{item.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{item.detail}</p>
+                    <Button asChild variant="link" className="mt-2 h-auto p-0 text-primary">
+                      <Link href={item.href}>{item.cta}</Link>
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-border bg-background/70 p-4">
+              <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+                <ShieldCheck className="h-4 w-4 text-primary" />
+                Trust & security
+              </div>
+              <div className="space-y-3">
+                {trustStatus.map((item) => (
+                  <div key={item.label} className="flex items-center justify-between rounded-xl border border-border px-3 py-2">
+                    <span className="text-sm text-muted-foreground">{item.label}</span>
+                    <span className={`text-sm font-medium ${item.tone}`}>{item.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/70">
+          <CardHeader>
+            <CardTitle>Suggested next actions</CardTitle>
+            <CardDescription>Launch-safe steps that move the workspace forward without pretending missing features are done.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {suggestedNextActions.map((item) => (
+              <div key={item.title} className="rounded-2xl border border-border bg-background/70 p-4">
+                <p className="text-sm font-semibold">{item.title}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{item.detail}</p>
+                <Button asChild className="mt-4" size="sm">
+                  <Link href={item.href}>{item.cta}</Link>
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Quick Start Checklist</CardTitle>
@@ -335,9 +528,17 @@ export default function DashboardPage() {
                 </ResponsiveContainer>
               </>
             ) : (
-              <div className="flex h-[300px] items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
-                No financial performance data yet.
-              </div>
+              <PremiumEmptyState
+                eyebrow="Accounting"
+                title="No financial pulse yet."
+                description="Record your first invoice and expense to unlock revenue, expense, and month-to-date performance trends."
+                icon={<DollarSign className="h-5 w-5" />}
+                primaryAction={
+                  <Button asChild size="sm">
+                    <Link href="/dashboard/accounting">Open Accounting</Link>
+                  </Button>
+                }
+              />
             )}
           </CardContent>
         </Card>
@@ -368,9 +569,12 @@ export default function DashboardPage() {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex h-[300px] items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
-                No operational mix data yet.
-              </div>
+              <PremiumEmptyState
+                eyebrow="Operations"
+                title="No operational mix yet."
+                description="Once approvals, overdue invoices, or pending expenses exist, this card will show where workload is building up."
+                icon={<Package className="h-5 w-5" />}
+              />
             )}
           </CardContent>
         </Card>
@@ -412,9 +616,12 @@ export default function DashboardPage() {
               ))}
             </div>
           ) : (
-            <div className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
-              No urgent decisions right now. This feed will populate as your org creates invoices, deals, tasks, and approvals.
-            </div>
+            <PremiumEmptyState
+              eyebrow="Decision Feed"
+              title="Your workspace is quiet for now."
+              description="Create invoices, tasks, or approvals and Civis will start surfacing the items that need a real decision."
+              icon={<AlertTriangle className="h-5 w-5" />}
+            />
           )}
         </CardContent>
       </Card>
@@ -447,9 +654,12 @@ export default function DashboardPage() {
               ))}
             </div>
           ) : (
-            <div className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
-              No activity yet. Recent transactions and updates will appear here after the workspace starts being used.
-            </div>
+            <PremiumEmptyState
+              eyebrow="Activity"
+              title="No activity yet."
+              description="Recent transactions, updates, and audit-backed changes will appear here once the workspace starts being used."
+              icon={<TrendingUp className="h-5 w-5" />}
+            />
           )}
         </CardContent>
       </Card>

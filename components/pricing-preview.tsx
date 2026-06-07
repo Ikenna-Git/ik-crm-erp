@@ -41,6 +41,9 @@ export function PricingPreview() {
           <p className="mx-auto max-w-2xl text-base leading-7 text-muted-foreground">
             These plans are framed around team size and rollout depth so buyers can understand where they fit quickly.
           </p>
+          <p className="mx-auto max-w-2xl text-sm text-muted-foreground">
+            Civis pricing is live to review, but public self-serve checkout is still intentionally disabled until billing validation is complete.
+          </p>
         </div>
 
         <div className="grid gap-6 md:grid-cols-3">

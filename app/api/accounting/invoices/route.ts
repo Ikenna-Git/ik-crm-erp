@@ -4,6 +4,7 @@ import { requireModuleAccess, handleAccessRouteError } from "@/lib/access-route"
 import { createAuditLog } from "@/lib/audit"
 import { createDecisionTrail, invoiceSnapshot } from "@/lib/decision-trails"
 import { getApprovalStateMapForOrg } from "@/lib/approval-requests"
+import { hasModuleAccess } from "@/lib/access-control"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable Accounting data." }, { status: 503 })
@@ -11,7 +12,7 @@ const dbUnavailable = () =>
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await requireModuleAccess(request, "accounting", "view")
+    const { org, user } = await requireModuleAccess(request, "accounting", "view")
     const [invoices, approvalStates] = await Promise.all([
       prisma.invoice.findMany({
         where: { orgId: org.id },
@@ -19,9 +20,15 @@ export async function GET(request: Request) {
       }),
       getApprovalStateMapForOrg(org.id),
     ])
+    const canManageAccounting = hasModuleAccess(user, "accounting", "manage")
     return NextResponse.json({
       invoices: invoices.map((invoice) => ({
-        ...invoice,
+        ...(canManageAccounting
+          ? invoice
+          : {
+              ...invoice,
+              amount: 0,
+            }),
         approvalStatus: approvalStates[`invoice:${invoice.id}`]?.status || null,
       })),
     })

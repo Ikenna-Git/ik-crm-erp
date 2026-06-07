@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
 import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
+import { hasModuleAccess } from "@/lib/access-control"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable HR data." }, { status: 503 })
@@ -9,13 +10,25 @@ const dbUnavailable = () =>
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org } = await requireModuleAccess(request, "hr", "view")
+    const { org, user } = await requireModuleAccess(request, "hr", "view")
     const employees = await prisma.employee.findMany({
       where: { orgId: org.id },
       include: { position: true },
       orderBy: [{ startDate: "desc" }, { createdAt: "desc" }],
     })
-    return NextResponse.json({ employees })
+    const canManageHr = hasModuleAccess(user, "hr", "manage")
+    return NextResponse.json({
+      employees: employees.map((employee) =>
+        canManageHr
+          ? employee
+          : {
+              ...employee,
+              email: null,
+              phone: null,
+              salary: 0,
+            },
+      ),
+    })
   } catch (error) {
     return handleAccessRouteError(error, "Failed to load employees")
   }
