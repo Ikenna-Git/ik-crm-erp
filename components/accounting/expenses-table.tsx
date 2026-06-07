@@ -68,6 +68,7 @@ type Props = {
   onDeleteExpense?: (id: string) => void
   onRequestApproval?: (expense: Expense) => Promise<void> | void
   showAmounts?: boolean
+  canManage?: boolean
 }
 
 const formatNaira = (amount: number) =>
@@ -100,6 +101,7 @@ export function ExpensesTable({
   onDeleteExpense,
   onRequestApproval,
   showAmounts = true,
+  canManage = false,
 }: Props) {
   const [expenses, setExpenses] = useState<Expense[]>(providedExpenses ?? [])
   const [currentPage, setCurrentPage] = useState(1)
@@ -248,12 +250,13 @@ export function ExpensesTable({
               size="sm"
               variant="outline"
               onClick={downloadExpensesCSV}
+              disabled={!canManage}
               className="flex items-center gap-2 bg-transparent"
             >
               <Download className="w-4 h-4" />
               Export CSV
             </Button>
-            <Button size="sm" onClick={() => setShowModal(true)} className="flex items-center gap-2">
+            <Button size="sm" onClick={() => setShowModal(true)} className="flex items-center gap-2" disabled={!canManage}>
               <Plus className="w-4 h-4" />
               Add Expense
             </Button>
@@ -299,34 +302,40 @@ export function ExpensesTable({
                       </td>
                       <td className="py-4 px-4 text-muted-foreground">{expense.date || "—"}</td>
                       <td className="py-4 px-4">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm" className="p-2">
-                              <MoreHorizontal className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setSelectedExpense(expense)}>
-                              <Eye className="w-4 h-4 mr-2" />
-                              View details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEditExpense(expense)}>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem disabled={approvalAction.disabled} onClick={() => requestApproval(expense)}>
-                              <CheckSquare className="w-4 h-4 mr-2" />
-                              {approvalAction.label}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => handleDeleteExpense(expense.id)}
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        {canManage ? (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="p-2">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setSelectedExpense(expense)}>
+                                <Eye className="w-4 h-4 mr-2" />
+                                View details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditExpense(expense)}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem disabled={approvalAction.disabled} onClick={() => requestApproval(expense)}>
+                                <CheckSquare className="w-4 h-4 mr-2" />
+                                {approvalAction.label}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => handleDeleteExpense(expense.id)}
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        ) : (
+                          <Button variant="ghost" size="sm" className="p-2" disabled aria-label="Expense actions unavailable">
+                            <X className="w-4 h-4" />
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   )
@@ -353,6 +362,8 @@ export function ExpensesTable({
         }}
         title={selectedExpense?.description || "Expense details"}
         description="Review expense information in a readable panel."
+        locked={!canManage}
+        lockedDescription="Expense details, approvals, and edits are only available to finance managers and workspace admins."
         sections={
           selectedExpense
             ? [
@@ -374,7 +385,7 @@ export function ExpensesTable({
       />
 
       {/* Add Expense Modal */}
-      {showModal && (
+      {showModal && canManage ? (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
@@ -442,7 +453,7 @@ export function ExpensesTable({
             </CardContent>
           </Card>
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

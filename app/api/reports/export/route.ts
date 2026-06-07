@@ -40,7 +40,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { org, user } = await requireModuleAccess(request, "analytics", "view")
+    const exportAccess =
+      type === "analytics"
+        ? { module: "analytics" as const, level: "view" as const }
+        : type === "crm"
+          ? { module: "crm" as const, level: "manage" as const }
+          : { module: "accounting" as const, level: "manage" as const }
+
+    const { org, user } = await requireModuleAccess(request, exportAccess.module, exportAccess.level)
 
     const rows =
       type === "accounting"

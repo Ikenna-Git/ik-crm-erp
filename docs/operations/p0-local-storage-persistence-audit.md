@@ -27,9 +27,9 @@ Core rule:
 | `lib/ai-assist.ts` | AI instruction seed | `localStorage` | local assistant prompt memory | Safe temporary client convenience | Keep | No change needed |
 | `components/ai-assist-popover.tsx` | AI chat history and open state | `localStorage` | preserves local chat draft/history | Safe temporary client convenience | Keep, but not a business record | No change needed |
 | `app/(dashboard)/dashboard/ai/page.tsx` | AI conversation draft | `localStorage` | local chat history | Safe temporary client convenience | Keep, but not a business record | No change needed |
-| `app/(dashboard)/dashboard/accounting/page.tsx` | finance unlock code | `localStorage` | local sensitive-view unlock toggle | Safe local browser gate only | Keep clearly separate from server auth | No change needed |
-| `components/hr/payroll-table.tsx` | payroll unlock code | `localStorage` | local sensitive-view unlock toggle | Safe local browser gate only | Keep clearly separate from server auth | No change needed |
-| `components/hr/employees-table.tsx` | HR unlock code | `localStorage` | local sensitive-view unlock toggle | Safe local browser gate only | Keep clearly separate from server auth | No change needed |
+| `app/(dashboard)/dashboard/accounting/page.tsx` | finance unlock code | `localStorage` | local sensitive-view unlock toggle | Unsafe for launch trust because it implied entitlement outside server role checks | Removed in launch UX sweep | Yes |
+| `components/hr/payroll-table.tsx` | payroll unlock code | `localStorage` | local sensitive-view unlock toggle | Unsafe for launch trust because it implied entitlement outside server role checks | Removed in launch UX sweep | Yes |
+| `components/hr/employees-table.tsx` | HR unlock code | `localStorage` | local sensitive-view unlock toggle | Unsafe for launch trust because it implied entitlement outside server role checks | Removed in launch UX sweep | Yes |
 | `app/(dashboard)/layout.tsx` | dashboard identity mirror | `localStorage` | cached session user in browser | Unsafe identity source | Removed local write; session is source of truth | Yes |
 | `components/dashboard-header.tsx` | header user identity | `localStorage` | read cached user name | Unsafe identity source | Removed local read; now follows session/event only | Yes |
 | `components/dashboard-sidebar.tsx` | logout identity cleanup | `localStorage` | removed cached user | Unsafe identity path | Removed local identity dependency | Yes |

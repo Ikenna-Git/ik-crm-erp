@@ -92,9 +92,6 @@ export default function CivisAIPage() {
     const headers: Record<string, string> = { "Content-Type": "application/json", ...getSessionHeaders() }
     if (typeof window !== "undefined") {
       headers["x-current-path"] = window.location.pathname
-      headers["x-hr-sensitive-unlocked"] = localStorage.getItem("civis_payroll_unlocked") === "true" ? "true" : "false"
-      headers["x-finance-sensitive-unlocked"] =
-        localStorage.getItem("civis_finance_unlocked") === "true" ? "true" : "false"
     }
 
     try {

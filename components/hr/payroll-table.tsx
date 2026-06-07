@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Download, Eye, EyeOff, Plus, X, MoreHorizontal, Edit, Trash2, CheckSquare } from "lucide-react"
+import { Download, Eye, EyeOff, Plus, X, MoreHorizontal, Edit, Trash2, CheckSquare, Lock } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { formatNaira } from "@/lib/currency"
 import { PaginationControls } from "@/components/shared/pagination-controls"
@@ -85,6 +85,7 @@ type PayrollTableProps = {
   onAddPayroll?: (data: Omit<PayrollRecord, "id">) => void
   onUpdatePayroll?: (id: string, data: Omit<PayrollRecord, "id">) => void
   onDeletePayroll?: (id: string) => void
+  canManage?: boolean
 }
 
 export function PayrollTable({
@@ -93,21 +94,14 @@ export function PayrollTable({
   onAddPayroll,
   onUpdatePayroll,
   onDeletePayroll,
+  canManage = false,
 }: PayrollTableProps) {
   const [payroll, setPayroll] = useState<PayrollRecord[]>(providedPayroll ?? [])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const [showAmounts, setShowAmounts] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedPayroll, setSelectedPayroll] = useState<PayrollRecord | null>(null)
-  const [isUnlocked, setIsUnlocked] = useState(false)
-  const [accessCode, setAccessCode] = useState("1234")
-  const [accessInput, setAccessInput] = useState("")
-  const [accessError, setAccessError] = useState("")
-  const [accessNotice, setAccessNotice] = useState("")
-  const [newAccessCode, setNewAccessCode] = useState("")
-  const [confirmAccessCode, setConfirmAccessCode] = useState("")
   const [formData, setFormData] = useState({
     employee: "",
     period: "",
@@ -135,22 +129,10 @@ export function PayrollTable({
     total: filteredPayroll.reduce((sum, p) => sum + p.netPay, 0),
   }
 
-  const displayAmounts = isUnlocked && showAmounts
+  const displayAmounts = canManage
 
   const totalPages = Math.max(1, Math.ceil(sortedPayroll.length / pageSize))
   const pagedPayroll = sortedPayroll.slice((currentPage - 1) * pageSize, currentPage * pageSize)
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const stored = localStorage.getItem("civis_payroll_access_code")
-    if (stored) {
-      setAccessCode(stored)
-    } else {
-      localStorage.setItem("civis_payroll_access_code", "1234")
-    }
-    localStorage.setItem("civis_payroll_unlocked", "false")
-    setShowAmounts(false)
-  }, [])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -201,7 +183,7 @@ export function PayrollTable({
   }
 
   const handleEditPayroll = (record: PayrollRecord) => {
-    if (!isUnlocked) return
+    if (!canManage) return
     setEditingId(record.id)
     setFormData({
       employee: record.employee,
@@ -233,109 +215,21 @@ export function PayrollTable({
     a.click()
   }
 
-  const unlockPayroll = () => {
-    if (accessInput.trim() !== accessCode) {
-      setAccessError("Invalid access code.")
-      setAccessNotice("")
-      return
-    }
-    setIsUnlocked(true)
-    setShowAmounts(true)
-    if (typeof window !== "undefined") {
-      localStorage.setItem("civis_payroll_unlocked", "true")
-    }
-    setAccessInput("")
-    setAccessError("")
-    setAccessNotice("")
-  }
-
-  const lockPayroll = () => {
-    setIsUnlocked(false)
-    setShowAmounts(false)
-    if (typeof window !== "undefined") {
-      localStorage.setItem("civis_payroll_unlocked", "false")
-    }
-    setAccessInput("")
-    setAccessError("")
-    setAccessNotice("")
-  }
-
-  const updateAccessCode = () => {
-    const next = newAccessCode.trim()
-    const confirm = confirmAccessCode.trim()
-    if (!next || next !== confirm) {
-      setAccessError("Access codes do not match.")
-      setAccessNotice("")
-      return
-    }
-    setAccessCode(next)
-    if (typeof window !== "undefined") {
-      localStorage.setItem("civis_payroll_access_code", next)
-    }
-    setNewAccessCode("")
-    setConfirmAccessCode("")
-    setAccessError("")
-    setAccessNotice("Access code updated.")
-  }
-
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle>Payroll Access</CardTitle>
-          <CardDescription>Protect salary data with an access code.</CardDescription>
+          <CardDescription>Payroll access is enforced by workspace role, not by browser-local unlock codes.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!isUnlocked ? (
-            <div className="grid md:grid-cols-3 gap-4">
-              <div className="md:col-span-2">
-                <label className="text-sm font-medium">Access code</label>
-                <Input
-                  type="password"
-                  value={accessInput}
-                  onChange={(e) => setAccessInput(e.target.value)}
-                  placeholder="Enter payroll access code"
-                />
-                {accessError ? <p className="text-xs text-destructive mt-2">{accessError}</p> : null}
-                <p className="text-xs text-muted-foreground mt-2">
-                  Access is required to view, edit, or export payroll details.
-                </p>
-              </div>
-              <div className="flex items-end">
-                <Button className="w-full" onClick={unlockPayroll}>
-                  Unlock Payroll
-                </Button>
-              </div>
+          {canManage ? (
+            <div className="rounded-lg border border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+              This role can manage payroll amounts, exports, and record edits for the current workspace.
             </div>
           ) : (
-            <div className="grid md:grid-cols-3 gap-4">
-              <div className="md:col-span-2 space-y-2">
-                <p className="text-sm text-muted-foreground">Payroll is unlocked for this session.</p>
-                <div className="grid md:grid-cols-2 gap-2">
-                  <Input
-                    type="password"
-                    placeholder="New access code"
-                    value={newAccessCode}
-                    onChange={(e) => setNewAccessCode(e.target.value)}
-                  />
-                  <Input
-                    type="password"
-                    placeholder="Confirm new code"
-                    value={confirmAccessCode}
-                    onChange={(e) => setConfirmAccessCode(e.target.value)}
-                  />
-                </div>
-                {accessError ? <p className="text-xs text-destructive">{accessError}</p> : null}
-                {accessNotice ? <p className="text-xs text-green-600 dark:text-green-400">{accessNotice}</p> : null}
-              </div>
-              <div className="flex flex-col gap-2 justify-end">
-                <Button variant="outline" className="bg-transparent" onClick={updateAccessCode}>
-                  Update Access Code
-                </Button>
-                <Button variant="secondary" onClick={lockPayroll}>
-                  Lock Payroll
-                </Button>
-              </div>
+            <div className="rounded-lg border border-dashed border-border bg-muted/10 p-4 text-sm text-muted-foreground">
+              Payroll totals are masked and record actions are disabled for roles without HR manage access.
             </div>
           )}
         </CardContent>
@@ -376,24 +270,23 @@ export function PayrollTable({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => setShowAmounts(!showAmounts)}
-              disabled={!isUnlocked}
+              disabled
               className="flex items-center gap-2"
             >
-              {showAmounts ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              {showAmounts ? "Hide" : "Show"}
+              {displayAmounts ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              {displayAmounts ? "Sensitive data visible" : "Sensitive data masked"}
             </Button>
             <Button
               size="sm"
               variant="outline"
               onClick={downloadPayrollCSV}
-              disabled={!isUnlocked}
+              disabled={!canManage}
               className="flex items-center gap-2 bg-transparent"
             >
               <Download className="w-4 h-4" />
               Export CSV
             </Button>
-            <Button size="sm" onClick={() => setShowModal(true)} className="flex items-center gap-2" disabled={!isUnlocked}>
+            <Button size="sm" onClick={() => setShowModal(true)} className="flex items-center gap-2" disabled={!canManage}>
               <Plus className="w-4 h-4" />
               Add Payroll
             </Button>
@@ -431,7 +324,7 @@ export function PayrollTable({
                       </Badge>
                     </td>
                     <td className="py-4 px-4">
-                      {isUnlocked ? (
+                      {canManage ? (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm" className="p-2">
@@ -462,8 +355,8 @@ export function PayrollTable({
                           </DropdownMenuContent>
                         </DropdownMenu>
                       ) : (
-                        <Button variant="ghost" size="sm" className="p-2" disabled>
-                          <MoreHorizontal className="w-4 h-4" />
+                        <Button variant="ghost" size="sm" className="p-2" disabled aria-label="Payroll actions unavailable">
+                          <Lock className="w-4 h-4" />
                         </Button>
                       )}
                     </td>
@@ -491,6 +384,8 @@ export function PayrollTable({
         }}
         title={selectedPayroll?.employee || "Payroll record"}
         description="Review payroll details in an app dialog."
+        locked={!canManage}
+        lockedDescription="Payroll details, exports, and approvals are restricted to HR managers and workspace admins."
         sections={
           selectedPayroll
             ? [
@@ -512,7 +407,7 @@ export function PayrollTable({
       />
 
       {/* Add Payroll Modal */}
-      {showModal && (
+      {showModal && canManage ? (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
@@ -587,7 +482,7 @@ export function PayrollTable({
             </CardContent>
           </Card>
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

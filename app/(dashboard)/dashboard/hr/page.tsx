@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useSession } from "next-auth/react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Plus, Sparkles } from "lucide-react"
@@ -21,6 +22,7 @@ import { AttendanceTracker, type AttendanceRecord } from "@/components/hr/attend
 import { PositionsTable, type Position } from "@/components/hr/positions-table"
 import { HrQualityScorecard } from "@/components/hr/hr-quality-scorecard"
 import { CompliancePack } from "@/components/hr/compliance-pack"
+import { hasModuleAccess } from "@/lib/access-control"
 
 const today = () => new Date().toISOString().slice(0, 10)
 const toDateString = (value?: string | null) => (value ? String(value).slice(0, 10) : today())
@@ -88,6 +90,7 @@ const mapPosition = (position: any): Position => ({
 })
 
 export default function HRPage() {
+  const { data: session } = useSession()
   const searchQuery = ""
   const [employees, setEmployees] = useState<Employee[]>([])
   const [payroll, setPayroll] = useState<PayrollRecord[]>([])
@@ -111,6 +114,7 @@ export default function HRPage() {
     bonus: "",
     deductions: "",
   })
+  const canManageHr = hasModuleAccess(session?.user || {}, "hr", "manage")
 
   const loadData = async () => {
     setLoading(true)
@@ -323,7 +327,7 @@ export default function HRPage() {
         <div className="flex gap-2">
           <Dialog open={openPayrollDialog} onOpenChange={setOpenPayrollDialog}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+              <Button variant="outline" className="flex items-center gap-2 bg-transparent" disabled={!canManageHr}>
                 <Plus className="w-4 h-4" />
                 New Payroll
               </Button>
@@ -382,7 +386,7 @@ export default function HRPage() {
 
           <Dialog open={openEmployeeDialog} onOpenChange={setOpenEmployeeDialog}>
             <DialogTrigger asChild>
-              <Button className="flex items-center gap-2">
+              <Button className="flex items-center gap-2" disabled={!canManageHr}>
                 <Plus className="w-4 h-4" />
                 New Employee
               </Button>
@@ -458,6 +462,12 @@ export default function HRPage() {
       </div>
 
       {error ? <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div> : null}
+      {!canManageHr ? (
+        <div className="rounded-lg border border-dashed border-border bg-muted/10 p-3 text-sm text-muted-foreground">
+          This role can view the HR workspace shell, but employee contact details, payroll amounts, exports, and record
+          actions remain restricted.
+        </div>
+      ) : null}
 
       <HrQualityScorecard employees={employees} />
       <CompliancePack employeesCount={employees.length} payrollRuns={payroll.length} />
@@ -499,6 +509,7 @@ export default function HRPage() {
             onAddEmployee={addEmployee}
             onUpdateEmployee={handleUpdateEmployee}
             onDeleteEmployee={handleDeleteEmployee}
+            canManage={canManageHr}
           />
         </TabsContent>
 
@@ -509,6 +520,7 @@ export default function HRPage() {
             onAddPayroll={addPayrollRecord}
             onUpdatePayroll={handleUpdatePayroll}
             onDeletePayroll={handleDeletePayroll}
+            canManage={canManageHr}
           />
         </TabsContent>
 

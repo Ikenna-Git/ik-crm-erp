@@ -95,6 +95,7 @@ type EmployeesTableProps = {
   onAddEmployee?: (data: Omit<Employee, "id">) => void
   onUpdateEmployee?: (id: string, data: Omit<Employee, "id">) => void
   onDeleteEmployee?: (id: string) => void
+  canManage?: boolean
 }
 
 export function EmployeesTable({
@@ -103,21 +104,14 @@ export function EmployeesTable({
   onAddEmployee,
   onUpdateEmployee,
   onDeleteEmployee,
+  canManage = false,
 }: EmployeesTableProps) {
   const [employees, setEmployees] = useState<Employee[]>(providedEmployees ?? [])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [isUnlocked, setIsUnlocked] = useState(false)
-  const [showSalaries, setShowSalaries] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
-  const [accessCode, setAccessCode] = useState("1234")
-  const [accessInput, setAccessInput] = useState("")
-  const [accessError, setAccessError] = useState("")
-  const [accessNotice, setAccessNotice] = useState("")
-  const [newAccessCode, setNewAccessCode] = useState("")
-  const [confirmAccessCode, setConfirmAccessCode] = useState("")
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -137,17 +131,6 @@ export function EmployeesTable({
     setCurrentPage(1)
   }, [searchQuery, pageSize])
 
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const stored = localStorage.getItem("civis_hr_access_code")
-    if (stored) {
-      setAccessCode(stored)
-    } else {
-      localStorage.setItem("civis_hr_access_code", "1234")
-    }
-    setShowSalaries(false)
-  }, [])
-
   const filteredEmployees = employees.filter(
     (emp) =>
       emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -159,8 +142,7 @@ export function EmployeesTable({
 
   const activeEmployees = employees.filter((e) => e.status === "active").length
   const totalSalary = employees.reduce((sum, e) => sum + e.salary, 0)
-
-  const displaySalary = isUnlocked && showSalaries
+  const displaySalary = canManage
 
   const totalPages = Math.max(1, Math.ceil(sortedEmployees.length / pageSize))
   const pagedEmployees = sortedEmployees.slice((currentPage - 1) * pageSize, currentPage * pageSize)
@@ -169,47 +151,8 @@ export function EmployeesTable({
     if (currentPage > totalPages) setCurrentPage(totalPages)
   }, [currentPage, totalPages])
 
-  const unlockAccess = () => {
-    if (accessInput.trim() !== accessCode) {
-      setAccessError("Invalid access code.")
-      setAccessNotice("")
-      return
-    }
-    setIsUnlocked(true)
-    setShowSalaries(true)
-    setAccessInput("")
-    setAccessError("")
-    setAccessNotice("")
-  }
-
-  const lockAccess = () => {
-    setIsUnlocked(false)
-    setShowSalaries(false)
-    setAccessInput("")
-    setAccessError("")
-    setAccessNotice("")
-  }
-
-  const updateAccessCode = () => {
-    const next = newAccessCode.trim()
-    const confirm = confirmAccessCode.trim()
-    if (!next || next !== confirm) {
-      setAccessError("Access codes do not match.")
-      setAccessNotice("")
-      return
-    }
-    setAccessCode(next)
-    if (typeof window !== "undefined") {
-      localStorage.setItem("civis_hr_access_code", next)
-    }
-    setNewAccessCode("")
-    setConfirmAccessCode("")
-    setAccessError("")
-    setAccessNotice("Access code updated.")
-  }
-
   const openEditor = (employee?: Employee) => {
-    if (!isUnlocked) return
+    if (!canManage) return
     if (employee) {
       setEditingId(employee.id)
       setForm({
@@ -267,7 +210,7 @@ export function EmployeesTable({
   }
 
   const deleteEmployee = (id: string) => {
-    if (!isUnlocked) return
+    if (!canManage) return
     if (onDeleteEmployee) {
       onDeleteEmployee(id)
     } else {
@@ -280,59 +223,17 @@ export function EmployeesTable({
       <Card>
         <CardHeader>
           <CardTitle>HR Access</CardTitle>
-          <CardDescription>Protect employee salary data with an access code.</CardDescription>
+          <CardDescription>Employee detail access is enforced by workspace role, not local unlock codes.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {!isUnlocked ? (
-            <div className="grid md:grid-cols-3 gap-4">
-              <div className="md:col-span-2">
-                <Label className="text-sm font-medium">Access code</Label>
-                <Input
-                  type="password"
-                  value={accessInput}
-                  onChange={(e) => setAccessInput(e.target.value)}
-                  placeholder="Enter HR access code"
-                />
-                {accessError ? <p className="text-xs text-destructive mt-2">{accessError}</p> : null}
-              </div>
-              <div className="flex items-end">
-                <Button className="w-full" onClick={unlockAccess}>
-                  Unlock HR Data
-                </Button>
-              </div>
+          {canManage ? (
+            <div className="rounded-lg border border-border bg-muted/20 p-4 text-sm text-muted-foreground">
+              This workspace role can manage employee records, salaries, and contact details.
             </div>
           ) : (
-            <div className="grid md:grid-cols-3 gap-4">
-              <div className="md:col-span-2 space-y-2">
-                <p className="text-sm text-muted-foreground">HR data unlocked for this session.</p>
-                <div className="grid md:grid-cols-2 gap-2">
-                  <Input
-                    type="password"
-                    placeholder="New access code"
-                    value={newAccessCode}
-                    onChange={(e) => setNewAccessCode(e.target.value)}
-                  />
-                  <Input
-                    type="password"
-                    placeholder="Confirm new code"
-                    value={confirmAccessCode}
-                    onChange={(e) => setConfirmAccessCode(e.target.value)}
-                  />
-                </div>
-                {accessError ? <p className="text-xs text-destructive">{accessError}</p> : null}
-                {accessNotice ? <p className="text-xs text-green-600 dark:text-green-400">{accessNotice}</p> : null}
-              </div>
-              <div className="flex flex-col gap-2 justify-end">
-                <Button variant="outline" className="bg-transparent" onClick={updateAccessCode}>
-                  Update Access Code
-                </Button>
-                <Button variant="outline" className="bg-transparent" onClick={() => setShowSalaries(!showSalaries)}>
-                  {showSalaries ? "Hide salaries" : "Show salaries"}
-                </Button>
-                <Button variant="secondary" onClick={lockAccess}>
-                  Lock HR Data
-                </Button>
-              </div>
+            <div className="rounded-lg border border-dashed border-border bg-muted/10 p-4 text-sm text-muted-foreground">
+              This role can view the HR module shell, but personal contact details, salaries, and record actions stay
+              redacted until a same-workspace HR manager or admin grants manage access.
             </div>
           )}
         </CardContent>
@@ -385,7 +286,7 @@ export function EmployeesTable({
                     <td className="py-4 px-4">
                       <div>
                         <p className="font-medium">{employee.name}</p>
-                        <p className="text-xs text-muted-foreground">{employee.email}</p>
+                        <p className="text-xs text-muted-foreground">{canManage ? employee.email : "Contact details restricted"}</p>
                       </div>
                     </td>
                     <td className="py-4 px-4">
@@ -408,7 +309,7 @@ export function EmployeesTable({
                     <td className="py-4 px-4 text-muted-foreground">{employee.startDate}</td>
                     <td className="py-4 px-4 font-semibold">{displaySalary ? formatNaira(employee.salary) : "****"}</td>
                     <td className="py-4 px-4">
-                      {isUnlocked ? (
+                      {canManage ? (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm" className="p-2">
@@ -431,7 +332,7 @@ export function EmployeesTable({
                           </DropdownMenuContent>
                         </DropdownMenu>
                       ) : (
-                        <Button variant="ghost" size="sm" className="p-2" disabled>
+                        <Button variant="ghost" size="sm" className="p-2" disabled aria-label="Employee actions unavailable">
                           <Lock className="w-4 h-4" />
                         </Button>
                       )}
@@ -460,6 +361,8 @@ export function EmployeesTable({
         }}
         title={selectedEmployee?.name || "Employee details"}
         description="Review employee information without exposing raw JSON."
+        locked={!canManage}
+        lockedDescription="Employee details and salaries stay hidden for roles without HR manage access."
         sections={
           selectedEmployee
             ? [
@@ -481,7 +384,7 @@ export function EmployeesTable({
         }
       />
 
-      {showModal && (
+      {showModal && canManage ? (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-3xl mx-4">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
@@ -548,7 +451,7 @@ export function EmployeesTable({
             </CardContent>
           </Card>
         </div>
-      )}
+      ) : null}
     </div>
   )
 }
