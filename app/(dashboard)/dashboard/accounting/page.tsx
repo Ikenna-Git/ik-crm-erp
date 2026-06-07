@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Invoice } from "@/components/accounting/invoices-table"
 import type { Expense } from "@/components/accounting/expenses-table"
 import { SectionErrorBoundary } from "@/components/shared/section-error-boundary"
+import { PrivacyLockPanel } from "@/components/shared/privacy-lock-panel"
 import { getSessionHeaders } from "@/lib/user-settings"
 import { formatNaira } from "@/lib/currency"
 import { toast } from "@/hooks/use-toast"
@@ -119,6 +120,10 @@ export default function AccountingPage() {
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [privacyUnlocked, setPrivacyUnlocked] = useState(false)
+  const [privacyLoading, setPrivacyLoading] = useState(true)
+  const [privacyConfigured, setPrivacyConfigured] = useState(true)
+  const [privacyError, setPrivacyError] = useState("")
   const [importNotice, setImportNotice] = useState("")
   const [openInvoiceDialog, setOpenInvoiceDialog] = useState(false)
   const [invoiceForm, setInvoiceForm] = useState({
@@ -137,6 +142,7 @@ export default function AccountingPage() {
     date: "",
   })
   const canManageAccounting = hasModuleAccess(session?.user || {}, "accounting", "manage")
+  const canUseSensitiveAccounting = canManageAccounting && privacyUnlocked
 
   const parseJsonSafe = async (res: Response) => {
     const text = await res.text()
@@ -305,6 +311,66 @@ export default function AccountingPage() {
   useEffect(() => {
     loadData()
   }, [])
+
+  const loadPrivacyState = async () => {
+    setPrivacyLoading(true)
+    setPrivacyError("")
+    try {
+      const response = await parseJsonSafe(await fetch("/api/privacy-lock?module=accounting", { headers: { ...getSessionHeaders() } }))
+      setPrivacyUnlocked(Boolean(response.unlocked))
+      setPrivacyConfigured(response.configured !== false)
+    } catch (err: any) {
+      setPrivacyUnlocked(false)
+      setPrivacyConfigured(true)
+      setPrivacyError(err?.message || "Failed to load Accounting privacy state")
+    } finally {
+      setPrivacyLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadPrivacyState()
+  }, [])
+
+  const unlockPrivacy = async (pin: string) => {
+    setPrivacyError("")
+    setPrivacyLoading(true)
+    try {
+      const response = await fetch("/api/privacy-lock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({ module: "accounting", pin }),
+      })
+      const data = await parseJsonSafe(response)
+      if (!response.ok) throw new Error(data.error || "Failed to unlock Accounting privacy")
+      setPrivacyUnlocked(true)
+      await loadData()
+    } catch (err: any) {
+      setPrivacyError(err?.message || "Failed to unlock Accounting privacy")
+    } finally {
+      setPrivacyLoading(false)
+    }
+  }
+
+  const lockPrivacyAgain = async () => {
+    setPrivacyError("")
+    setPrivacyLoading(true)
+    try {
+      const response = await fetch("/api/privacy-lock", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
+        body: JSON.stringify({ module: "accounting" }),
+      })
+      const data = await parseJsonSafe(response)
+      if (!response.ok) throw new Error(data.error || "Failed to relock Accounting privacy")
+      setPrivacyUnlocked(false)
+      await loadData()
+    } catch (err: any) {
+      setPrivacyError(err?.message || "Failed to relock Accounting privacy")
+    } finally {
+      setPrivacyLoading(false)
+    }
+  }
 
   const createInvoice = async (payload: Omit<Invoice, "id">) => {
     try {
@@ -643,7 +709,7 @@ export default function AccountingPage() {
         <div className="flex gap-2 flex-wrap justify-end">
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2 bg-transparent" disabled={!canManageAccounting}>
+              <Button variant="outline" className="flex items-center gap-2 bg-transparent" disabled={!canUseSensitiveAccounting}>
                 <Download className="w-4 h-4" />
                 Export Reports
               </Button>
@@ -665,14 +731,14 @@ export default function AccountingPage() {
                   />
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Button className="flex-1" onClick={() => handleExportReports("desktop")} disabled={!canManageAccounting}>
+                  <Button className="flex-1" onClick={() => handleExportReports("desktop")} disabled={!canUseSensitiveAccounting}>
                     Export to desktop (CSV)
                   </Button>
                   <Button
                     variant="outline"
                     className="flex-1"
                     onClick={() => handleExportReports("email")}
-                    disabled={!canManageAccounting}
+                    disabled={!canUseSensitiveAccounting}
                   >
                     Email CSV report
                   </Button>
@@ -685,7 +751,7 @@ export default function AccountingPage() {
           </Dialog>
           <Dialog open={openExpenseDialog} onOpenChange={setOpenExpenseDialog}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2 bg-transparent" disabled={!canManageAccounting}>
+              <Button variant="outline" className="flex items-center gap-2 bg-transparent" disabled={!canUseSensitiveAccounting}>
                 <Plus className="w-4 h-4" />
                 New Expense
               </Button>
@@ -751,7 +817,7 @@ export default function AccountingPage() {
           </Dialog>
           <Dialog open={openInvoiceDialog} onOpenChange={setOpenInvoiceDialog}>
             <DialogTrigger asChild>
-              <Button className="flex items-center gap-2" disabled={!canManageAccounting}>
+              <Button className="flex items-center gap-2" disabled={!canUseSensitiveAccounting}>
                 <Plus className="w-4 h-4" />
                 New Invoice
               </Button>
@@ -849,6 +915,19 @@ export default function AccountingPage() {
         </div>
       </div>
 
+      <PrivacyLockPanel
+        moduleLabel="Accounting privacy"
+        unlockLabel="Unlock Accounting privacy"
+        unlocked={privacyUnlocked}
+        canUnlock={canManageAccounting}
+        loading={privacyLoading}
+        configured={privacyConfigured}
+        error={privacyError}
+        helperText="Accounting uses a separate session-scoped privacy PIN so finance details stay hidden until an authorized manager explicitly unlocks them."
+        onUnlock={unlockPrivacy}
+        onLockAgain={lockPrivacyAgain}
+      />
+
       {/* Finance Privacy */}
       <Card>
         <CardHeader>
@@ -859,10 +938,13 @@ export default function AccountingPage() {
           <CardDescription>Sensitive amounts, detail views, exports, and record mutations are controlled by workspace role.</CardDescription>
         </CardHeader>
         <CardContent>
-          {canManageAccounting ? (
+          {canUseSensitiveAccounting ? (
             <div className="rounded-lg border border-border bg-muted/20 p-4 text-sm text-muted-foreground">
-              This role can manage invoices, expenses, approvals, exports, and financial detail views for the current
-              workspace.
+              Accounting privacy is unlocked for this session. Financial amounts, approvals, exports, and row actions are visible again.
+            </div>
+          ) : canManageAccounting ? (
+            <div className="rounded-lg border border-dashed border-border bg-muted/10 p-4 text-sm text-muted-foreground">
+              This role can manage accounting, but Accounting privacy is still locked. Unlock Accounting privacy before viewing finance totals, exports, approvals, or row actions.
             </div>
           ) : (
             <div className="rounded-lg border border-dashed border-border bg-muted/10 p-4 text-sm text-muted-foreground">
@@ -888,12 +970,13 @@ export default function AccountingPage() {
             <InvoicesTable
               searchQuery={searchQuery}
               invoices={invoices}
-              showAmounts={canManageAccounting}
+              showAmounts={canUseSensitiveAccounting}
               onAddInvoice={createInvoice}
               onUpdateInvoice={handleUpdateInvoice}
               onDeleteInvoice={handleDeleteInvoice}
               onRequestApproval={handleRequestInvoiceApproval}
               canManage={canManageAccounting}
+              privacyUnlocked={privacyUnlocked}
             />
           </SectionErrorBoundary>
         </TabsContent>
@@ -904,12 +987,13 @@ export default function AccountingPage() {
             <ExpensesTable
               searchQuery={searchQuery}
               expenses={expenses}
-              showAmounts={canManageAccounting}
+              showAmounts={canUseSensitiveAccounting}
               onAddExpense={createExpense}
               onUpdateExpense={handleUpdateExpense}
               onDeleteExpense={handleDeleteExpense}
               onRequestApproval={handleRequestExpenseApproval}
               canManage={canManageAccounting}
+              privacyUnlocked={privacyUnlocked}
             />
           </SectionErrorBoundary>
         </TabsContent>
@@ -934,7 +1018,7 @@ export default function AccountingPage() {
                       <p className="text-xs text-muted-foreground mt-1">{pack.cadence} cadence</p>
                     </div>
                     <div className="flex gap-2">
-                      <Button size="sm" onClick={() => handleExportReports("desktop")} disabled={!canManageAccounting}>
+                      <Button size="sm" onClick={() => handleExportReports("desktop")} disabled={!canUseSensitiveAccounting}>
                         Export CSV
                       </Button>
                       <Button
@@ -942,7 +1026,7 @@ export default function AccountingPage() {
                         variant="outline"
                         className="bg-transparent"
                         onClick={() => handleExportReports("email")}
-                        disabled={!canManageAccounting}
+                        disabled={!canUseSensitiveAccounting}
                       >
                         Send Email
                       </Button>
@@ -965,11 +1049,11 @@ export default function AccountingPage() {
                     <p className="font-medium">VAT Snapshot</p>
                     <p className="text-sm text-muted-foreground">7.5% VAT on taxable revenue.</p>
                     <div className="text-sm">
-                      <p>Taxable revenue: {canManageAccounting ? formatNaira(vatTaxable) : "Restricted"}</p>
-                      <p>VAT due: {canManageAccounting ? formatNaira(vatDue) : "Restricted"}</p>
+                      <p>Taxable revenue: {canUseSensitiveAccounting ? formatNaira(vatTaxable) : "Restricted"}</p>
+                      <p>VAT due: {canUseSensitiveAccounting ? formatNaira(vatDue) : "Restricted"}</p>
                     </div>
                     <div className="flex flex-wrap gap-2 pt-2">
-                      <Button size="sm" onClick={() => handleExportCompliance("vat", "desktop")} disabled={!canManageAccounting}>
+                      <Button size="sm" onClick={() => handleExportCompliance("vat", "desktop")} disabled={!canUseSensitiveAccounting}>
                         Export CSV
                       </Button>
                       <Button
@@ -977,7 +1061,7 @@ export default function AccountingPage() {
                         variant="outline"
                         className="bg-transparent"
                         onClick={() => handleExportCompliance("vat", "email")}
-                        disabled={!canManageAccounting}
+                        disabled={!canUseSensitiveAccounting}
                       >
                         Email VAT CSV
                       </Button>
@@ -989,7 +1073,7 @@ export default function AccountingPage() {
                       Pull action logs, approval trails, and edits for compliance review.
                     </p>
                     <div className="flex flex-wrap gap-2 pt-2">
-                      <Button size="sm" onClick={() => handleExportCompliance("audit", "desktop")} disabled={!canManageAccounting}>
+                      <Button size="sm" onClick={() => handleExportCompliance("audit", "desktop")} disabled={!canUseSensitiveAccounting}>
                         Export audit log
                       </Button>
                       <Button
@@ -997,7 +1081,7 @@ export default function AccountingPage() {
                         variant="outline"
                         className="bg-transparent"
                         onClick={() => handleExportCompliance("audit", "email")}
-                        disabled={!canManageAccounting}
+                        disabled={!canUseSensitiveAccounting}
                       >
                         Email audit log
                       </Button>
@@ -1027,14 +1111,14 @@ export default function AccountingPage() {
                     variant="outline"
                     className="bg-transparent w-full"
                     onClick={() => downloadTemplate("invoices")}
-                    disabled={!canManageAccounting}
+                    disabled={!canUseSensitiveAccounting}
                   >
                     Download invoice template
                   </Button>
                   <Input
                     type="file"
                     accept=".csv"
-                    disabled={!canManageAccounting}
+                    disabled={!canUseSensitiveAccounting}
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) handleImportInvoices(file)
@@ -1050,14 +1134,14 @@ export default function AccountingPage() {
                     variant="outline"
                     className="bg-transparent w-full"
                     onClick={() => downloadTemplate("expenses")}
-                    disabled={!canManageAccounting}
+                    disabled={!canUseSensitiveAccounting}
                   >
                     Download expenses template
                   </Button>
                   <Input
                     type="file"
                     accept=".csv"
-                    disabled={!canManageAccounting}
+                    disabled={!canUseSensitiveAccounting}
                     onChange={(e) => {
                       const file = e.target.files?.[0]
                       if (file) handleImportExpenses(file)

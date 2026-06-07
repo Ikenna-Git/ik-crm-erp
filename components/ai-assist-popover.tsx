@@ -34,24 +34,24 @@ const getPageCoach = (pathname: string): PageCoach => {
   if (pathname.startsWith("/dashboard/crm")) {
     return {
       title: "CRM Coach",
-      hint: "Track contacts, deal stages, and follow-ups.",
-      prompts: ["How many contacts do we have?", "Show open deals", "Generate follow-up tasks"],
+      hint: "Track contacts, deal stages, and follow-ups with a governed workspace view.",
+      prompts: ["How many contacts do we have?", "Open sales pipeline", "What should I do next?"],
     }
   }
 
   if (pathname.startsWith("/dashboard/accounting")) {
     return {
       title: "Accounting Coach",
-      hint: "Review invoices, expenses, and report readiness.",
-      prompts: ["Show finance snapshot", "How many overdue invoices do we have?", "Draft invoice reminder email"],
+      hint: "Review invoices, expenses, approvals, and privacy lock readiness.",
+      prompts: ["How do I create an invoice?", "Show finance snapshot", "Unlock accounting"],
     }
   }
 
   if (pathname.startsWith("/dashboard/hr")) {
     return {
       title: "HR Coach",
-      hint: "Manage employees, attendance, leave, and payroll actions.",
-      prompts: ["How many employees do we have?", "Guide me on attendance flow", "Take me to payroll controls"],
+      hint: "Manage employees, attendance, leave, payroll, and privacy lock guidance.",
+      prompts: ["Why can't I see payroll details?", "Guide me on attendance flow", "Unlock HR privacy"],
     }
   }
 
@@ -72,9 +72,9 @@ const getPageCoach = (pathname: string): PageCoach => {
   }
 
   return {
-    title: "Civis Coach",
-    hint: "Ask anything about this page, and I will guide you step by step.",
-    prompts: ["What can I do on this page?", "Show my business snapshot", "Take me to CRM"],
+    title: "Civis Guide",
+    hint: "Ask anything about this page and I will guide you step by step.",
+    prompts: ["What can I do here?", "What should I do next?", "Take me to CRM"],
   }
 }
 
@@ -230,7 +230,7 @@ export function AiAssistPopover() {
       <div className="fixed bottom-6 right-6 z-[70]">
         <Button className="rounded-full h-12 px-4 shadow-lg gap-2" onClick={() => setOpen(true)}>
           <Bot className="w-4 h-4" />
-          AI Guide
+          Civis Guide
         </Button>
       </div>
     )

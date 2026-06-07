@@ -7,15 +7,15 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
 const quickPoints = [
-  "CRM, finance, HR, projects, and client portal in one accountable workspace",
-  "Founder keeps platform control while each company admin stays inside their own org",
-  "Built for growing teams that need clarity, approvals, and trust before complexity",
+  "CRM, finance, HR, projects, documents, and approvals in one governed workspace",
+  "Founder keeps platform control while each company admin stays inside their own org boundary",
+  "Built for growing teams that need clarity, approvals, privacy locks, and trust before complexity",
 ]
 
 const proofCards = [
   { label: "Founder control", value: "Platform locked" },
   { label: "Workspace admins", value: "Scoped by company" },
-  { label: "Launch posture", value: "Honest by design" },
+  { label: "Launch posture", value: "Evidence-aware" },
 ]
 
 export function Hero() {
@@ -34,11 +34,10 @@ export function Hero() {
 
           <div className="space-y-4">
             <h1 className="max-w-4xl text-4xl font-semibold leading-tight text-foreground sm:text-5xl lg:text-6xl">
-              Run the operating system for your business from one calm, accountable workspace.
+              The AI-native CRM and ERP command centre for teams that need one governed workspace.
             </h1>
             <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
-              Civis brings CRM, approvals, finance, HR, projects, and admin control into one product that feels clear
-              enough for operators and credible enough for buyers, investors, and real teams.
+              Civis connects CRM, approvals, finance, people, inventory, operations, and admin control into one calm operating layer. It is built to guide teams clearly, not overwhelm them with dashboard noise.
             </p>
           </div>
 
@@ -59,9 +58,9 @@ export function Hero() {
               </Link>
             </Button>
             <Button size="lg" variant="outline" asChild>
-              <Link href="/features" className="flex items-center gap-2">
+              <Link href="/pricing" className="flex items-center gap-2">
                 <Play className="h-4 w-4" />
-                See what each team gets
+                Review launch-safe pricing
               </Link>
             </Button>
           </div>
@@ -100,7 +99,7 @@ export function Hero() {
 
           <div className="absolute -bottom-5 right-0 hidden w-64 rounded-3xl border border-border/70 bg-background/90 p-4 shadow-xl backdrop-blur md:block">
             <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Admin flow</p>
-            <p className="mt-2 text-sm font-medium text-foreground">Create a workspace, invite the company admin, and keep founder-level control untouched.</p>
+              <p className="mt-2 text-sm font-medium text-foreground">Invite the company admin, preserve founder-only controls, and keep sensitive modules privacy locked until explicitly unlocked.</p>
           </div>
         </div>
       </div>

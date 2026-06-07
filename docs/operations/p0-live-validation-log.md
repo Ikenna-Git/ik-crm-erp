@@ -12,9 +12,12 @@ Date: 2026-06-07
   - logged-out `/api/admin/platform-status` blocked with `401`
 
 ## New Manual Validation Required After This Sweep
+- HR privacy PIN unlock / wrong PIN / relock flow
+- Accounting privacy PIN unlock / wrong PIN / relock flow
 - AI deterministic commands on live Render
 - HR restricted-user redaction on live Render
 - Accounting restricted-user redaction on live Render
 - Civis Pulse rendering on live Render
 - Founder trust/status area on live Render
 - Marketing preview-only messaging on live Render
+- Landing page premium redesign on mobile and desktop

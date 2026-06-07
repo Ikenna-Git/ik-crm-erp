@@ -5,6 +5,7 @@ import { createAuditLog } from "@/lib/audit"
 import { createDecisionTrail, expenseSnapshot } from "@/lib/decision-trails"
 import { getApprovalStateMapForOrg } from "@/lib/approval-requests"
 import { hasModuleAccess } from "@/lib/access-control"
+import { isPrivacyUnlocked } from "@/lib/privacy-lock"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable Accounting data." }, { status: 503 })
@@ -21,12 +22,14 @@ export async function GET(request: Request) {
       getApprovalStateMapForOrg(org.id),
     ])
     const canManageAccounting = hasModuleAccess(user, "accounting", "manage")
+    const revealSensitive = canManageAccounting && isPrivacyUnlocked(request, "accounting")
     return NextResponse.json({
       expenses: expenses.map((expense) => ({
-        ...(canManageAccounting
+        ...(revealSensitive
           ? expense
           : {
               ...expense,
+              description: "Protected expense",
               amount: 0,
               submittedBy: null,
             }),

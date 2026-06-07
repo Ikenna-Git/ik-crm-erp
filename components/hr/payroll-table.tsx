@@ -86,6 +86,7 @@ type PayrollTableProps = {
   onUpdatePayroll?: (id: string, data: Omit<PayrollRecord, "id">) => void
   onDeletePayroll?: (id: string) => void
   canManage?: boolean
+  privacyUnlocked?: boolean
 }
 
 export function PayrollTable({
@@ -95,6 +96,7 @@ export function PayrollTable({
   onUpdatePayroll,
   onDeletePayroll,
   canManage = false,
+  privacyUnlocked = false,
 }: PayrollTableProps) {
   const [payroll, setPayroll] = useState<PayrollRecord[]>(providedPayroll ?? [])
   const [currentPage, setCurrentPage] = useState(1)
@@ -129,7 +131,8 @@ export function PayrollTable({
     total: filteredPayroll.reduce((sum, p) => sum + p.netPay, 0),
   }
 
-  const displayAmounts = canManage
+  const revealSensitive = canManage && privacyUnlocked
+  const displayAmounts = revealSensitive
 
   const totalPages = Math.max(1, Math.ceil(sortedPayroll.length / pageSize))
   const pagedPayroll = sortedPayroll.slice((currentPage - 1) * pageSize, currentPage * pageSize)
@@ -183,7 +186,7 @@ export function PayrollTable({
   }
 
   const handleEditPayroll = (record: PayrollRecord) => {
-    if (!canManage) return
+    if (!revealSensitive) return
     setEditingId(record.id)
     setFormData({
       employee: record.employee,
@@ -220,12 +223,16 @@ export function PayrollTable({
       <Card>
         <CardHeader>
           <CardTitle>Payroll Access</CardTitle>
-          <CardDescription>Payroll access is enforced by workspace role, not by browser-local unlock codes.</CardDescription>
+          <CardDescription>Payroll combines workspace role checks with a session-scoped HR privacy unlock.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {canManage ? (
+          {revealSensitive ? (
             <div className="rounded-lg border border-border bg-muted/20 p-4 text-sm text-muted-foreground">
-              This role can manage payroll amounts, exports, and record edits for the current workspace.
+              HR privacy is unlocked for this session. Payroll amounts, exports, and sensitive record actions are visible again.
+            </div>
+          ) : canManage ? (
+            <div className="rounded-lg border border-dashed border-border bg-muted/10 p-4 text-sm text-muted-foreground">
+              This role can manage payroll, but HR privacy is still locked. Unlock HR privacy before viewing payroll amounts, exports, or row actions.
             </div>
           ) : (
             <div className="rounded-lg border border-dashed border-border bg-muted/10 p-4 text-sm text-muted-foreground">
@@ -280,13 +287,13 @@ export function PayrollTable({
               size="sm"
               variant="outline"
               onClick={downloadPayrollCSV}
-              disabled={!canManage}
+              disabled={!revealSensitive}
               className="flex items-center gap-2 bg-transparent"
             >
               <Download className="w-4 h-4" />
               Export CSV
             </Button>
-            <Button size="sm" onClick={() => setShowModal(true)} className="flex items-center gap-2" disabled={!canManage}>
+            <Button size="sm" onClick={() => setShowModal(true)} className="flex items-center gap-2" disabled={!revealSensitive}>
               <Plus className="w-4 h-4" />
               Add Payroll
             </Button>
@@ -324,7 +331,7 @@ export function PayrollTable({
                       </Badge>
                     </td>
                     <td className="py-4 px-4">
-                      {canManage ? (
+                      {revealSensitive ? (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm" className="p-2">
@@ -355,7 +362,13 @@ export function PayrollTable({
                           </DropdownMenuContent>
                         </DropdownMenu>
                       ) : (
-                        <Button variant="ghost" size="sm" className="p-2" disabled aria-label="Payroll actions unavailable">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="p-2"
+                          disabled
+                          aria-label={canManage ? "Unlock HR privacy to manage payroll actions" : "Payroll actions unavailable"}
+                        >
                           <Lock className="w-4 h-4" />
                         </Button>
                       )}
@@ -384,8 +397,13 @@ export function PayrollTable({
         }}
         title={selectedPayroll?.employee || "Payroll record"}
         description="Review payroll details in an app dialog."
-        locked={!canManage}
-        lockedDescription="Payroll details, exports, and approvals are restricted to HR managers and workspace admins."
+        locked={!revealSensitive}
+        lockedTitle="HR privacy locked"
+        lockedDescription={
+          canManage
+            ? "This record is protected. Unlock HR privacy to view payroll details."
+            : "This record is protected. An authorized HR manager must unlock HR privacy to view payroll details."
+        }
         sections={
           selectedPayroll
             ? [
@@ -407,7 +425,7 @@ export function PayrollTable({
       />
 
       {/* Add Payroll Modal */}
-      {showModal && canManage ? (
+      {showModal && revealSensitive ? (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4">
             <CardHeader className="flex flex-row items-center justify-between pb-3">

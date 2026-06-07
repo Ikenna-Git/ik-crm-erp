@@ -69,6 +69,7 @@ type Props = {
   onRequestApproval?: (expense: Expense) => Promise<void> | void
   showAmounts?: boolean
   canManage?: boolean
+  privacyUnlocked?: boolean
 }
 
 const formatNaira = (amount: number) =>
@@ -102,6 +103,7 @@ export function ExpensesTable({
   onRequestApproval,
   showAmounts = true,
   canManage = false,
+  privacyUnlocked = false,
 }: Props) {
   const [expenses, setExpenses] = useState<Expense[]>(providedExpenses ?? [])
   const [currentPage, setCurrentPage] = useState(1)
@@ -120,6 +122,8 @@ export function ExpensesTable({
   useEffect(() => {
     if (providedExpenses) setExpenses(providedExpenses)
   }, [providedExpenses])
+
+  const revealSensitive = canManage && privacyUnlocked
 
   useEffect(() => {
     setCurrentPage(1)
@@ -185,6 +189,7 @@ export function ExpensesTable({
   }
 
   const handleDeleteExpense = (id: string) => {
+    if (!revealSensitive) return
     if (onDeleteExpense) {
       onDeleteExpense(id)
     } else {
@@ -193,6 +198,7 @@ export function ExpensesTable({
   }
 
   const handleEditExpense = (expense: Expense) => {
+    if (!revealSensitive) return
     setEditingId(expense.id)
     setFormData({
       description: expense.description,
@@ -250,13 +256,13 @@ export function ExpensesTable({
               size="sm"
               variant="outline"
               onClick={downloadExpensesCSV}
-              disabled={!canManage}
+              disabled={!revealSensitive}
               className="flex items-center gap-2 bg-transparent"
             >
               <Download className="w-4 h-4" />
               Export CSV
             </Button>
-            <Button size="sm" onClick={() => setShowModal(true)} className="flex items-center gap-2" disabled={!canManage}>
+            <Button size="sm" onClick={() => setShowModal(true)} className="flex items-center gap-2" disabled={!revealSensitive}>
               <Plus className="w-4 h-4" />
               Add Expense
             </Button>
@@ -302,7 +308,7 @@ export function ExpensesTable({
                       </td>
                       <td className="py-4 px-4 text-muted-foreground">{expense.date || "—"}</td>
                       <td className="py-4 px-4">
-                        {canManage ? (
+                        {revealSensitive ? (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="sm" className="p-2">
@@ -332,7 +338,13 @@ export function ExpensesTable({
                             </DropdownMenuContent>
                           </DropdownMenu>
                         ) : (
-                          <Button variant="ghost" size="sm" className="p-2" disabled aria-label="Expense actions unavailable">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="p-2"
+                            disabled
+                            aria-label={canManage ? "Unlock Accounting privacy to manage expense actions" : "Expense actions unavailable"}
+                          >
                             <X className="w-4 h-4" />
                           </Button>
                         )}
@@ -362,8 +374,13 @@ export function ExpensesTable({
         }}
         title={selectedExpense?.description || "Expense details"}
         description="Review expense information in a readable panel."
-        locked={!canManage}
-        lockedDescription="Expense details, approvals, and edits are only available to finance managers and workspace admins."
+        locked={!revealSensitive}
+        lockedTitle="Accounting privacy locked"
+        lockedDescription={
+          canManage
+            ? "This record is protected. Unlock Accounting privacy to view expense details."
+            : "This record is protected. An authorized finance manager must unlock Accounting privacy to view expense details."
+        }
         sections={
           selectedExpense
             ? [
@@ -385,7 +402,7 @@ export function ExpensesTable({
       />
 
       {/* Add Expense Modal */}
-      {showModal && canManage ? (
+      {showModal && revealSensitive ? (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
