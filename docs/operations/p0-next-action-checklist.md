@@ -2,7 +2,11 @@
 
 ## 1. Live Validation Required Now
 
-- [ ] Run `BASE_URL=https://your-render-url npm run p0:smoke`
+- [x] Run `BASE_URL=https://ik-crm-erp.onrender.com P0_SMOKE_DEBUG=1 npm run p0:smoke`
+- [x] Confirm logged-out `/dashboard` no longer returns `200`
+- [x] Confirm logged-out `/admin` no longer returns `200`
+- [x] Confirm `/api/admin/orgs` still returns `401` when logged out
+- [x] Confirm `/api/admin/platform-status` still returns `401` when logged out
 - [ ] Run the browser checks in `docs/operations/p0-screen-check-runbook.md`
 - [ ] Confirm founder vs org owner admin boundaries on live Render
 - [ ] Confirm invite flow lands new users in invite org only
@@ -11,6 +15,15 @@
 - [ ] Confirm CRM contact/company/deal CRUD survives refresh
 - [ ] Confirm workflows remain org-scoped
 - [ ] Confirm notifications persist through DB-backed flow
+
+Blocked/manual items still remaining from the smoke run:
+- [ ] Role cookie checks for founder/org owner routes
+- [ ] Invite flow manual/browser validation
+- [ ] Accounting approval lifecycle manual/browser validation
+- [ ] CRM CRUD manual/browser validation
+- [ ] Upload/provider validation
+- [ ] Notification write validation
+- [ ] Remote environment verification outside the smoke script
 
 ## 2. Environment Validation
 

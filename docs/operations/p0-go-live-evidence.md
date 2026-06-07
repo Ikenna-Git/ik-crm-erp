@@ -29,20 +29,37 @@ This file is the deployment gate for P0. A release is not go-live ready until th
   - `P0_SMOKE_RETRY_DELAY_MS`
 - if a cloud shell cannot reach Render, rerun from a local machine and record the blocked network result separately from app failures
 
+## Recorded Smoke Test Evidence
+
+- date: `2026-06-07`
+- base URL: `https://ik-crm-erp.onrender.com`
+- command:
+  - `BASE_URL=https://ik-crm-erp.onrender.com P0_SMOKE_DEBUG=1 npm run p0:smoke`
+- result:
+  - `25 checks`
+  - `0 fail`
+  - `15 blocked`
+- protected page route guard fix confirmed live:
+  - `/dashboard` blocked for logged-out users via `307` redirect to `/login`
+  - `/admin` blocked for logged-out users via `307` redirect to `/login`
+  - `/api/admin/orgs` blocked with `401`
+  - `/api/admin/platform-status` blocked with `401`
+- remaining blocked items are expected manual/provider/write validations, not route access failures
+
 ## Go-Live Evidence Table
 
 | Test area | Test item | Role | Route / API | Expected result | Actual result | Pass / Fail / Blocked | Evidence link / screenshot note | Tester | Date |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Auth and access | Logged-out dashboard blocked | logged out | `/dashboard` | Redirected or blocked |  |  |  |  |  |
-| Auth and access | Logged-out admin blocked | logged out | `/admin` | Redirected or blocked |  |  |  |  |  |
+| Auth and access | Logged-out dashboard blocked | logged out | `/dashboard` | Redirected or blocked | `307` redirect to `/login` | Pass | P0 smoke test on Render after route guard fix | Live smoke runner | 2026-06-07 |
+| Auth and access | Logged-out admin blocked | logged out | `/admin` | Redirected or blocked | `307` redirect to `/login` | Pass | P0 smoke test on Render after route guard fix | Live smoke runner | 2026-06-07 |
 | Auth and access | Founder login works | founder | `/login` | Founder lands in correct workspace/admin scope |  |  |  |  |  |
 | Auth and access | Org owner login works | org owner | `/login` | Org owner lands in correct workspace only |  |  |  |  |  |
 | Auth and access | Normal user login works | normal user | `/login` | User lands in correct workspace only |  |  |  |  |  |
 | Admin and org boundary | Founder Desk visible to founder | founder | `/admin` | Founder-only navigation visible |  |  |  |  |  |
 | Admin and org boundary | Founder Desk hidden from org owner | org owner | `/admin` | Founder-only navigation hidden |  |  |  |  |  |
 | Admin and org boundary | Org owner blocked from system page | org owner | `/admin/system` | Forbidden / redirect |  |  |  |  |  |
-| Admin and org boundary | Org owner blocked from org API | org owner | `/api/admin/orgs` | `401/403` or equivalent block |  |  |  |  |  |
-| Admin and org boundary | Org owner blocked from platform status API | org owner | `/api/admin/platform-status` | `401/403` or equivalent block |  |  |  |  |  |
+| Admin and org boundary | Logged-out org API blocked | logged out | `/api/admin/orgs` | `401/403` or equivalent block | `401` | Pass | P0 smoke test on Render after route guard fix | Live smoke runner | 2026-06-07 |
+| Admin and org boundary | Logged-out platform status API blocked | logged out | `/api/admin/platform-status` | `401/403` or equivalent block | `401` | Pass | P0 smoke test on Render after route guard fix | Live smoke runner | 2026-06-07 |
 | Admin and org boundary | Org owner team list is same-org only | org owner | `/admin/users` | Founder/super-admin not visible; same-org only |  |  |  |  |  |
 | Invite flow | Founder invites org owner | founder | `/admin/users` or `/dashboard/settings` | Invite created and link/email generated |  |  |  |  |  |
 | Invite flow | Invitee lands in invite org | invited user | invite link + `/signup` | Correct org only |  |  |  |  |  |
