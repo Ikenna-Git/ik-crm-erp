@@ -3,8 +3,8 @@ import { Role } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
 import { buildModuleAccessForUser, getDefaultAccessProfileForRole } from "@/lib/access-control"
-import { getUserFromRequest } from "@/lib/request-user"
-import { canAssignRole, canManageWorkspaceSettings, getAssignableRoles, isAdmin } from "@/lib/authz"
+import { canAssignRole, getAssignableRoles } from "@/lib/authz"
+import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable settings." }, { status: 503 })
@@ -12,10 +12,7 @@ const dbUnavailable = () =>
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
-    if (!canManageWorkspaceSettings(user.role)) {
-      return NextResponse.json({ error: "Organization owner access required" }, { status: 403 })
-    }
+    const { org } = await requireAdminRequest(request, { requireWorkspaceOwner: true })
     const users = await prisma.user.findMany({
       where: { orgId: org.id },
       orderBy: { createdAt: "desc" },
@@ -23,18 +20,14 @@ export async function GET(request: Request) {
     })
     return NextResponse.json({ org, users })
   } catch (error) {
-    console.error("Settings fetch failed", error)
-    return NextResponse.json({ error: "Failed to load settings" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to load settings")
   }
 }
 
 export async function PATCH(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
-    if (!canManageWorkspaceSettings(user.role)) {
-      return NextResponse.json({ error: "Organization owner access required" }, { status: 403 })
-    }
+    const { org, user } = await requireAdminRequest(request, { requireWorkspaceOwner: true })
     const body = await request.json()
     const { name, theme, notifyEmail } = body || {}
     const updated = await prisma.org.update({
@@ -51,23 +44,19 @@ export async function PATCH(request: Request) {
     })
     return NextResponse.json({ org: updated })
   } catch (error) {
-    console.error("Settings update failed", error)
-    return NextResponse.json({ error: "Failed to update settings" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to update settings")
   }
 }
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
-    const { org, user } = await getUserFromRequest(request)
-    if (!isAdmin(user.role)) {
-      return NextResponse.json({ error: "Admin access required" }, { status: 403 })
-    }
+    const { org, user } = await requireAdminRequest(request)
     const body = await request.json()
     const { name, email, role } = body || {}
     if (!name || !email || !role) return NextResponse.json({ error: "name, email, role required" }, { status: 400 })
     const normalizedRole = String(role).trim().toUpperCase() as Role
-    const assignableRoles = getAssignableRoles(user.role)
+    const assignableRoles = getAssignableRoles(user.role, user.email)
     if (!assignableRoles.includes(normalizedRole)) {
       return NextResponse.json({ error: `Only ${assignableRoles.join(", ")} can be created here` }, { status: 400 })
     }
@@ -108,7 +97,6 @@ export async function POST(request: Request) {
     if (error.code === "P2002") {
       return NextResponse.json({ error: "Email already exists" }, { status: 400 })
     }
-    console.error("Settings user create failed", error)
-    return NextResponse.json({ error: "Failed to invite user" }, { status: 500 })
+    return handleAccessRouteError(error, "Failed to invite user")
   }
 }

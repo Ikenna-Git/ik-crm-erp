@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { isSuperAdmin } from "@/lib/authz"
+import { canViewFounderControls } from "@/lib/authz"
 
 type OrgRecord = {
   id: string
@@ -123,11 +123,11 @@ export default function AdminSystemPage() {
   }
 
   useEffect(() => {
-    if (isSuperAdmin(session?.user?.role)) {
+    if (canViewFounderControls(session?.user?.role, session?.user?.email)) {
       load()
       loadStatus()
     }
-  }, [session?.user?.role])
+  }, [session?.user?.email, session?.user?.role])
 
   const handleCreateWorkspace = async () => {
     try {
@@ -207,7 +207,7 @@ export default function AdminSystemPage() {
     }
   }
 
-  if (!isSuperAdmin(session?.user?.role)) {
+  if (!canViewFounderControls(session?.user?.role, session?.user?.email)) {
     return (
       <Card className="border-white/10 bg-white/5 text-slate-100">
         <CardHeader>

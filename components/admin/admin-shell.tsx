@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ThemeToggle } from "@/components/theme-toggle"
-import { isAdmin, isOrgOwner, isSuperAdmin } from "@/lib/authz"
+import { canViewFounderControls, isAdmin, isOrgOwner } from "@/lib/authz"
 
 const navItems = [
   { href: "/admin", label: "Ops Center", icon: ShieldCheck, superOnly: false },
@@ -40,8 +40,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }, [role, router, status])
 
   const items = useMemo(
-    () => navItems.filter((item) => (item.superOnly ? isSuperAdmin(role) : true)),
-    [role],
+    () => navItems.filter((item) => (item.superOnly ? canViewFounderControls(role, session?.user?.email) : true)),
+    [role, session?.user?.email],
   )
 
   if (status === "loading") {
@@ -59,7 +59,11 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     return null
   }
 
-  const label = isSuperAdmin(role) ? "Platform Super Admin" : isOrgOwner(role) ? "Organization Owner" : "Workspace Admin"
+  const label = canViewFounderControls(role, session?.user?.email)
+    ? "Platform Super Admin"
+    : isOrgOwner(role)
+      ? "Organization Owner"
+      : "Workspace Admin"
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.14),_transparent_35%),linear-gradient(180deg,_#0f172a_0%,_#020617_100%)] text-slate-100">

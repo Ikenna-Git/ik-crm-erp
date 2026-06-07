@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
-import { isSuperAdmin } from "@/lib/authz"
+import { canManageWorkspaceSettings, canViewFounderControls } from "@/lib/authz"
 import {
   BILLING_CYCLE_LABELS,
   BILLING_CYCLES,
@@ -30,10 +30,21 @@ export async function GET(request: Request) {
 
   try {
     const { org, user } = await requireAdminRequest(request)
+    const showFounderControls = canViewFounderControls(user.role, user.email)
 
     const [seatUsage, privilegedUserCount] = await Promise.all([
-      prisma.user.count({ where: { orgId: org.id } }),
-      prisma.user.count({ where: { orgId: org.id, role: { in: ["ORG_OWNER", "ADMIN", "SUPER_ADMIN"] } } }),
+      prisma.user.count({
+        where: {
+          orgId: org.id,
+          ...(showFounderControls ? {} : { role: { not: "SUPER_ADMIN" } }),
+        },
+      }),
+      prisma.user.count({
+        where: {
+          orgId: org.id,
+          role: { in: showFounderControls ? ["ORG_OWNER", "ADMIN", "SUPER_ADMIN"] : ["ORG_OWNER", "ADMIN"] },
+        },
+      }),
     ])
 
     return NextResponse.json({
@@ -48,8 +59,8 @@ export async function GET(request: Request) {
         nextBillingDate: org.nextBillingDate,
         trialEndsAt: org.trialEndsAt,
         paymentProvider: org.paymentProvider || "",
-        paymentCustomerRef: isSuperAdmin(user.role) ? org.paymentCustomerRef || "" : "",
-        paymentSubscriptionRef: isSuperAdmin(user.role) ? org.paymentSubscriptionRef || "" : "",
+        paymentCustomerRef: showFounderControls ? org.paymentCustomerRef || "" : "",
+        paymentSubscriptionRef: showFounderControls ? org.paymentSubscriptionRef || "" : "",
       },
       summary: {
         seatsUsed: seatUsage,
@@ -57,9 +68,9 @@ export async function GET(request: Request) {
         privilegedUserCount,
       },
       permissions: {
-        canManageBilling: canManageWorkspaceSettings(user.role),
-        canEditProviderRefs: isSuperAdmin(user.role),
-        isPlatformSuperAdmin: isSuperAdmin(user.role),
+        canManageBilling: canManageWorkspaceSettings(user.role, user.email),
+        canEditProviderRefs: showFounderControls,
+        isPlatformSuperAdmin: showFounderControls,
       },
       options: {
         plans: BILLING_PLANS.map((value) => ({ value, label: BILLING_PLAN_LABELS[value] })),
@@ -78,6 +89,7 @@ export async function PATCH(request: Request) {
 
   try {
     const { org, user } = await requireAdminRequest(request, { requireWorkspaceOwner: true })
+    const showFounderControls = canViewFounderControls(user.role, user.email)
 
     const body = await request.json()
     const billingEmail = String(body?.billingEmail || "").trim()
@@ -85,7 +97,7 @@ export async function PATCH(request: Request) {
       billingEmail: billingEmail || null,
     }
 
-    if (isSuperAdmin(user.role)) {
+    if (showFounderControls) {
       updateData.billingPlan = normalizeBillingPlan(body?.billingPlan || org.billingPlan)
       updateData.billingStatus = normalizeBillingStatus(body?.billingStatus || org.billingStatus)
       updateData.billingCycle = normalizeBillingCycle(body?.billingCycle || org.billingCycle)
@@ -130,8 +142,8 @@ export async function PATCH(request: Request) {
         nextBillingDate: updated.nextBillingDate,
         trialEndsAt: updated.trialEndsAt,
         paymentProvider: updated.paymentProvider || "",
-        paymentCustomerRef: isSuperAdmin(user.role) ? updated.paymentCustomerRef || "" : "",
-        paymentSubscriptionRef: isSuperAdmin(user.role) ? updated.paymentSubscriptionRef || "" : "",
+        paymentCustomerRef: showFounderControls ? updated.paymentCustomerRef || "" : "",
+        paymentSubscriptionRef: showFounderControls ? updated.paymentSubscriptionRef || "" : "",
       },
     })
   } catch (error) {

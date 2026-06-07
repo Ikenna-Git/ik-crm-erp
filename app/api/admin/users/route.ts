@@ -9,7 +9,14 @@ import {
   normalizeAccessProfile,
   summarizeModuleAccess,
 } from "@/lib/access-control"
-import { canAssignRole, canDeleteUser, getAssignableRoles } from "@/lib/authz"
+import {
+  canAssignRole,
+  canDeleteUser,
+  canViewFounderControls,
+  getAssignableRoles,
+  getFounderSuperAdminEmail,
+  isFounderSuperAdminEmail,
+} from "@/lib/authz"
 import { issueSignupInvite, sendSignupInviteEmail } from "@/lib/invitations"
 import { getPublicOrigin } from "@/lib/public-url"
 import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
@@ -46,8 +53,18 @@ export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org, user } = await requireAdminRequest(request)
+    const showPlatformUsers = canViewFounderControls(user.role, user.email)
+    const founderEmail = getFounderSuperAdminEmail()
     const users = await prisma.user.findMany({
-      where: { orgId: org.id },
+      where: {
+        orgId: org.id,
+        ...(showPlatformUsers
+          ? {}
+          : {
+              role: { not: "SUPER_ADMIN" },
+              email: { not: founderEmail },
+            }),
+      },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -67,9 +84,10 @@ export async function GET(request: Request) {
         },
       },
     })
+    const visibleUsers = showPlatformUsers ? users : users.filter((member) => !isFounderSuperAdminEmail(member.email))
     return NextResponse.json({
-      users: users.map(mapAdminUser),
-      assignableRoles: getAssignableRoles(user.role),
+      users: visibleUsers.map(mapAdminUser),
+      assignableRoles: getAssignableRoles(user.role, user.email),
       accessProfiles: ACCESS_PROFILES,
     })
   } catch (error) {
@@ -88,7 +106,7 @@ export async function POST(request: Request) {
     const title = String(body?.title || "").trim()
     const normalized = String(body?.role || "USER").trim().toUpperCase() as Role
     const accessProfile = normalizeAccessProfile(body?.accessProfile || getDefaultAccessProfileForRole(normalized))
-    const assignableRoles = getAssignableRoles(actor.role)
+    const assignableRoles = getAssignableRoles(actor.role, actor.email)
 
     if (!name || !email) {
       return NextResponse.json({ error: "name and email required" }, { status: 400 })

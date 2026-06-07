@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { canViewFounderControls, getFounderSuperAdminEmail, isSuperAdmin } from "@/lib/authz"
+import { canViewFounderControls, getFounderSuperAdminEmail } from "@/lib/authz"
 import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
 
 const dbUnavailable = () =>
@@ -20,7 +20,7 @@ export async function GET(request: Request) {
 
   try {
     const { org, user } = await requireAdminRequest(request)
-    const showFounderControls = canViewFounderControls(user.role)
+    const showFounderControls = canViewFounderControls(user.role, user.email)
 
     const [
       userCount,
@@ -39,8 +39,19 @@ export async function GET(request: Request) {
       totalUsers,
       recentOrgs,
     ] = await Promise.all([
-      prisma.user.count({ where: { orgId: org.id } }),
-      prisma.user.count({ where: { orgId: org.id, role: { in: ["ORG_OWNER", "ADMIN", "SUPER_ADMIN"] } } }),
+      prisma.user.count({
+        where: {
+          orgId: org.id,
+          ...(showFounderControls ? {} : { role: { not: "SUPER_ADMIN" }, email: { not: getFounderSuperAdminEmail() } }),
+        },
+      }),
+      prisma.user.count({
+        where: {
+          orgId: org.id,
+          role: { in: showFounderControls ? ["ORG_OWNER", "ADMIN", "SUPER_ADMIN"] : ["ORG_OWNER", "ADMIN"] },
+          ...(showFounderControls ? {} : { email: { not: getFounderSuperAdminEmail() } }),
+        },
+      }),
       prisma.user.count({ where: { orgId: org.id, twoFactorEnabled: true } }),
       prisma.contact.count({ where: { orgId: org.id } }),
       prisma.employee.count({ where: { orgId: org.id } }),
@@ -61,9 +72,9 @@ export async function GET(request: Request) {
         take: 6,
         select: { id: true, createdAt: true, metadata: true },
       }),
-      isSuperAdmin(user.role) ? prisma.org.count() : Promise.resolve(0),
-      isSuperAdmin(user.role) ? prisma.user.count() : Promise.resolve(0),
-      isSuperAdmin(user.role)
+      showFounderControls ? prisma.org.count() : Promise.resolve(0),
+      showFounderControls ? prisma.user.count() : Promise.resolve(0),
+      showFounderControls
         ? prisma.org.findMany({
             orderBy: { updatedAt: "desc" },
             take: 5,
@@ -321,7 +332,7 @@ export async function GET(request: Request) {
         incidents,
         nextActions,
       },
-      platform: isSuperAdmin(user.role)
+      platform: showFounderControls
         ? {
             totalOrgs,
             totalUsers,

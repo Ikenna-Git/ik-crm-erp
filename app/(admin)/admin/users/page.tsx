@@ -16,7 +16,7 @@ import {
   ACCESS_PROFILES,
   type AccessProfile,
 } from "@/lib/access-control"
-import { FOUNDER_SUPER_ADMIN_EMAIL } from "@/lib/authz"
+import { canViewFounderControls, FOUNDER_SUPER_ADMIN_EMAIL } from "@/lib/authz"
 
 type AssignableRole = "USER" | "ADMIN" | "ORG_OWNER"
 
@@ -62,7 +62,7 @@ export default function AdminUsersPage() {
   })
 
   const founderEmail = useMemo(() => FOUNDER_SUPER_ADMIN_EMAIL, [])
-  const isPlatformSuperAdmin = session?.user?.role === "SUPER_ADMIN"
+  const isPlatformSuperAdmin = canViewFounderControls(session?.user?.role, session?.user?.email)
 
   const load = async () => {
     try {
@@ -389,6 +389,7 @@ export default function AdminUsersPage() {
                 {(data?.users || []).map((member) => {
                   const isFounder = member.email.toLowerCase() === founderEmail
                   const isSelf = member.email.toLowerCase() === session?.user?.email?.toLowerCase()
+                  const isLockedElevatedRole = member.role === "SUPER_ADMIN" && !isFounder
                   const canEditMemberRole = !isFounder && member.role !== "SUPER_ADMIN" && data?.assignableRoles.includes(member.role as AssignableRole)
                   const canEditAccessProfile = canEditMemberRole
                   return (
@@ -448,10 +449,18 @@ export default function AdminUsersPage() {
                         ) : (
                           <div className="space-y-1">
                             <Badge className="bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15">
-                              {member.role === "SUPER_ADMIN" ? "Founder access" : ACCESS_PROFILE_LABELS[member.accessProfile]}
+                              {isFounder
+                                ? "Founder access"
+                                : isLockedElevatedRole
+                                  ? "Locked elevated role"
+                                  : ACCESS_PROFILE_LABELS[member.accessProfile]}
                             </Badge>
                             <p className="max-w-xs text-xs text-slate-400">
-                              {member.accessSummary.length ? member.accessSummary.join(", ") : "Full privileged access."}
+                              {isLockedElevatedRole
+                                ? "This row is using a non-founder SUPER_ADMIN role and should be audited before any data change."
+                                : member.accessSummary.length
+                                  ? member.accessSummary.join(", ")
+                                  : "Full privileged access."}
                             </p>
                           </div>
                         )}

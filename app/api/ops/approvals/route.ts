@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
-import { getApprovalStateMapForOrg, listApprovalItemsForOrg, approvalActions, buildApprovalMetadata, type ApprovalDecision, type ApprovalSourceType } from "@/lib/approval-requests"
+import {
+  getApprovalStateMapForOrg,
+  listApprovalItemsForOrg,
+  approvalActions,
+  buildApprovalMetadata,
+  type ApprovalDecision,
+  type ApprovalSourceType,
+} from "@/lib/approval-requests"
 import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 
 const dbUnavailable = () =>
@@ -170,7 +177,7 @@ export async function PATCH(request: Request) {
         owner: source.owner,
         amount: source.amount,
         approvalStatus: decision,
-        sourceStatus: sourceType === "expense" ? expense?.status || source.sourceStatus : source.sourceStatus,
+        sourceStatus: source.sourceStatus,
       }),
     })
 
