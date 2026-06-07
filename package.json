@@ -6,6 +6,7 @@
     "build": "prisma generate && next build --webpack",
     "dev": "next dev",
     "lint": "eslint .",
+    "p0:smoke": "node scripts/p0-smoke-check.mjs",
     "start": "next start"
   },
   "dependencies": {
