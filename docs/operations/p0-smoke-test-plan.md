@@ -19,6 +19,14 @@ Branch: `p0-automated-smoke-validation`
 BASE_URL=https://your-render-url npm run p0:smoke
 ```
 
+With debug diagnostics:
+
+```bash
+BASE_URL=https://your-render-url \
+P0_SMOKE_DEBUG=1 \
+npm run p0:smoke
+```
+
 Optional authenticated role checks:
 
 ```bash
@@ -32,6 +40,51 @@ Notes:
 - the script does not print secrets
 - the script does not mutate production data by default
 - write-heavy flows remain manual/browser validations and are marked `BLOCKED` by the script
+- pre-HTTP fetch failures are `BLOCKED`, not `FAIL`
+- `FAIL` means the app responded but the response did not match the expected behavior
+
+### Timeout and retry tuning
+
+Defaults:
+
+```bash
+P0_SMOKE_TIMEOUT_MS=15000
+P0_SMOKE_RETRIES=2
+P0_SMOKE_RETRY_DELAY_MS=3000
+```
+
+Example with a slower cold-start tolerance:
+
+```bash
+BASE_URL=https://your-render-url \
+P0_SMOKE_TIMEOUT_MS=30000 \
+P0_SMOKE_RETRIES=4 \
+P0_SMOKE_RETRY_DELAY_MS=5000 \
+npm run p0:smoke
+```
+
+### Network diagnostic behavior
+
+- the script performs a warm-up request to `/` before the rest of the route checks
+- if warm-up reaches the app, route checks continue
+- if warm-up is blocked by DNS/TLS/timeout/network issues, network-dependent checks are marked `BLOCKED`
+- safe reason labels include:
+  - `NETWORK_ERROR`
+  - `DNS_ERROR`
+  - `TLS_ERROR`
+  - `TIMEOUT`
+  - `CONNECTION_REFUSED`
+  - `CONNECTION_RESET`
+  - `UNKNOWN_FETCH_ERROR`
+- cookie-gated checks without cookies are marked `BLOCKED :: MISSING_COOKIE`
+
+### If this environment cannot reach Render
+
+If the smoke runner shows only network-blocked results from a hosted shell, rerun it from:
+- your local terminal on the same machine you use for browser validation
+- another trusted machine/network that can reach the Render URL
+
+That is a connectivity limitation, not proof that the app failed its route checks.
 
 ## Coverage Matrix
 

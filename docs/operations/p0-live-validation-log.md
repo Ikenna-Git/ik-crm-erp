@@ -5,6 +5,16 @@ Branch: `p0-automated-smoke-validation`
 
 Use this file during each Render validation pass.
 
+## Smoke Runner Notes
+
+- network/connectivity failures from `npm run p0:smoke` should be recorded as `Blocked`, not `Fail`
+- use debug mode when needed:
+  - `BASE_URL=https://your-render-url P0_SMOKE_DEBUG=1 npm run p0:smoke`
+- increase timeout/retries for cold starts if needed:
+  - `P0_SMOKE_TIMEOUT_MS`
+  - `P0_SMOKE_RETRIES`
+  - `P0_SMOKE_RETRY_DELAY_MS`
+
 ## Session Header
 
 | Item | Value |

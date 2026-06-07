@@ -14,6 +14,20 @@ This file is the deployment gate for P0. A release is not go-live ready until th
 - screenshots or log references should be linked in the notes column
 - if provider config is missing, mark blocked or fail clearly
 - do not claim production readiness without completed evidence
+- smoke-test network/connectivity failures are `BLOCKED`, not app `FAIL`
+- only treat a smoke check as `FAIL` when the app returned an HTTP response that violated the expected behavior
+
+## Smoke Runner Notes
+
+- baseline command:
+  - `BASE_URL=https://your-render-url npm run p0:smoke`
+- debug command:
+  - `BASE_URL=https://your-render-url P0_SMOKE_DEBUG=1 npm run p0:smoke`
+- timeout/retry tuning:
+  - `P0_SMOKE_TIMEOUT_MS`
+  - `P0_SMOKE_RETRIES`
+  - `P0_SMOKE_RETRY_DELAY_MS`
+- if a cloud shell cannot reach Render, rerun from a local machine and record the blocked network result separately from app failures
 
 ## Go-Live Evidence Table
 

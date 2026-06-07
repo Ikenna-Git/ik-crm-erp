@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 
 const baseUrl = process.env.BASE_URL?.trim()
+const debug = process.env.P0_SMOKE_DEBUG === "1"
+const timeoutMs = Number.parseInt(process.env.P0_SMOKE_TIMEOUT_MS || "15000", 10)
+const retries = Number.parseInt(process.env.P0_SMOKE_RETRIES || "2", 10)
+const retryDelayMs = Number.parseInt(process.env.P0_SMOKE_RETRY_DELAY_MS || "3000", 10)
 
 if (!baseUrl) {
-  console.error("FAIL BASE_URL is required. Example: BASE_URL=https://your-render-url npm run p0:smoke")
+  console.error("FAIL Preflight :: BASE_URL missing :: Set BASE_URL=https://your-render-url before running p0:smoke")
   process.exit(1)
 }
 
@@ -17,153 +21,351 @@ const cookieEnv = {
 
 const results = []
 
-const pushResult = (status, area, item, detail, route = "") => {
-  results.push({ status, area, item, detail, route })
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const sanitizeMessage = (value) => (typeof value === "string" ? value.replace(/\s+/g, " ").trim() : "")
+
+const getHeader = (res, name) => {
+  try {
+    return res.headers.get(name)
+  } catch {
+    return null
+  }
 }
 
-const request = async (path, options = {}) => {
-  const res = await fetch(`${normalizedBaseUrl}${path}`, {
-    redirect: "manual",
-    ...options,
-    headers: {
-      "user-agent": "civis-p0-smoke-check/1.0",
-      ...(options.headers || {}),
-    },
-  })
-  return res
+const isLoginRedirect = (res) => {
+  const location = getHeader(res, "location") || ""
+  if (!location) return false
+  return /\/login(?:[/?#]|$)/i.test(location)
+}
+
+const classifyFetchError = (error) => {
+  const err = error instanceof Error ? error : new Error(String(error))
+  const cause = typeof err.cause === "object" && err.cause !== null ? err.cause : {}
+  const code = typeof cause.code === "string" ? cause.code : typeof err.code === "string" ? err.code : ""
+  const message = sanitizeMessage(err.message)
+  const lowerMessage = message.toLowerCase()
+
+  let reason = "UNKNOWN_FETCH_ERROR"
+  if (code === "ENOTFOUND" || code === "EAI_AGAIN" || lowerMessage.includes("getaddrinfo")) {
+    reason = "DNS_ERROR"
+  } else if (code === "ETIMEDOUT" || code === "UND_ERR_CONNECT_TIMEOUT" || lowerMessage.includes("timed out")) {
+    reason = "TIMEOUT"
+  } else if (code === "ECONNREFUSED") {
+    reason = "CONNECTION_REFUSED"
+  } else if (code === "ECONNRESET" || lowerMessage.includes("socket hang up")) {
+    reason = "CONNECTION_RESET"
+  } else if (
+    code === "ERR_TLS_CERT_ALTNAME_INVALID" ||
+    code === "UNABLE_TO_VERIFY_LEAF_SIGNATURE" ||
+    lowerMessage.includes("certificate") ||
+    lowerMessage.includes("tls")
+  ) {
+    reason = "TLS_ERROR"
+  } else if (message) {
+    reason = "NETWORK_ERROR"
+  }
+
+  return {
+    status: "BLOCKED",
+    reason,
+    errorName: err.name || "Error",
+    errorMessage: message || "Fetch failed before receiving an HTTP response",
+    causeCode: code || "",
+  }
+}
+
+const formatElapsed = (elapsedMs) => `${elapsedMs}ms`
+
+const formatNetworkDetail = ({ reason, errorName, errorMessage, causeCode, elapsedMs, attempt }) => {
+  const parts = [
+    reason,
+    `error=${errorName || "Error"}`,
+    `message=${errorMessage || "Fetch failed before receiving an HTTP response"}`,
+  ]
+  if (causeCode) parts.push(`cause=${causeCode}`)
+  if (typeof attempt === "number") parts.push(`attempt=${attempt}`)
+  parts.push(`elapsed=${formatElapsed(elapsedMs)}`)
+  return parts.join(" :: ")
+}
+
+const formatResponseDetail = ({ label, res, elapsedMs }) => {
+  const location = getHeader(res, "location")
+  const parts = [`${label} ${res.status}`, `elapsed=${formatElapsed(elapsedMs)}`]
+  if (debug) {
+    parts.push(`finalUrl=${res.url || "unknown"}`)
+    if (location) parts.push(`location=${location}`)
+  }
+  return parts.join(" :: ")
+}
+
+const pushResult = (status, area, item, detail, route = "", extra = {}) => {
+  results.push({ status, area, item, detail, route, ...extra })
+}
+
+const requestOnce = async (path, options = {}) => {
+  const controller = new AbortController()
+  const startedAt = Date.now()
+  const timer = setTimeout(() => controller.abort(new Error(`Request timed out after ${timeoutMs}ms`)), timeoutMs)
+
+  try {
+    const res = await fetch(`${normalizedBaseUrl}${path}`, {
+      redirect: "manual",
+      ...options,
+      signal: controller.signal,
+      headers: {
+        "user-agent": "civis-p0-smoke-check/1.0",
+        ...(options.headers || {}),
+      },
+    })
+    return {
+      ok: true,
+      response: res,
+      elapsedMs: Date.now() - startedAt,
+    }
+  } catch (error) {
+    const elapsedMs = Date.now() - startedAt
+    const classified = classifyFetchError(error)
+    return {
+      ok: false,
+      ...classified,
+      elapsedMs,
+    }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+const requestWithRetry = async (path, options = {}) => {
+  let lastResult = null
+
+  for (let attempt = 1; attempt <= retries + 1; attempt += 1) {
+    const result = await requestOnce(path, options)
+    if (result.ok) {
+      return { ...result, attempt }
+    }
+
+    lastResult = { ...result, attempt }
+    if (attempt <= retries) {
+      await delay(retryDelayMs)
+    }
+  }
+
+  return lastResult
+}
+
+const markBlockedByWarmup = (path, area, item, warmupResult) => {
+  pushResult(
+    "BLOCKED",
+    area,
+    item,
+    `WARMUP_BLOCKED :: ${warmupResult.reason} :: ${warmupResult.errorMessage}${warmupResult.causeCode ? ` :: cause=${warmupResult.causeCode}` : ""}`,
+    path,
+    { reason: warmupResult.reason },
+  )
 }
 
 const expectPublicOk = async (path, area, item) => {
-  try {
-    const res = await request(path)
-    if (res.status >= 200 && res.status < 400) {
-      pushResult("PASS", area, item, `Received status ${res.status}`, path)
-    } else {
-      pushResult("FAIL", area, item, `Expected public success, got ${res.status}`, path)
-    }
-  } catch (error) {
-    pushResult("FAIL", area, item, error instanceof Error ? error.message : "Unknown fetch error", path)
+  const result = await requestWithRetry(path)
+  if (!result.ok) {
+    pushResult("BLOCKED", area, item, formatNetworkDetail(result), path, { reason: result.reason })
+    return
   }
+
+  if (result.response.status >= 200 && result.response.status < 400) {
+    pushResult("PASS", area, item, formatResponseDetail({ label: "Received status", res: result.response, elapsedMs: result.elapsedMs }), path)
+    return
+  }
+
+  pushResult(
+    "FAIL",
+    area,
+    item,
+    formatResponseDetail({ label: "Expected public success, got", res: result.response, elapsedMs: result.elapsedMs }),
+    path,
+  )
 }
 
 const expectProtectedBlocked = async (path, area, item) => {
-  try {
-    const res = await request(path)
-    if ([401, 403, 302, 303, 307, 308].includes(res.status)) {
-      pushResult("PASS", area, item, `Protected route blocked with ${res.status}`, path)
-      return
-    }
-    if (res.status >= 200 && res.status < 300) {
-      pushResult("FAIL", area, item, `Expected blocked route, got ${res.status}`, path)
-      return
-    }
-    pushResult("PASS", area, item, `Protected route returned non-success status ${res.status}`, path)
-  } catch (error) {
-    pushResult("FAIL", area, item, error instanceof Error ? error.message : "Unknown fetch error", path)
+  const result = await requestWithRetry(path)
+  if (!result.ok) {
+    pushResult("BLOCKED", area, item, formatNetworkDetail(result), path, { reason: result.reason })
+    return
   }
+
+  const res = result.response
+  if ([401, 403].includes(res.status) || (res.status >= 300 && res.status < 400 && isLoginRedirect(res))) {
+    pushResult("PASS", area, item, formatResponseDetail({ label: "Protected route blocked with", res, elapsedMs: result.elapsedMs }), path)
+    return
+  }
+
+  pushResult(
+    "FAIL",
+    area,
+    item,
+    formatResponseDetail({ label: "Expected blocked route, got", res, elapsedMs: result.elapsedMs }),
+    path,
+  )
 }
 
 const expectWithCookie = async ({ path, area, item, cookie, expectedStatuses, blockedStatuses }) => {
   if (!cookie) {
-    pushResult("BLOCKED", area, item, "Missing cookie env for this role check", path)
+    pushResult("BLOCKED", area, item, "MISSING_COOKIE :: Cookie env for this role check was not provided", path, {
+      reason: "MISSING_COOKIE",
+    })
     return
   }
 
-  try {
-    const res = await request(path, {
-      headers: {
-        cookie,
-      },
-    })
+  const result = await requestWithRetry(path, {
+    headers: {
+      cookie,
+    },
+  })
 
-    if (expectedStatuses?.includes(res.status)) {
-      pushResult("PASS", area, item, `Received expected status ${res.status}`, path)
-      return
-    }
-
-    if (blockedStatuses?.includes(res.status)) {
-      pushResult("PASS", area, item, `Access correctly blocked with ${res.status}`, path)
-      return
-    }
-
-    pushResult(
-      "FAIL",
-      area,
-      item,
-      `Unexpected status ${res.status}; expected one of ${[...(expectedStatuses || []), ...(blockedStatuses || [])].join(", ")}`,
-      path,
-    )
-  } catch (error) {
-    pushResult("FAIL", area, item, error instanceof Error ? error.message : "Unknown fetch error", path)
+  if (!result.ok) {
+    pushResult("BLOCKED", area, item, formatNetworkDetail(result), path, { reason: result.reason })
+    return
   }
+
+  const res = result.response
+  if (expectedStatuses?.includes(res.status)) {
+    pushResult("PASS", area, item, formatResponseDetail({ label: "Received expected status", res, elapsedMs: result.elapsedMs }), path)
+    return
+  }
+
+  if (blockedStatuses?.includes(res.status) || (blockedStatuses?.some((status) => status >= 300 && status < 400) && isLoginRedirect(res))) {
+    pushResult("PASS", area, item, formatResponseDetail({ label: "Access correctly blocked with", res, elapsedMs: result.elapsedMs }), path)
+    return
+  }
+
+  pushResult(
+    "FAIL",
+    area,
+    item,
+    `Unexpected status ${res.status} :: expected one of ${[...(expectedStatuses || []), ...(blockedStatuses || [])].join(", ")} :: elapsed=${formatElapsed(result.elapsedMs)}${debug ? ` :: finalUrl=${res.url || "unknown"}${getHeader(res, "location") ? ` :: location=${getHeader(res, "location")}` : ""}` : ""}`,
+    path,
+  )
+}
+
+const runWarmup = async () => {
+  const warmup = await requestWithRetry("/")
+  if (!warmup.ok) {
+    pushResult("BLOCKED", "Warm-up", "Warm-up homepage reachability", formatNetworkDetail(warmup), "/", { reason: warmup.reason })
+    return { reachedApp: false, result: warmup }
+  }
+
+  if (warmup.response.status >= 200 && warmup.response.status < 400) {
+    pushResult("PASS", "Warm-up", "Warm-up homepage reachability", formatResponseDetail({ label: "Received status", res: warmup.response, elapsedMs: warmup.elapsedMs }), "/")
+    return { reachedApp: true, result: warmup }
+  }
+
+  pushResult("FAIL", "Warm-up", "Warm-up homepage reachability", formatResponseDetail({ label: "Expected public success, got", res: warmup.response, elapsedMs: warmup.elapsedMs }), "/")
+  return { reachedApp: true, result: warmup }
 }
 
 const run = async () => {
   pushResult("PASS", "Preflight", "BASE_URL provided", normalizedBaseUrl)
-
-  await expectPublicOk("/", "Public routes", "Homepage loads")
-  await expectPublicOk("/login", "Auth and access", "Login page loads")
-  await expectPublicOk("/pricing", "Billing", "Pricing page loads")
-
-  await expectProtectedBlocked("/dashboard", "Auth and access", "Logged-out dashboard access is blocked")
-  await expectProtectedBlocked("/admin", "Auth and access", "Logged-out admin access is blocked")
-  await expectProtectedBlocked("/api/admin/orgs", "Admin and org boundary", "Logged-out admin org API access is blocked")
-  await expectProtectedBlocked(
-    "/api/admin/platform-status",
-    "Admin and org boundary",
-    "Logged-out platform status API access is blocked",
+  pushResult(
+    "PASS",
+    "Preflight",
+    "Smoke configuration",
+    `timeout=${timeoutMs}ms :: retries=${retries} :: retryDelay=${retryDelayMs}ms :: debug=${debug ? "1" : "0"}`,
   )
 
-  await expectWithCookie({
-    path: "/admin",
-    area: "Admin and org boundary",
-    item: "Founder can access admin root",
-    cookie: cookieEnv.founder,
-    expectedStatuses: [200],
-  })
-  await expectWithCookie({
-    path: "/admin/system",
-    area: "Admin and org boundary",
-    item: "Founder can access system page",
-    cookie: cookieEnv.founder,
-    expectedStatuses: [200],
-  })
-  await expectWithCookie({
-    path: "/api/admin/orgs",
-    area: "Admin and org boundary",
-    item: "Founder can access platform org API",
-    cookie: cookieEnv.founder,
-    expectedStatuses: [200],
-  })
+  const warmup = await runWarmup()
 
-  await expectWithCookie({
-    path: "/admin/system",
-    area: "Admin and org boundary",
-    item: "Org owner cannot access system page",
-    cookie: cookieEnv.orgOwner,
-    blockedStatuses: [401, 403, 302, 303, 307, 308],
-  })
-  await expectWithCookie({
-    path: "/api/admin/orgs",
-    area: "Admin and org boundary",
-    item: "Org owner cannot access platform org API",
-    cookie: cookieEnv.orgOwner,
-    blockedStatuses: [401, 403],
-  })
-  await expectWithCookie({
-    path: "/api/admin/platform-status",
-    area: "Admin and org boundary",
-    item: "Org owner cannot access platform status API",
-    cookie: cookieEnv.orgOwner,
-    blockedStatuses: [401, 403],
-  })
-  await expectWithCookie({
-    path: "/admin/users",
-    area: "Admin and org boundary",
-    item: "Org owner can access workspace users page",
-    cookie: cookieEnv.orgOwner,
-    expectedStatuses: [200],
-  })
+  if (warmup.reachedApp) {
+    await expectPublicOk("/", "Public routes", "Homepage loads")
+    await expectPublicOk("/login", "Auth and access", "Login page loads")
+    await expectPublicOk("/pricing", "Billing", "Pricing page loads")
+
+    await expectProtectedBlocked("/dashboard", "Auth and access", "Logged-out dashboard access is blocked")
+    await expectProtectedBlocked("/admin", "Auth and access", "Logged-out admin access is blocked")
+    await expectProtectedBlocked("/api/admin/orgs", "Admin and org boundary", "Logged-out admin org API access is blocked")
+    await expectProtectedBlocked(
+      "/api/admin/platform-status",
+      "Admin and org boundary",
+      "Logged-out platform status API access is blocked",
+    )
+  } else {
+    markBlockedByWarmup("/", "Public routes", "Homepage loads", warmup.result)
+    markBlockedByWarmup("/login", "Auth and access", "Login page loads", warmup.result)
+    markBlockedByWarmup("/pricing", "Billing", "Pricing page loads", warmup.result)
+    markBlockedByWarmup("/dashboard", "Auth and access", "Logged-out dashboard access is blocked", warmup.result)
+    markBlockedByWarmup("/admin", "Auth and access", "Logged-out admin access is blocked", warmup.result)
+    markBlockedByWarmup("/api/admin/orgs", "Admin and org boundary", "Logged-out admin org API access is blocked", warmup.result)
+    markBlockedByWarmup(
+      "/api/admin/platform-status",
+      "Admin and org boundary",
+      "Logged-out platform status API access is blocked",
+      warmup.result,
+    )
+  }
+
+  if (warmup.reachedApp) {
+    await expectWithCookie({
+      path: "/admin",
+      area: "Admin and org boundary",
+      item: "Founder can access admin root",
+      cookie: cookieEnv.founder,
+      expectedStatuses: [200],
+    })
+    await expectWithCookie({
+      path: "/admin/system",
+      area: "Admin and org boundary",
+      item: "Founder can access system page",
+      cookie: cookieEnv.founder,
+      expectedStatuses: [200],
+    })
+    await expectWithCookie({
+      path: "/api/admin/orgs",
+      area: "Admin and org boundary",
+      item: "Founder can access platform org API",
+      cookie: cookieEnv.founder,
+      expectedStatuses: [200],
+    })
+
+    await expectWithCookie({
+      path: "/admin/system",
+      area: "Admin and org boundary",
+      item: "Org owner cannot access system page",
+      cookie: cookieEnv.orgOwner,
+      blockedStatuses: [401, 403, 302, 303, 307, 308],
+    })
+    await expectWithCookie({
+      path: "/api/admin/orgs",
+      area: "Admin and org boundary",
+      item: "Org owner cannot access platform org API",
+      cookie: cookieEnv.orgOwner,
+      blockedStatuses: [401, 403],
+    })
+    await expectWithCookie({
+      path: "/api/admin/platform-status",
+      area: "Admin and org boundary",
+      item: "Org owner cannot access platform status API",
+      cookie: cookieEnv.orgOwner,
+      blockedStatuses: [401, 403],
+    })
+    await expectWithCookie({
+      path: "/admin/users",
+      area: "Admin and org boundary",
+      item: "Org owner can access workspace users page",
+      cookie: cookieEnv.orgOwner,
+      expectedStatuses: [200],
+    })
+  } else {
+    for (const roleCheck of [
+      ["Founder can access admin root", "/admin"],
+      ["Founder can access system page", "/admin/system"],
+      ["Founder can access platform org API", "/api/admin/orgs"],
+      ["Org owner cannot access system page", "/admin/system"],
+      ["Org owner cannot access platform org API", "/api/admin/orgs"],
+      ["Org owner cannot access platform status API", "/api/admin/platform-status"],
+      ["Org owner can access workspace users page", "/admin/users"],
+    ]) {
+      markBlockedByWarmup(roleCheck[1], "Admin and org boundary", roleCheck[0], warmup.result)
+    }
+  }
 
   pushResult(
     "BLOCKED",
