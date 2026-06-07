@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ProjectsBoard, type Project } from "@/components/projects/projects-board"
 import { TasksKanban, type Task } from "@/components/projects/tasks-kanban"
 import { TimelineView, type TimelineItem } from "@/components/projects/timeline-view"
+import { toast } from "@/hooks/use-toast"
 
 const today = () => new Date().toISOString().slice(0, 10)
 const toDateString = (value?: string | null) => (value ? String(value).slice(0, 10) : today())
@@ -187,7 +188,10 @@ export default function ProjectsPage() {
   }
 
   const handleExportReport = () => {
-    window.alert("Project export is ready through the reports module. Use Docs/API if you want raw endpoint access.")
+    toast({
+      title: "Project export not available here",
+      description: "Use the reports module for project exports in this release.",
+    })
   }
 
   const timelineItems = useMemo<TimelineItem[]>(

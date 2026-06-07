@@ -87,6 +87,9 @@ export default function PricingPage() {
           <p className="text-xl text-muted-foreground">
             Choose the perfect plan for your business needs. All plans include a 14-day free trial.
           </p>
+          <p className="text-sm text-muted-foreground">
+            Self-serve checkout is not live yet. New workspaces are onboarded through sign-up and admin-assisted billing setup.
+          </p>
         </div>
 
         {/* Pricing Cards */}
@@ -121,8 +124,8 @@ export default function PricingPage() {
                 </div>
 
               {/* CTA Button */}
-                <Button className="w-full" variant={plan.highlighted ? "default" : "outline"}>
-                  Get Started
+                <Button className="w-full" variant={plan.highlighted ? "default" : "outline"} asChild>
+                  <Link href="/signup">Start with sign-up</Link>
                 </Button>
 
                 {/* Features */}
@@ -153,7 +156,7 @@ export default function PricingPage() {
             <div className="space-y-2">
               <h3 className="font-semibold">What payment methods do you accept?</h3>
               <p className="text-sm text-muted-foreground">
-                We accept bank transfers, cards, and mobile money (MTN, Airtel) for Nigerian customers.
+                Billing setup is currently handled during onboarding. Public self-serve card checkout is not live until Stripe validation is completed.
               </p>
             </div>
             <div className="space-y-2">
@@ -175,8 +178,8 @@ export default function PricingPage() {
         <div className="bg-primary text-primary-foreground rounded-lg p-12 text-center space-y-4">
           <h2 className="text-3xl font-bold">Ready to get started?</h2>
           <p className="text-lg opacity-90">Join thousands of businesses using Civis to manage their operations.</p>
-          <Button className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
-            Start Your Free Trial
+          <Button className="bg-primary-foreground text-primary hover:bg-primary-foreground/90" asChild>
+            <Link href="/signup">Create your workspace</Link>
           </Button>
         </div>
       </div>

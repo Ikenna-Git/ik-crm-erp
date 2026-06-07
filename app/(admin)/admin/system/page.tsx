@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { canViewFounderControls } from "@/lib/authz"
 
 type OrgRecord = {
@@ -85,6 +86,11 @@ export default function AdminSystemPage() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [lastInvite, setLastInvite] = useState<InvitePayload | null>(null)
+  const [statusDialog, setStatusDialog] = useState<{
+    org: OrgRecord
+    status: "active" | "suspended" | "archived"
+    statusReason: string
+  } | null>(null)
   const [form, setForm] = useState({
     name: "",
     theme: "light",
@@ -169,17 +175,7 @@ export default function AdminSystemPage() {
     }
   }
 
-  const handleStatusChange = async (org: OrgRecord, status: "active" | "suspended" | "archived") => {
-    const statusReason =
-      status === "active"
-        ? ""
-        : window.prompt(
-            status === "suspended"
-              ? `Why are you suspending ${org.name}?`
-              : `Why are you archiving ${org.name}?`,
-            org.statusReason || "",
-          ) || ""
-
+  const handleStatusChange = async (org: OrgRecord, status: "active" | "suspended" | "archived", statusReason = "") => {
     try {
       setLifecycleSavingId(org.id)
       setError("")
@@ -496,7 +492,13 @@ export default function AdminSystemPage() {
                               variant="outline"
                               className="border-white/10 bg-transparent text-amber-200"
                               disabled={lifecycleSavingId === org.id}
-                              onClick={() => handleStatusChange(org, "suspended")}
+                              onClick={() =>
+                                setStatusDialog({
+                                  org,
+                                  status: "suspended",
+                                  statusReason: org.statusReason || "",
+                                })
+                              }
                             >
                               Suspend
                             </Button>
@@ -507,12 +509,67 @@ export default function AdminSystemPage() {
                               variant="outline"
                               className="border-white/10 bg-transparent text-slate-200"
                               disabled={lifecycleSavingId === org.id}
-                              onClick={() => handleStatusChange(org, "archived")}
+                              onClick={() =>
+                                setStatusDialog({
+                                  org,
+                                  status: "archived",
+                                  statusReason: org.statusReason || "",
+                                })
+                              }
                             >
                               Archive
                             </Button>
                           ) : null}
-                        </div>
+      </div>
+
+      <Dialog open={Boolean(statusDialog)} onOpenChange={(open) => !open && setStatusDialog(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{statusDialog?.status === "suspended" ? "Suspend workspace" : "Archive workspace"}</DialogTitle>
+            <DialogDescription>
+              {statusDialog
+                ? `Record why ${statusDialog.org.name} is being ${statusDialog.status}.`
+                : "Record the reason for this workspace status change."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="status-reason">Reason</Label>
+              <Input
+                id="status-reason"
+                value={statusDialog?.statusReason || ""}
+                onChange={(event) =>
+                  setStatusDialog((current) =>
+                    current
+                      ? {
+                          ...current,
+                          statusReason: event.target.value,
+                        }
+                      : current,
+                  )
+                }
+                placeholder="Document the reason for this change"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setStatusDialog(null)} disabled={Boolean(lifecycleSavingId)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={async () => {
+                  if (!statusDialog) return
+                  await handleStatusChange(statusDialog.org, statusDialog.status, statusDialog.statusReason)
+                  setStatusDialog(null)
+                }}
+                disabled={Boolean(lifecycleSavingId)}
+              >
+                {statusDialog?.status === "suspended" ? "Suspend workspace" : "Archive workspace"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
                       </div>
                     </TableCell>
                     <TableCell>

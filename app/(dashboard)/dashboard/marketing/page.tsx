@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Mail, Users, Send, BarChart3, Plus, Eye, Edit, Trash2 } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
 
 const campaigns = [
   {
@@ -74,12 +75,11 @@ export default function MarketingPage() {
   const [selectedTemplate, setSelectedTemplate] = useState("")
 
   const handleCreateCampaign = () => {
-    // In a real implementation, this would create the campaign
-    console.log("Creating campaign:", { campaignName, campaignSubject, selectedTemplate })
-    setShowNewCampaign(false)
-    setCampaignName("")
-    setCampaignSubject("")
-    setSelectedTemplate("")
+    toast({
+      title: "Campaign creation unavailable",
+      description: "Marketing campaign persistence is not implemented in this release yet.",
+      variant: "destructive",
+    })
   }
 
   return (

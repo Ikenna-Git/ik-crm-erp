@@ -15,6 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { RecordDetailsDialog } from "@/components/shared/record-details-dialog"
 
 export interface Invoice {
   id: string
@@ -99,6 +100,7 @@ export function InvoicesTable({
   const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
   const [formData, setFormData] = useState({
     number: "",
     client: "",
@@ -283,7 +285,7 @@ export function InvoicesTable({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => alert(JSON.stringify(invoice, null, 2))}>
+                            <DropdownMenuItem onClick={() => setSelectedInvoice(invoice)}>
                               <Eye className="w-4 h-4 mr-2" />
                               View details
                             </DropdownMenuItem>
@@ -326,6 +328,33 @@ export function InvoicesTable({
           </div>
         </CardContent>
       </Card>
+
+      <RecordDetailsDialog
+        open={Boolean(selectedInvoice)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedInvoice(null)
+        }}
+        title={selectedInvoice?.number || "Invoice details"}
+        description="Review invoice metadata in a readable panel."
+        sections={
+          selectedInvoice
+            ? [
+                {
+                  title: "Invoice summary",
+                  fields: [
+                    { label: "Invoice number", value: selectedInvoice.number },
+                    { label: "Client", value: selectedInvoice.client },
+                    { label: "Amount", value: formatNaira(selectedInvoice.amount) },
+                    { label: "Status", value: selectedInvoice.status },
+                    { label: "Approval", value: selectedInvoice.approvalStatus || "Not requested" },
+                    { label: "Invoice date", value: selectedInvoice.date || "—" },
+                    { label: "Due date", value: selectedInvoice.dueDate || "—" },
+                  ],
+                },
+              ]
+            : []
+        }
+      />
 
       {/* Add Invoice Modal */}
       {showModal && (

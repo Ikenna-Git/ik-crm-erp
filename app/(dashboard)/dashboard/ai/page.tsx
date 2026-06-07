@@ -163,12 +163,6 @@ export default function CivisAIPage() {
       if (!res.ok) throw new Error(data?.error || "Failed to generate follow-ups")
       const created = data?.created
       const skipped = Number(data?.skipped || 0)
-      if (data?.simulated) {
-        setTaskStatus(
-          `Simulated mode: created ${created?.contacts || 0} contact follow-ups and ${created?.deals || 0} stalled deal tasks while DB is offline.`,
-        )
-        return
-      }
       setTaskStatus(
         skipped > 0
           ? `Created ${created?.contacts || 0} contact follow-ups and ${created?.deals || 0} stalled deal tasks. ${skipped} item(s) were skipped safely.`

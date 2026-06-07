@@ -14,6 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { RecordDetailsDialog } from "@/components/shared/record-details-dialog"
 
 export interface PurchaseOrder {
   id: string
@@ -83,6 +84,7 @@ export function OrdersTable({
   const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null)
   const [form, setForm] = useState({
     orderNo: "",
     supplier: "",
@@ -248,7 +250,7 @@ export function OrdersTable({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => alert(JSON.stringify(order, null, 2))}>
+                          <DropdownMenuItem onClick={() => setSelectedOrder(order)}>
                             <Eye className="w-4 h-4 mr-2" />
                             View details
                           </DropdownMenuItem>
@@ -283,6 +285,33 @@ export function OrdersTable({
           </div>
         </CardContent>
       </Card>
+
+      <RecordDetailsDialog
+        open={Boolean(selectedOrder)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedOrder(null)
+        }}
+        title={selectedOrder?.orderNo || "Purchase order details"}
+        description="Review purchase order details in a launch-ready dialog."
+        sections={
+          selectedOrder
+            ? [
+                {
+                  title: "Purchase order",
+                  fields: [
+                    { label: "Order number", value: selectedOrder.orderNo },
+                    { label: "Supplier", value: selectedOrder.supplier },
+                    { label: "Items", value: String(selectedOrder.items) },
+                    { label: "Total value", value: formatNaira(selectedOrder.totalValue) },
+                    { label: "Order date", value: selectedOrder.orderDate },
+                    { label: "Expected delivery", value: selectedOrder.expectedDelivery },
+                    { label: "Status", value: selectedOrder.status },
+                  ],
+                },
+              ]
+            : []
+        }
+      />
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

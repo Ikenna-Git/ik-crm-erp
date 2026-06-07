@@ -19,6 +19,7 @@ import {
 import { TrendingUp, Users, DollarSign, ShoppingCart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { toast } from "@/hooks/use-toast"
 
 const revenueData = [
   { month: "Jan", revenue: 45000, expenses: 32000 },
@@ -84,12 +85,23 @@ export default function AnalyticsPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        alert(data.error || "Failed to send email")
+        toast({
+          title: "Analytics export failed",
+          description: data.error || "Failed to send email",
+          variant: "destructive",
+        })
         return
       }
-      alert(data.message || "Report sent")
+      toast({
+        title: "Analytics report queued",
+        description: data.message || "Report sent",
+      })
     } catch (err) {
-      alert("Export failed. Please try again.")
+      toast({
+        title: "Analytics export failed",
+        description: "Export failed. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 

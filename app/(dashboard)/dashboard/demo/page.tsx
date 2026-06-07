@@ -14,7 +14,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { PaginationControls } from "@/components/shared/pagination-controls"
+import { toast } from "@/hooks/use-toast"
 
 type DemoVideo = {
   id: string
@@ -102,6 +113,7 @@ export default function DemoPage() {
   const [selectedVideo, setSelectedVideo] = useState<DemoVideo | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<DemoVideo | null>(null)
   const [uploadError, setUploadError] = useState("")
   const [form, setForm] = useState({
     title: "",
@@ -201,17 +213,22 @@ export default function DemoPage() {
   }, [pagedVideos])
 
   const handleShare = (title: string) => {
-    alert(`Demo "${title}" link copied to clipboard!`)
+    toast({
+      title: "Share link ready",
+      description: `The demo link for "${title}" is ready to copy.`,
+    })
   }
 
   const handleDownload = (title: string) => {
-    alert(`Downloading "${title}"...`)
+    toast({
+      title: "Download started",
+      description: `"${title}" is being prepared for download.`,
+    })
   }
 
   const handleDelete = (id: string) => {
-    const confirmed = window.confirm("Delete this demo video?")
-    if (!confirmed) return
     setVideos((prev) => prev.filter((video) => video.id !== id))
+    setPendingDelete(null)
   }
 
   const openAddDialog = () => {
@@ -430,7 +447,7 @@ export default function DemoPage() {
                           <Button
                             size="icon"
                             variant="ghost"
-                            onClick={() => handleDelete(video.id)}
+                            onClick={() => setPendingDelete(video)}
                             aria-label="Delete demo"
                             className="text-destructive hover:text-destructive"
                           >
@@ -465,6 +482,29 @@ export default function DemoPage() {
           />
         </div>
       </div>
+
+      <AlertDialog open={Boolean(pendingDelete)} onOpenChange={(open) => (!open ? setPendingDelete(null) : null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete demo video?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete
+                ? `This removes "${pendingDelete.title}" from the local demo library for this browser.`
+                : "This removes the selected demo video from the local demo library for this browser."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingDelete) handleDelete(pendingDelete.id)
+              }}
+            >
+              Delete video
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Video Player Modal */}
       {selectedVideo && (

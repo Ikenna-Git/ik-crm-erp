@@ -1,5 +1,7 @@
 # P0 Next Action Checklist
 
+Branch focus: `p0-full-launch-readiness-audit`
+
 ## 1. Live Validation Required Now
 
 - [x] Run `BASE_URL=https://ik-crm-erp.onrender.com P0_SMOKE_DEBUG=1 npm run p0:smoke`
@@ -18,8 +20,13 @@
 - [ ] Confirm invoice approval lifecycle persists after refresh
 - [ ] Confirm expense approval lifecycle persists after refresh
 - [ ] Confirm CRM contact/company/deal CRUD survives refresh
+- [ ] Confirm no launch-facing screen still uses native `alert` / `confirm` / `prompt`
+- [ ] Confirm CRM/accounting/HR/inventory/projects detail views no longer show raw JSON popups
+- [ ] Confirm marketing campaign creation fails honestly instead of implying a saved draft
 - [ ] Confirm workflows remain org-scoped
 - [ ] Confirm notifications persist through DB-backed flow
+- [ ] Confirm `/pricing` no longer implies live self-serve checkout
+- [ ] Confirm portal approvals reject any second/finalized decision attempt
 
 Blocked/manual items still remaining from the smoke run:
 - [ ] Role cookie checks for founder/org owner routes
@@ -45,6 +52,7 @@ Blocked/manual items still remaining from the smoke run:
 
 ## 3. Payments / Billing Validation
 
+- [ ] Confirm pricing CTAs route to sign-up/onboarding, not fake checkout
 - [ ] Confirm missing Stripe config fails safely
 - [ ] If Stripe test env is configured, run checkout validation
 - [ ] If Stripe test env is configured, run webhook validation
@@ -67,7 +75,23 @@ Blocked/manual items still remaining from the smoke run:
 - [ ] Clean up repo-wide TypeScript / `.next/types` config debt in a separate pass
 - [ ] Add a browser automation tool later if the team wants true E2E coverage
 
-## 7. Go-Live Decision
+## 7. Prototype / Debug UI Sweep Follow-Up
+
+- [x] Remove raw JSON alerts from launch-facing record detail views
+- [x] Remove native browser prompts/confirms from launch-facing admin/settings flows
+- [x] Replace export alerts with in-app toast feedback
+- [x] Replace prompt-based copy flows for portal/webhook actions
+- [x] Replace demo-page native alerts/confirms
+- [x] Remove marketing console-backed fake create flow
+- [ ] Run the prototype/debug UI checks in `docs/operations/p0-prototype-debug-ui-sweep.md`
+
+## 8. Launch Audit Evidence
+
+- [ ] Fill `docs/operations/p0-full-launch-readiness-audit.md`
+- [ ] Fill `docs/operations/p0-launch-blocker-register.md`
+- [ ] Fill `docs/operations/p0-go-live-decision.md`
+
+## 9. Go-Live Decision
 
 - [ ] Fill `docs/operations/p0-go-live-evidence.md`
 - [ ] Fill `docs/operations/p0-live-validation-log.md`

@@ -1,7 +1,7 @@
 # P0 Live Validation Log
 
 Date: 2026-06-07
-Branch: `p0-automated-smoke-validation`
+Branch: `p0-full-launch-readiness-audit`
 
 Use this file during each Render validation pass.
 
@@ -22,6 +22,13 @@ Use this file during each Render validation pass.
 - root cause: page protection lived in client-only layouts and redirected after render
 - fix applied on `main`: server-side guards in dashboard and admin layouts
 - live smoke evidence below confirms that the fix is deployed and active
+
+## Launch Audit Addendum
+
+- this branch also carries the verified prototype/debug UI sweep
+- public pricing copy now avoids implying live self-serve billing
+- portal approvals now fail closed once a client update is already approved or rejected
+- these items still require live browser verification after redeploy
 
 ## Session Header
 
@@ -54,6 +61,10 @@ Use this file during each Render validation pass.
 | Uploads | Cloudinary behavior |  | `/dashboard/gallery` | Real upload or clear config error |  |  | Manual/provider validation still required |  |  |
 | Notifications | Persistence |  | notifications UI / API | Survives refresh |  |  | Manual/write validation still required |  |  |
 | Billing | Missing or test Stripe behavior |  | pricing/checkout | Safe failure or validated test flow |  |  | Manual/provider validation still required |  |  |
+| UI trust | No native browser dialogs in launch flows |  | dashboard/admin/public pages | No `alert` / `confirm` / `prompt` for real product actions |  |  | Manual/browser validation still required |  |  |
+| UI trust | No raw JSON detail popups |  | CRM/accounting/HR/inventory/projects | Details render in-app dialogs, not JSON alerts |  |  | Manual/browser validation still required |  |  |
+| Billing | Pricing page is honest about non-live self-serve checkout | logged out | `/pricing` | Sign-up CTA only; no claim that public checkout is already live |  |  | Manual/browser validation still required |  |  |
+| Portal | Finalized update cannot be re-approved/re-rejected | portal user | `/portal/[code]` + `/api/portal/[code]/approvals` | Second decision blocked |  |  | Manual/browser validation still required |  |  |
 
 ## Outcome
 

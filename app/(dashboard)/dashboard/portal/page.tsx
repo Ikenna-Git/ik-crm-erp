@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { getSessionHeaders } from "@/lib/user-settings"
 import { Copy, PlusCircle, UploadCloud } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
 
 type PortalUpdate = {
   id: string
@@ -290,8 +291,16 @@ export default function ClientPortalPage() {
     const link = `${base}/portal/${code}`
     try {
       await navigator.clipboard.writeText(link)
+      toast({
+        title: "Portal link copied",
+        description: "The client portal link is now in your clipboard.",
+      })
     } catch {
-      window.prompt("Copy portal link:", link)
+      toast({
+        title: "Copy failed",
+        description: "Clipboard access was blocked. Copy the portal link from the portal card instead.",
+        variant: "destructive",
+      })
     }
   }
 

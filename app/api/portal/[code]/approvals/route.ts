@@ -47,6 +47,14 @@ export async function POST(request: Request, { params }: { params: { code: strin
       return NextResponse.json({ error: "Update not found" }, { status: 404 })
     }
 
+    const currentStatus = String(update.status || "").toUpperCase()
+    if (currentStatus !== "PENDING") {
+      return NextResponse.json(
+        { error: `This approval is already ${currentStatus.toLowerCase()}.` },
+        { status: 409 },
+      )
+    }
+
     const updated = await prisma.clientPortalUpdate.update({
       where: { id: updateId },
       data: { status: normalized },

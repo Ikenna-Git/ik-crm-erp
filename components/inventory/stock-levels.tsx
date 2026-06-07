@@ -14,6 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { RecordDetailsDialog } from "@/components/shared/record-details-dialog"
 
 export interface StockItem {
   id: string
@@ -69,6 +70,7 @@ export function StockLevels({
   const [pageSize, setPageSize] = useState(10)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showModal, setShowModal] = useState(false)
+  const [selectedItem, setSelectedItem] = useState<StockItem | null>(null)
   const [form, setForm] = useState({
     sku: "",
     name: "",
@@ -252,7 +254,7 @@ export function StockLevels({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => alert(JSON.stringify(item, null, 2))}>
+                            <DropdownMenuItem onClick={() => setSelectedItem(item)}>
                               <Eye className="w-4 h-4 mr-2" />
                               View details
                             </DropdownMenuItem>
@@ -284,6 +286,33 @@ export function StockLevels({
           </div>
         </CardContent>
       </Card>
+
+      <RecordDetailsDialog
+        open={Boolean(selectedItem)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedItem(null)
+        }}
+        title={selectedItem?.name || "Stock item details"}
+        description="Review stock and reorder information in an app dialog."
+        sections={
+          selectedItem
+            ? [
+                {
+                  title: "Inventory status",
+                  fields: [
+                    { label: "SKU", value: selectedItem.sku },
+                    { label: "Name", value: selectedItem.name },
+                    { label: "Current stock", value: `${selectedItem.currentStock} units` },
+                    { label: "Reorder point", value: `${selectedItem.reorderPoint} units` },
+                    { label: "Reorder quantity", value: `${selectedItem.reorderQuantity} units` },
+                    { label: "Warehouse location", value: selectedItem.warehouseLocation },
+                    { label: "Status", value: selectedItem.status },
+                  ],
+                },
+              ]
+            : []
+        }
+      />
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

@@ -23,6 +23,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { toast } from "@/hooks/use-toast"
 
 const crmNames = ["Adaeze Okafor", "Emeka Umeh", "Sarah Johnson", "David Chen", "Ibrahim Musa", "Lena Martins", "Grace Williams", "Noah Brown"]
 const crmCompanies = ["Northwind", "Acme Corp", "Venture Labs", "Globex", "NovaWorks", "Blue Ridge", "Nimbus", "Zenith"]
@@ -585,12 +586,23 @@ export default function CRMPage() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        alert(data.error || "Failed to send email")
+        toast({
+          title: "CRM export failed",
+          description: data.error || "Failed to send email",
+          variant: "destructive",
+        })
         return
       }
-      alert(data.message || "Report sent")
+      toast({
+        title: "CRM report queued",
+        description: data.message || "Report sent",
+      })
     } catch (err) {
-      alert("Export failed. Please try again.")
+      toast({
+        title: "CRM export failed",
+        description: "Export failed. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 

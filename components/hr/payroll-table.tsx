@@ -16,6 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { RecordDetailsDialog } from "@/components/shared/record-details-dialog"
 
 export interface PayrollRecord {
   id: string
@@ -99,6 +100,7 @@ export function PayrollTable({
   const [showAmounts, setShowAmounts] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [selectedPayroll, setSelectedPayroll] = useState<PayrollRecord | null>(null)
   const [isUnlocked, setIsUnlocked] = useState(false)
   const [accessCode, setAccessCode] = useState("1234")
   const [accessInput, setAccessInput] = useState("")
@@ -437,7 +439,7 @@ export function PayrollTable({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => alert(JSON.stringify(record, null, 2))}>
+                            <DropdownMenuItem onClick={() => setSelectedPayroll(record)}>
                               <Eye className="w-4 h-4 mr-2" />
                               View details
                             </DropdownMenuItem>
@@ -481,6 +483,33 @@ export function PayrollTable({
           </div>
         </CardContent>
       </Card>
+
+      <RecordDetailsDialog
+        open={Boolean(selectedPayroll)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedPayroll(null)
+        }}
+        title={selectedPayroll?.employee || "Payroll record"}
+        description="Review payroll details in an app dialog."
+        sections={
+          selectedPayroll
+            ? [
+                {
+                  title: "Payroll summary",
+                  fields: [
+                    { label: "Employee", value: selectedPayroll.employee },
+                    { label: "Period", value: selectedPayroll.period },
+                    { label: "Status", value: selectedPayroll.status },
+                    { label: "Base salary", value: formatNaira(selectedPayroll.baseSalary) },
+                    { label: "Bonus", value: formatNaira(selectedPayroll.bonus) },
+                    { label: "Deductions", value: formatNaira(selectedPayroll.deductions) },
+                    { label: "Net pay", value: formatNaira(selectedPayroll.netPay) },
+                  ],
+                },
+              ]
+            : []
+        }
+      />
 
       {/* Add Payroll Modal */}
       {showModal && (

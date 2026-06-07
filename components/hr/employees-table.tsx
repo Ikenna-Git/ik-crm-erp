@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { RecordDetailsDialog } from "@/components/shared/record-details-dialog"
 
 export interface Employee {
   id: string
@@ -110,6 +111,7 @@ export function EmployeesTable({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isUnlocked, setIsUnlocked] = useState(false)
   const [showSalaries, setShowSalaries] = useState(false)
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
   const [accessCode, setAccessCode] = useState("1234")
   const [accessInput, setAccessInput] = useState("")
   const [accessError, setAccessError] = useState("")
@@ -414,7 +416,7 @@ export function EmployeesTable({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => alert(JSON.stringify(employee, null, 2))}>
+                            <DropdownMenuItem onClick={() => setSelectedEmployee(employee)}>
                               <Eye className="w-4 h-4 mr-2" />
                               View details
                             </DropdownMenuItem>
@@ -450,6 +452,34 @@ export function EmployeesTable({
           </div>
         </CardContent>
       </Card>
+
+      <RecordDetailsDialog
+        open={Boolean(selectedEmployee)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedEmployee(null)
+        }}
+        title={selectedEmployee?.name || "Employee details"}
+        description="Review employee information without exposing raw JSON."
+        sections={
+          selectedEmployee
+            ? [
+                {
+                  title: "Employee profile",
+                  fields: [
+                    { label: "Name", value: selectedEmployee.name },
+                    { label: "Email", value: selectedEmployee.email },
+                    { label: "Phone", value: selectedEmployee.phone },
+                    { label: "Department", value: selectedEmployee.department },
+                    { label: "Position", value: selectedEmployee.position },
+                    { label: "Status", value: selectedEmployee.status },
+                    { label: "Start date", value: selectedEmployee.startDate },
+                    { label: "Salary", value: formatNaira(selectedEmployee.salary) },
+                  ],
+                },
+              ]
+            : []
+        }
+      />
 
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">

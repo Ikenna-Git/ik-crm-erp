@@ -44,6 +44,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { RecordDetailsDialog } from "@/components/shared/record-details-dialog"
 import { getSessionHeaders } from "@/lib/user-settings"
 import type { CrmViewSettings } from "@/lib/user-settings"
 import { DEFAULT_CRM_VIEWS } from "@/lib/user-settings"
@@ -226,6 +227,7 @@ export function ContactsTable({
   const [fieldsLoading, setFieldsLoading] = useState(false)
   const [fieldsError, setFieldsError] = useState("")
   const [fieldDialogOpen, setFieldDialogOpen] = useState(false)
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null)
   const [fieldForm, setFieldForm] = useState({
     name: "",
@@ -736,7 +738,7 @@ export function ContactsTable({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => alert(JSON.stringify(contact, null, 2))}>
+                          <DropdownMenuItem onClick={() => setSelectedContact(contact)}>
                             <Eye className="w-4 h-4 mr-2" />
                             View details
                           </DropdownMenuItem>
@@ -944,6 +946,33 @@ export function ContactsTable({
           </div>
         </DialogContent>
       </Dialog>
+
+      <RecordDetailsDialog
+        open={Boolean(selectedContact)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedContact(null)
+        }}
+        title={selectedContact?.name || "Contact details"}
+        description="Review CRM contact information without exposing raw record payloads."
+        sections={
+          selectedContact
+            ? [
+                {
+                  title: "Contact profile",
+                  fields: [
+                    { label: "Name", value: selectedContact.name },
+                    { label: "Email", value: selectedContact.email },
+                    { label: "Phone", value: selectedContact.phone || "—" },
+                    { label: "Company", value: selectedContact.company || "—" },
+                    { label: "Status", value: selectedContact.status },
+                    { label: "Revenue", value: formatNaira(selectedContact.revenue || 0) },
+                    { label: "Last contact", value: selectedContact.lastContact || "—" },
+                  ],
+                },
+              ]
+            : []
+        }
+      />
 
       {/* Add Contact Modal */}
       {showModal && (

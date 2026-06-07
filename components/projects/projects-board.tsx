@@ -14,6 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { RecordDetailsDialog } from "@/components/shared/record-details-dialog"
 
 export interface Project {
   id: string
@@ -114,6 +115,7 @@ export function ProjectsBoard({
   const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [form, setForm] = useState({
     name: "",
     description: "",
@@ -336,7 +338,7 @@ export function ProjectsBoard({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => alert(JSON.stringify(project, null, 2))}>
+                        <DropdownMenuItem onClick={() => setSelectedProject(project)}>
                           <Eye className="w-4 h-4 mr-2" />
                           View details
                         </DropdownMenuItem>
@@ -357,6 +359,37 @@ export function ProjectsBoard({
           )
         })}
       </div>
+
+      <RecordDetailsDialog
+        open={Boolean(selectedProject)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedProject(null)
+        }}
+        title={selectedProject?.name || "Project details"}
+        description="Review project status and budget details without raw JSON."
+        sections={
+          selectedProject
+            ? [
+                {
+                  title: "Project summary",
+                  fields: [
+                    { label: "Name", value: selectedProject.name },
+                    { label: "Client", value: selectedProject.client || "—" },
+                    { label: "Status", value: selectedProject.status },
+                    { label: "Priority", value: selectedProject.priority },
+                    { label: "Progress", value: `${selectedProject.progress}%` },
+                    { label: "Team size", value: String(selectedProject.team) },
+                    { label: "Budget", value: formatNaira(selectedProject.budget) },
+                    { label: "Spent", value: formatNaira(selectedProject.spent) },
+                    { label: "Start date", value: selectedProject.startDate },
+                    { label: "End date", value: selectedProject.endDate },
+                    { label: "Description", value: selectedProject.description },
+                  ],
+                },
+              ]
+            : []
+        }
+      />
 
       <PaginationControls
         currentPage={currentPage}

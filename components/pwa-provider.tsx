@@ -87,8 +87,7 @@ export function PWAProvider() {
       document.getElementById("install-btn")?.addEventListener("click", async () => {
         if (deferredPrompt) {
           deferredPrompt.prompt()
-          const { outcome } = await deferredPrompt.userChoice
-          console.log(`User response to install prompt: ${outcome}`)
+          await deferredPrompt.userChoice
           deferredPrompt = null
         }
         banner.remove()
@@ -109,14 +108,7 @@ export function PWAProvider() {
     const dismissedTime = localStorage.getItem("pwa-install-dismissed")
     const hoursSinceDismissed = dismissedTime ? (Date.now() - parseInt(dismissedTime, 10)) / (1000 * 60 * 60) : Infinity
 
-    navigator.serviceWorker
-      .register("/sw.js")
-      .then((registration) => {
-        console.log("Service Worker registered:", registration.scope)
-      })
-      .catch((error) => {
-        console.log("Service Worker registration failed:", error)
-      })
+    navigator.serviceWorker.register("/sw.js").catch(() => {})
 
     const handleBeforeInstallPrompt = (event: Event) => {
       const promptEvent = event as Event & {

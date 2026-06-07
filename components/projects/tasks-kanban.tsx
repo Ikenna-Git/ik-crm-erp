@@ -15,6 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { RecordDetailsDialog } from "@/components/shared/record-details-dialog"
 
 export interface Task {
   id: string
@@ -90,6 +91,7 @@ export function TasksKanban({ searchQuery, tasks: providedTasks, onAddTask, onUp
   const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [stageFilter, setStageFilter] = useState<"all" | Task["stage"]>("all")
   const [monthFilter, setMonthFilter] = useState("all")
   const [priorityFilter, setPriorityFilter] = useState<"all" | Task["priority"]>("all")
@@ -307,7 +309,7 @@ export function TasksKanban({ searchQuery, tasks: providedTasks, onAddTask, onUp
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => alert(JSON.stringify(task, null, 2))}>
+                                <DropdownMenuItem onClick={() => setSelectedTask(task)}>
                                   <Eye className="w-4 h-4 mr-2" />
                                   View details
                                 </DropdownMenuItem>
@@ -357,6 +359,33 @@ export function TasksKanban({ searchQuery, tasks: providedTasks, onAddTask, onUp
           )
         })}
       </div>
+
+      <RecordDetailsDialog
+        open={Boolean(selectedTask)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedTask(null)
+        }}
+        title={selectedTask?.title || "Task details"}
+        description="Review task assignment and scheduling details in-app."
+        sections={
+          selectedTask
+            ? [
+                {
+                  title: "Task summary",
+                  fields: [
+                    { label: "Title", value: selectedTask.title },
+                    { label: "Project", value: selectedTask.project },
+                    { label: "Assignee", value: selectedTask.assignee },
+                    { label: "Priority", value: selectedTask.priority },
+                    { label: "Stage", value: selectedTask.stage },
+                    { label: "Start date", value: selectedTask.startDate },
+                    { label: "End date", value: selectedTask.endDate },
+                  ],
+                },
+              ]
+            : []
+        }
+      />
 
       <PaginationControls
         currentPage={currentPage}
