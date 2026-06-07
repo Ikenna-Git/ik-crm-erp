@@ -63,6 +63,10 @@ export async function PATCH(request: Request) {
     const body = await request.json()
     const { id, ...updates } = body || {}
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
+    const existing = await prisma.galleryItem.findFirst({ where: { id, orgId: org.id } })
+    if (!existing) {
+      return NextResponse.json({ error: "Gallery item not found in this workspace" }, { status: 404 })
+    }
 
     const item = await prisma.galleryItem.update({
       where: { id },
@@ -96,7 +100,11 @@ export async function DELETE(request: Request) {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
-    const deleted = await prisma.galleryItem.delete({ where: { id } })
+    const deleted = await prisma.galleryItem.findFirst({ where: { id, orgId: org.id } })
+    if (!deleted) {
+      return NextResponse.json({ error: "Gallery item not found in this workspace" }, { status: 404 })
+    }
+    await prisma.galleryItem.delete({ where: { id } })
     await createAuditLog({
       orgId: org.id,
       userId: user.id,

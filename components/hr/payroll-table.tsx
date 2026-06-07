@@ -211,10 +211,6 @@ export function PayrollTable({
     setShowModal(true)
   }
 
-  const requestApproval = (record: PayrollRecord) => {
-    alert(`Payroll approval for ${record.period} is not persisted yet in this release. Do not use this action as a source of truth.`)
-  }
-
   const handleDeletePayroll = (id: string) => {
     if (onDeletePayroll) {
       onDeletePayroll(id)
@@ -453,9 +449,9 @@ export function PayrollTable({
                               <Download className="w-4 h-4 mr-2" />
                               Download payslip
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => requestApproval(record)}>
+                            <DropdownMenuItem disabled>
                               <CheckSquare className="w-4 h-4 mr-2" />
-                              Request approval
+                              Approval not implemented
                             </DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive" onClick={() => handleDeletePayroll(record.id)}>
                               <Trash2 className="w-4 h-4 mr-2" />

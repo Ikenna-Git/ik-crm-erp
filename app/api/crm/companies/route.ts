@@ -63,6 +63,10 @@ export async function PATCH(request: Request) {
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 })
     }
+    const existing = await prisma.company.findFirst({ where: { id, orgId: org.id } })
+    if (!existing) {
+      return NextResponse.json({ error: "Company not found in this workspace" }, { status: 404 })
+    }
     const company = await prisma.company.update({
       where: { id },
       data: {
@@ -97,7 +101,11 @@ export async function DELETE(request: Request) {
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 })
     }
-    const deleted = await prisma.company.delete({ where: { id } })
+    const deleted = await prisma.company.findFirst({ where: { id, orgId: org.id } })
+    if (!deleted) {
+      return NextResponse.json({ error: "Company not found in this workspace" }, { status: 404 })
+    }
+    await prisma.company.delete({ where: { id } })
     await createAuditLog({
       orgId: org.id,
       userId: user.id,

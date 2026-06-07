@@ -64,6 +64,13 @@ export async function PATCH(request: Request) {
     const { id, active, name, trigger, action } = body || {}
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
 
+    const existing = await prisma.automationWorkflow.findFirst({
+      where: { id, orgId: org.id },
+    })
+    if (!existing) {
+      return NextResponse.json({ error: "Workflow not found in this workspace" }, { status: 404 })
+    }
+
     const workflow = await prisma.automationWorkflow.update({
       where: { id },
       data: {

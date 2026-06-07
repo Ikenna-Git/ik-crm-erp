@@ -5,7 +5,6 @@ import { createAuditLog } from "@/lib/audit"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable follow-ups." }, { status: 503 })
-const isDev = process.env.NODE_ENV !== "production"
 
 const CONTACT_INACTIVITY_DAYS = 21
 const DEAL_STALL_DAYS = 10
@@ -115,21 +114,6 @@ const buildSummary = async (orgId: string) => {
   }
 }
 
-const buildEmptySummary = () => ({
-  inactiveContacts: { count: 0, items: [] as FollowupItem[] },
-  stalledDeals: { count: 0, items: [] as FollowupItem[] },
-  generatedAt: new Date().toISOString(),
-})
-
-const buildSummarySafe = async (orgId: string) => {
-  try {
-    return await buildSummary(orgId)
-  } catch (error) {
-    console.error("Follow-up summary build failed; returning empty summary", error)
-    return buildEmptySummary()
-  }
-}
-
 const resolveValidOwners = async (orgId: string, ids: Array<string | null | undefined>) => {
   const ownerIds = [...new Set(ids.filter((id): id is string => Boolean(id)))]
   if (ownerIds.length === 0) return new Set<string>()
@@ -144,33 +128,19 @@ const resolveValidOwners = async (orgId: string, ids: Array<string | null | unde
   return new Set(existingOwners.map((owner) => owner.id))
 }
 
-const resolveValidOwnersSafe = async (orgId: string, ids: Array<string | null | undefined>) => {
-  try {
-    return await resolveValidOwners(orgId, ids)
-  } catch (error) {
-    console.warn("Failed to resolve task owners, assigning unowned tasks", error)
-    return new Set<string>()
-  }
-}
-
-const findExistingOpenTasksSafe = async (
+const findExistingOpenTasks = async (
   orgId: string,
   relatedFilters: Array<{ relatedType: string; relatedId: { in: string[] } }>,
 ) => {
-  try {
-    if (relatedFilters.length === 0) return [] as Array<{ relatedType: string | null; relatedId: string | null }>
-    return await prisma.task.findMany({
-      where: {
-        orgId,
-        status: "OPEN",
-        OR: relatedFilters,
-      },
-      select: { relatedType: true, relatedId: true },
-    })
-  } catch (error) {
-    console.warn("Failed to load existing open follow-up tasks; continuing without dedupe", error)
-    return [] as Array<{ relatedType: string | null; relatedId: string | null }>
-  }
+  if (relatedFilters.length === 0) return [] as Array<{ relatedType: string | null; relatedId: string | null }>
+  return prisma.task.findMany({
+    where: {
+      orgId,
+      status: "OPEN",
+      OR: relatedFilters,
+    },
+    select: { relatedType: true, relatedId: true },
+  })
 }
 
 const normalizeOwnerId = (ownerId: string | null | undefined, validOwners: Set<string>) => {
@@ -183,42 +153,14 @@ const formatCreateError = (prefix: string, error: unknown) => {
   return `${prefix}: ${detail}`
 }
 
-const buildSimulatedSummary = () => {
-  const now = new Date().toISOString()
-  return {
-    inactiveContacts: {
-      count: 4,
-      items: [
-        { id: "sim-c-1", label: "Northwind Procurement", meta: "34 days idle", daysIdle: 34, priority: "high" as const },
-        { id: "sim-c-2", label: "Acme Holdings", meta: "52 days idle", daysIdle: 52, priority: "critical" as const },
-        { id: "sim-c-3", label: "Blue Ridge Retail", meta: "24 days idle", daysIdle: 24, priority: "normal" as const },
-        { id: "sim-c-4", label: "Zenith Logistics", meta: "46 days idle", daysIdle: 46, priority: "critical" as const },
-      ],
-    },
-    stalledDeals: {
-      count: 3,
-      items: [
-        { id: "sim-d-1", label: "Civis ERP rollout - Northwind", meta: "negotiation • 16 days", daysIdle: 16, priority: "high" as const },
-        { id: "sim-d-2", label: "Payroll revamp - NovaWorks", meta: "proposal • 23 days", daysIdle: 23, priority: "critical" as const },
-        { id: "sim-d-3", label: "CRM migration - Acme", meta: "qualified • 11 days", daysIdle: 11, priority: "normal" as const },
-      ],
-    },
-    generatedAt: now,
-  }
-}
-
 export async function GET(request: Request) {
-  if (!process.env.DATABASE_URL) {
-    if (isDev) return NextResponse.json({ summary: buildSimulatedSummary(), simulated: true })
-    return dbUnavailable()
-  }
+  if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org } = await requireModuleAccess(request, "crm", "view")
-    const summary = await buildSummarySafe(org.id)
+    const summary = await buildSummary(org.id)
     return NextResponse.json({ summary })
   } catch (error) {
     if (isTransientPrismaError(error)) {
-      if (isDev) return NextResponse.json({ summary: buildSimulatedSummary(), simulated: true })
       return NextResponse.json(
         { error: "Database connection is temporarily unavailable. Please retry in a moment." },
         { status: 503 },
@@ -229,20 +171,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!process.env.DATABASE_URL) {
-    if (isDev) {
-      return NextResponse.json({
-        created: { contacts: 4, deals: 3 },
-        skipped: 0,
-        summary: buildSimulatedSummary(),
-        simulated: true,
-      })
-    }
-    return dbUnavailable()
-  }
+  if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
     const { org, user } = await requireModuleAccess(request, "crm", "manage")
-    const summary = await buildSummarySafe(org.id)
+    const summary = await buildSummary(org.id)
     const contactItems = summary.inactiveContacts.items
     const dealItems = summary.stalledDeals.items
 
@@ -262,10 +194,10 @@ export async function POST(request: Request) {
       relatedFilters.push({ relatedType: "deal", relatedId: { in: dealItems.map((item) => item.id) } })
     }
 
-    const existingTasks = await findExistingOpenTasksSafe(org.id, relatedFilters)
+    const existingTasks = await findExistingOpenTasks(org.id, relatedFilters)
 
     const existingSet = new Set(existingTasks.map((task) => `${task.relatedType || ""}:${task.relatedId || ""}`))
-    const validOwners = await resolveValidOwnersSafe(org.id, [
+    const validOwners = await resolveValidOwners(org.id, [
       ...contactItems.map((item) => item.ownerId),
       ...dealItems.map((item) => item.ownerId),
     ])
@@ -355,14 +287,6 @@ export async function POST(request: Request) {
     })
   } catch (error) {
     if (isTransientPrismaError(error)) {
-      if (isDev) {
-        return NextResponse.json({
-          created: { contacts: 4, deals: 3 },
-          skipped: 0,
-          summary: buildSimulatedSummary(),
-          simulated: true,
-        })
-      }
       return NextResponse.json(
         { error: "Database connection is temporarily unavailable. Please retry in a moment." },
         { status: 503 },

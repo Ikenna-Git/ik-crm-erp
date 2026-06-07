@@ -55,18 +55,6 @@ export async function POST(request: Request) {
     }
 
     if (missing.length) {
-      if (process.env.NODE_ENV !== "production") {
-        const buffer = Buffer.from(await file.arrayBuffer())
-        const mime = file.type || "application/octet-stream"
-        const dataUrl = `data:${mime};base64,${buffer.toString("base64")}`
-        return NextResponse.json({
-          url: dataUrl,
-          bytes: buffer.length,
-          resourceType: mime.startsWith("image/") ? "image" : mime.startsWith("video/") ? "video" : "raw",
-          originalFilename: file.name,
-          mocked: true,
-        })
-      }
       return missingCloudinary()
     }
 

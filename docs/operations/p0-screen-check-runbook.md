@@ -1,71 +1,88 @@
 # P0 Screen Check Runbook
 
-Date: 2026-06-06  
-Branch: `p0-core-runtime-bug-sweep`
+Date: 2026-06-07
+Branch: `p0-full-platform-runtime-sweep`
 
 ## Purpose
 
-Use this runbook to do a quick live screen-by-screen check after a `main` redeploy. It focuses on the flows most likely to regress when browser storage, org scoping, approvals, or admin boundaries change.
+Use this after a `main` redeploy to do the minimum live screen verification for the current P0 sweep.
 
 ## Rules
 
 - record only what was actually observed
-- refresh after any mutation
-- if a page shows success but refresh loses the state, mark it as failed
-- if a page depends on missing environment config, mark it as blocked, not passed
+- refresh after every mutation that is supposed to persist
+- if success disappears after refresh, mark the screen as failed
+- if an environment-backed provider is missing, mark the screen as blocked, not passed
+- if a feature says it is not implemented, that is acceptable only if no fake success occurred first
 
-## Screen Checklist
+## Roles
 
-| Screen | What to do | Expected result | Evidence / Notes | Pass / Fail / Blocked |
-| --- | --- | --- | --- | --- |
-| `/login` | Sign in as normal user | Login succeeds, no raw JSON/auth crash |  |  |
-| `/dashboard` | Load after login | Correct workspace loads, no wrong-org flash |  |  |
-| `/dashboard/accounting` | Open page and refresh | No full-page crash; invoices, expenses, widgets load or safe fallback |  |  |
-| `/dashboard/accounting` invoices | Request invoice approval | Approval persists and appears in Operations after refresh |  |  |
-| `/dashboard/accounting` expenses | Request expense approval | Approval persists and appears in Operations after refresh |  |  |
-| `/dashboard/operations` approvals | Open approvals tab | Pending approvals list is org-scoped and persisted |  |  |
-| `/dashboard/operations` approvals | Approve or reject an item | Decision persists after refresh; source record reflects new state |  |  |
-| `/dashboard/operations` integrations | Open integrations tab | UI does not imply fake saved connection state |  |  |
-| `/dashboard/operations` reports | Save custom report if UI offers it | UI clearly says this is not persisted yet unless a backend exists |  |  |
-| `/dashboard/playbooks` | Launch a playbook | Run appears from API-backed response and remains after refresh |  |  |
-| `/dashboard/playbooks` | Pause or advance a run | Status/progress remains correct after refresh |  |  |
-| `/dashboard/settings` profile | Save profile | Profile persists after refresh |  |  |
-| `/dashboard/settings` workspace | Save workspace name | Name persists after refresh |  |  |
-| `/dashboard/settings` security | Toggle controls | UI does not claim persistence if backend save is missing |  |  |
-| `/admin` as founder | Load admin root | Founder-only navigation is visible |  |  |
-| `/admin` as org owner | Load admin root | Founder-only navigation is hidden |  |  |
-| `/admin/system` as org owner | Open directly | Blocked/forbidden |  |  |
-| `/admin/users` as org owner | Open user list | Same-org users only; founder not shown |  |  |
-| `/api/admin/orgs` as org owner | Request directly | Blocked/forbidden |  |  |
-| `/api/admin/platform-status` as org owner | Request directly | Blocked/forbidden |  |  |
-| Invite flow | Create invite, accept invite, sign in | User lands in invite org only; role is intended role only |  |  |
-| SMTP-backed action | Send invite or other mail action | Success if configured; clear config error if not |  |  |
-| Cloudinary-backed upload | Upload a file | Success if configured; clear config error if not |  |  |
-| AI screen | Open or send prompt | Clear disabled/missing-config behavior if provider unavailable |  |  |
-| Billing/pricing | Open checkout path | Fail closed if billing config missing; no fake live checkout |  |  |
+- founder `SUPER_ADMIN`
+- `ORG_OWNER`
+- normal authenticated user
+- one newly invited user from the current invite flow
 
-## Console / Network Capture
+## Screen Test Table
+
+| Route | Role | Expected result | Actual result | Pass / Fail / Blocked | Evidence / Notes | Tester | Date |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `/login` | logged out | Login page loads cleanly |  |  |  |  |  |
+| `/dashboard` | logged out | Redirected or blocked |  |  |  |  |  |
+| `/admin` | logged out | Redirected or blocked |  |  |  |  |  |
+| `/dashboard` | normal user | Correct workspace loads, no wrong-org flash |  |  |  |  |  |
+| `/admin` | founder | Founder Desk and platform controls visible |  |  |  |  |  |
+| `/admin` | org owner | Founder Desk hidden |  |  |  |  |  |
+| `/admin/system` | org owner | Blocked / forbidden |  |  |  |  |  |
+| `/api/admin/orgs` | org owner | Blocked / forbidden |  |  |  |  |  |
+| `/api/admin/platform-status` | org owner | Blocked / forbidden |  |  |  |  |  |
+| `/admin/users` | org owner | Same-org users only, founder row hidden |  |  |  |  |  |
+| Invite flow from `/admin/users` or `/dashboard/settings` | founder / org owner | Invite created; link or email generated |  |  |  |  |  |
+| Invite acceptance `/signup?...` | invited user | Lands in invite org only; role matches invite |  |  |  |  |  |
+| `/dashboard/accounting` | accounting user | Page loads without runtime crash |  |  |  |  |  |
+| `/dashboard/accounting` invoices | accounting user | Invoices list loads and stays scoped to own org |  |  |  |  |  |
+| `/dashboard/accounting` expenses | accounting user | Expenses list loads and stays scoped to own org |  |  |  |  |  |
+| `/dashboard/accounting` invoice approval | accounting user | Request approval once; second request blocked; refresh keeps pending status |  |  |  |  |  |
+| `/dashboard/accounting` expense approval | accounting user | Request approval once; second request blocked; refresh keeps pending status |  |  |  |  |  |
+| `/dashboard/operations` approvals | operations admin | Pending approvals show only own-org items |  |  |  |  |  |
+| `/dashboard/operations` approvals approve | operations admin | Approve persists; refresh keeps approved state |  |  |  |  |  |
+| `/dashboard/operations` approvals reject | operations admin | Reject persists; refresh keeps rejected state |  |  |  |  |  |
+| `/dashboard/operations` integrations | operations admin | UI does not claim connected state unless provider/config is real |  |  |  |  |  |
+| `/dashboard/operations` reports | operations admin | UI clearly says report saving is not persisted yet |  |  |  |  |  |
+| `/dashboard/crm` contacts | CRM user | Create/edit/delete persists and refresh survives |  |  |  |  |  |
+| `/dashboard/crm` companies | CRM user | Create/edit/delete persists and refresh survives |  |  |  |  |  |
+| `/dashboard/crm` deals | CRM user | Create/edit/delete persists and refresh survives |  |  |  |  |  |
+| `/dashboard/crm` follow-ups | CRM user | If DB/API unavailable, screen says automation unavailable; no simulated task creation |  |  |  |  |  |
+| `/dashboard/tasks` or tasks surface | task user | Task mutations persist and remain scoped |  |  |  |  |  |
+| `/dashboard/playbooks` | operations admin | Launch/pause/advance persists after refresh |  |  |  |  |  |
+| `/dashboard/operations` workflows | operations admin | Update applies only to own-org workflow |  |  |  |  |  |
+| `/dashboard/hr` payroll | HR user | Payroll records load; approval action is clearly not implemented |  |  |  |  |  |
+| `/dashboard/inventory` purchase orders | inventory user | Orders load; approval action is clearly not implemented |  |  |  |  |  |
+| `/dashboard/settings` profile | authenticated user | Profile save persists after refresh |  |  |  |  |  |
+| `/dashboard/settings` workspace | admin | Workspace name persists after refresh |  |  |  |  |  |
+| `/dashboard/settings` security | authenticated user | UI does not claim unsupported security toggles persisted |  |  |  |  |  |
+| `/dashboard/gallery` upload | gallery user | Upload succeeds only if Cloudinary is configured; otherwise clear config error |  |  |  |  |  |
+| Notifications UI | authenticated user | Notification create/read state persists through DB; no simulated success |  |  |  |  |  |
+| Reports / exports | permitted user | Export succeeds only through real backend/provider path |  |  |  |  |  |
+| `/dashboard/ai` | authenticated user | Missing AI config fails clearly or uses explicit fallback messaging |  |  |  |  |  |
+| Billing / pricing / checkout path | billing-eligible role | Missing billing config fails closed with no fake payment success |  |  |  |  |  |
+
+## Failure Capture
 
 If any screen fails, capture:
 
+- route
+- role used
+- expected vs actual
 - first browser console error
 - failed network request and status code
-- route and actor role
 - whether refresh reproduces it
 - relevant Render log line if available
 
-## Roles To Use
-
-- founder `SUPER_ADMIN`
-- org owner
-- normal user
-- one invited user created through the current invite flow
-
 ## Exit Criteria
 
-This screen check pass is complete only when:
+The live pass is complete only when:
 
-- no core workflow depends on browser-only state
-- any intentionally non-persisted screen says so clearly
-- org and founder boundaries stay correct after refresh
-- approvals survive refresh and a new page load
+- no core business workflow depends on browser-only state
+- any non-persisted feature says so clearly before the user trusts it
+- founder and org boundaries remain correct after refresh
+- approval transitions survive refresh and a second page load

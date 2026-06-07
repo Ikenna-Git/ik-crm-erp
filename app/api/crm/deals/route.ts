@@ -96,7 +96,10 @@ export async function PATCH(request: Request) {
         ? normalizedStage
         : undefined) as any
 
-    const previous = await prisma.deal.findUnique({ where: { id } })
+    const previous = await prisma.deal.findFirst({ where: { id, orgId: org.id } })
+    if (!previous) {
+      return NextResponse.json({ error: "Deal not found in this workspace" }, { status: 404 })
+    }
     const updated = await prisma.deal.update({
       where: { id },
       data: {
@@ -146,7 +149,11 @@ export async function DELETE(request: Request) {
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 })
     }
-    const deleted = await prisma.deal.delete({ where: { id } })
+    const deleted = await prisma.deal.findFirst({ where: { id, orgId: org.id } })
+    if (!deleted) {
+      return NextResponse.json({ error: "Deal not found in this workspace" }, { status: 404 })
+    }
+    await prisma.deal.delete({ where: { id } })
     await createAuditLog({
       orgId: org.id,
       userId: user.id,
