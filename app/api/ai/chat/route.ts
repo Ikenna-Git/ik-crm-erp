@@ -7,6 +7,7 @@ import { createAuditLog } from "@/lib/audit"
 import { prisma } from "@/lib/prisma"
 import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
 import { hasModuleAccess } from "@/lib/access-control"
+import { isPrivacyUnlocked } from "@/lib/privacy-lock"
 
 type AiMode = "qna" | "summary" | "email" | "tour"
 type AiAction = {
@@ -72,17 +73,19 @@ const normalizeMessages = (messages: any[]): AiMessage[] =>
 
 const buildSystemPrompt = (mode: AiMode, userName: string, orgName: string, knowledge?: string) => {
   const base =
-    `You are Civis AI, a smart assistant for the Civis CRM/ERP platform. ` +
-    `Help users manage business operations: query live data, generate tasks/emails, navigate modules, and guide actions. ` +
-    `Be concise, conversational, and practical like a trusted colleague. Detect intent despite typos and shorthand. ` +
-    `Maintain context across turns. Interpret shorthand and typos naturally. ` +
-    `For unclear inputs, ask one clarifying question instead of resetting to a full menu. ` +
-    `Respect sensitive data locks for HR/payroll and finance totals; if locked, explain what to unlock. ` +
-    `You may use light, tasteful humor sometimes when the moment is low-stakes and conversational. ` +
-    `Avoid humor for security, payroll, legal, or incident scenarios. ` +
-    `Use NGN for currency and keep responses under 180 words unless asked for more. Address the user as ${userName}.`
+    `You are Civis Guide — the intelligent, proactive AI co-pilot inside Civis CRM & ERP. ` +
+    `Your job is to help users navigate the platform, understand features, and guide them step-by-step on what to do next. ` +
+    `Be clear, confident, action-oriented, professional, calm, concise, and practical. ` +
+    `Always prioritise the user's goal over listing features. ` +
+    `Tell users exactly where to click when guidance is needed, and use numbered steps when it helps. ` +
+    `Ask one clarifying question at a time if the user is stuck. ` +
+    `Do not pretend an action completed unless Civis actually performed it. ` +
+    `Respect role boundaries, org boundaries, and privacy locks for HR/payroll and Accounting. ` +
+    `If HR or Accounting is locked, explain the lock clearly and only guide authorized users toward the correct module PIN unlock. ` +
+    `Keep responses concise but complete, and usually end with a useful next-step question. ` +
+    `Use NGN for currency and address the user as ${userName}.`
   const modePrompt = {
-    qna: "Answer questions about Civis features and best practices. Offer next steps.",
+    qna: "Answer questions about Civis features and best practices with direct navigation guidance and useful next steps.",
     summary: "Summarize the provided business metrics and suggest 1-2 next actions.",
     email: "Draft a professional email based on the provided context. Include a clear subject line.",
     tour:
@@ -363,6 +366,43 @@ const detectLogoutAction = (prompt: string): DataResolution | null => {
       message: "Use this action to sign out of Civis securely.",
     },
   }
+}
+
+const resolveGuidedHowTo = (prompt: string): DataResolution | null => {
+  const value = prompt.trim().toLowerCase()
+
+  if (/i('?| a)m lost|i am lost|lost here|where do i start/.test(value)) {
+    return {
+      message:
+        "No problem. What are you trying to accomplish right now?\n\nFor example:\n1. create a contact\n2. send or approve an invoice\n3. check approvals\n4. upload files\n5. set up a workflow\n6. manage users",
+    }
+  }
+
+  if (/how do i create an invoice|create an invoice|make an invoice/.test(value)) {
+    return {
+      message:
+        "Easy.\n\n1. Go to Accounting → Invoices from the sidebar.\n2. Click New Invoice.\n3. Select a client and add line items.\n4. Save the invoice, then request approval if your workflow requires it.\n\nYou can also create invoice workflows from CRM deals if that is enabled. Would you like me to walk you through a full invoice example?",
+      action: moduleActions.accounting,
+    }
+  }
+
+  if (/unlock accounting|why can('?|’)t i see invoice|why can('?|’)t i see expense|why can('?|’)t i see finance/.test(value)) {
+    return {
+      message:
+        "Accounting is currently privacy locked. If you are authorized, unlock Accounting using the Accounting PIN. Until then, invoice and expense details stay protected. Would you like me to take you to Accounting now?",
+      action: moduleActions.accounting,
+    }
+  }
+
+  if (/why can('?|’)t i see payroll|unlock hr|unlock payroll/.test(value)) {
+    return {
+      message:
+        "HR is currently privacy locked. If you are authorized, unlock HR using the HR PIN. Until then, employee and payroll details stay protected. Would you like me to open HR for you now?",
+      action: moduleActions.hr,
+    }
+  }
+
+  return null
 }
 
 const isAffirmativePrompt = (prompt: string) =>
@@ -803,8 +843,8 @@ const resolvePageHelp = ({
       return {
         canDo: "You can review invoices, expenses, approvals, and report packs for this workspace.",
         blocked: financeUnlocked
-          ? "Anything blocked here is more likely a provider or release limitation, not a finance permission issue."
-          : "Amounts, exports, approvals, and detail views stay redacted until you have Accounting manage access.",
+          ? "Anything blocked here is more likely a provider or release limitation, not a finance privacy lock."
+          : "Amounts, exports, approvals, and detail views stay privacy locked until an authorized manager unlocks Accounting for this session.",
         setup: "Record one invoice and one expense, then run the approval flow before trusting exports or summaries.",
         next: "Check overdue invoices first, then clear pending expenses and confirm approvals persist after refresh.",
         action: moduleActions.accounting,
@@ -813,8 +853,8 @@ const resolvePageHelp = ({
       return {
         canDo: "You can review employees, payroll, attendance, positions, and compliance packs from this page.",
         blocked: hrUnlocked
-          ? "Anything blocked here is likely a release or configuration gap, not a role restriction."
-          : "Employee contact details, payroll amounts, exports, and row-level actions stay locked until HR manage access is granted.",
+          ? "Anything blocked here is likely a release or configuration gap, not an HR privacy lock."
+          : "Employee contact details, payroll amounts, exports, and row-level actions stay privacy locked until an authorized manager unlocks HR for this session.",
         setup: "Add one employee, one payroll record, and one attendance record to validate that the HR workspace is grounded in real data.",
         next: "Verify employee directory quality first, then review payroll and attendance before inviting more HR operators.",
         action: moduleActions.hr,
@@ -1087,8 +1127,10 @@ export async function POST(request: Request) {
       typeof body?.context?.currentPath === "string" && body.context.currentPath
         ? body.context.currentPath
         : request.headers.get("x-current-path") || "/dashboard"
-    const hrUnlocked = accessSubject ? hasModuleAccess(accessSubject, "hr", "manage") : false
-    const financeUnlocked = accessSubject ? hasModuleAccess(accessSubject, "accounting", "manage") : false
+    const hrUnlocked = accessSubject ? hasModuleAccess(accessSubject, "hr", "manage") && isPrivacyUnlocked(request, "hr") : false
+    const financeUnlocked = accessSubject
+      ? hasModuleAccess(accessSubject, "accounting", "manage") && isPrivacyUnlocked(request, "accounting")
+      : false
 
     if (requestedMode === "qna") {
       const logoutResolution = detectLogoutAction(lastUserMessage)
@@ -1098,6 +1140,16 @@ export async function POST(request: Request) {
           provider: "civis-session-engine",
           mode: "qna",
           actions: logoutResolution.action ? [logoutResolution.action] : [],
+        })
+      }
+
+      const guidedHowTo = resolveGuidedHowTo(lastUserMessage)
+      if (guidedHowTo) {
+        return NextResponse.json({
+          message: guidedHowTo.message,
+          provider: "civis-guide",
+          mode: "qna",
+          actions: guidedHowTo.action ? [guidedHowTo.action] : [],
         })
       }
 

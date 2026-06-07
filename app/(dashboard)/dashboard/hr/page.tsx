@@ -22,6 +22,7 @@ import { AttendanceTracker, type AttendanceRecord } from "@/components/hr/attend
 import { PositionsTable, type Position } from "@/components/hr/positions-table"
 import { HrQualityScorecard } from "@/components/hr/hr-quality-scorecard"
 import { CompliancePack } from "@/components/hr/compliance-pack"
+import { PrivacyLockPanel } from "@/components/shared/privacy-lock-panel"
 import { hasModuleAccess } from "@/lib/access-control"
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -98,6 +99,10 @@ export default function HRPage() {
   const [positions, setPositions] = useState<Position[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [privacyUnlocked, setPrivacyUnlocked] = useState(false)
+  const [privacyLoading, setPrivacyLoading] = useState(true)
+  const [privacyConfigured, setPrivacyConfigured] = useState(true)
+  const [privacyError, setPrivacyError] = useState("")
   const [openEmployeeDialog, setOpenEmployeeDialog] = useState(false)
   const [employeeForm, setEmployeeForm] = useState({
     name: "",
@@ -115,6 +120,22 @@ export default function HRPage() {
     deductions: "",
   })
   const canManageHr = hasModuleAccess(session?.user || {}, "hr", "manage")
+
+  const loadPrivacyState = async () => {
+    setPrivacyLoading(true)
+    setPrivacyError("")
+    try {
+      const response = await requestJson("/api/privacy-lock?module=hr")
+      setPrivacyUnlocked(Boolean(response.unlocked))
+      setPrivacyConfigured(response.configured !== false)
+    } catch (err) {
+      setPrivacyUnlocked(false)
+      setPrivacyConfigured(true)
+      setPrivacyError(err instanceof Error ? err.message : "Failed to load HR privacy state")
+    } finally {
+      setPrivacyLoading(false)
+    }
+  }
 
   const loadData = async () => {
     setLoading(true)
@@ -140,6 +161,44 @@ export default function HRPage() {
   useEffect(() => {
     loadData()
   }, [])
+
+  useEffect(() => {
+    loadPrivacyState()
+  }, [])
+
+  const unlockPrivacy = async (pin: string) => {
+    setPrivacyError("")
+    setPrivacyLoading(true)
+    try {
+      await requestJson("/api/privacy-lock", {
+        method: "POST",
+        body: JSON.stringify({ module: "hr", pin }),
+      })
+      setPrivacyUnlocked(true)
+      await loadData()
+    } catch (err) {
+      setPrivacyError(err instanceof Error ? err.message : "Failed to unlock HR privacy")
+    } finally {
+      setPrivacyLoading(false)
+    }
+  }
+
+  const lockPrivacyAgain = async () => {
+    setPrivacyError("")
+    setPrivacyLoading(true)
+    try {
+      await requestJson("/api/privacy-lock", {
+        method: "DELETE",
+        body: JSON.stringify({ module: "hr" }),
+      })
+      setPrivacyUnlocked(false)
+      await loadData()
+    } catch (err) {
+      setPrivacyError(err instanceof Error ? err.message : "Failed to relock HR privacy")
+    } finally {
+      setPrivacyLoading(false)
+    }
+  }
 
   const addEmployee = async (data: Omit<Employee, "id">) => {
     const response = await requestJson("/api/hr/employees", {
@@ -327,7 +386,7 @@ export default function HRPage() {
         <div className="flex gap-2">
           <Dialog open={openPayrollDialog} onOpenChange={setOpenPayrollDialog}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2 bg-transparent" disabled={!canManageHr}>
+              <Button variant="outline" className="flex items-center gap-2 bg-transparent" disabled={!canManageHr || !privacyUnlocked}>
                 <Plus className="w-4 h-4" />
                 New Payroll
               </Button>
@@ -386,7 +445,7 @@ export default function HRPage() {
 
           <Dialog open={openEmployeeDialog} onOpenChange={setOpenEmployeeDialog}>
             <DialogTrigger asChild>
-              <Button className="flex items-center gap-2" disabled={!canManageHr}>
+              <Button className="flex items-center gap-2" disabled={!canManageHr || !privacyUnlocked}>
                 <Plus className="w-4 h-4" />
                 New Employee
               </Button>
@@ -462,12 +521,19 @@ export default function HRPage() {
       </div>
 
       {error ? <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div> : null}
-      {!canManageHr ? (
-        <div className="rounded-lg border border-dashed border-border bg-muted/10 p-3 text-sm text-muted-foreground">
-          This role can view the HR workspace shell, but employee contact details, payroll amounts, exports, and record
-          actions remain restricted.
-        </div>
-      ) : null}
+
+      <PrivacyLockPanel
+        moduleLabel="HR privacy"
+        unlockLabel="Unlock HR privacy"
+        unlocked={privacyUnlocked}
+        canUnlock={canManageHr}
+        loading={privacyLoading}
+        configured={privacyConfigured}
+        error={privacyError}
+        helperText="HR keeps employee and payroll data privacy locked until an authorized workspace manager unlocks it for the current session."
+        onUnlock={unlockPrivacy}
+        onLockAgain={lockPrivacyAgain}
+      />
 
       <HrQualityScorecard employees={employees} />
       <CompliancePack employeesCount={employees.length} payrollRuns={payroll.length} />
@@ -510,6 +576,7 @@ export default function HRPage() {
             onUpdateEmployee={handleUpdateEmployee}
             onDeleteEmployee={handleDeleteEmployee}
             canManage={canManageHr}
+            privacyUnlocked={privacyUnlocked}
           />
         </TabsContent>
 
@@ -521,6 +588,7 @@ export default function HRPage() {
             onUpdatePayroll={handleUpdatePayroll}
             onDeletePayroll={handleDeletePayroll}
             canManage={canManageHr}
+            privacyUnlocked={privacyUnlocked}
           />
         </TabsContent>
 

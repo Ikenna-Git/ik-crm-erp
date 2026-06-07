@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { createAuditLog } from "@/lib/audit"
 import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { hasModuleAccess } from "@/lib/access-control"
+import { isPrivacyUnlocked } from "@/lib/privacy-lock"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable payroll data." }, { status: 503 })
@@ -16,12 +17,14 @@ export async function GET(request: Request) {
       orderBy: [{ createdAt: "desc" }, { period: "desc" }],
     })
     const canManageHr = hasModuleAccess(user, "hr", "manage")
+    const revealSensitive = canManageHr && isPrivacyUnlocked(request, "hr")
     return NextResponse.json({
       payroll: payroll.map((record) =>
-        canManageHr
+        revealSensitive
           ? record
           : {
               ...record,
+              employeeName: "Protected employee",
               baseSalary: 0,
               bonus: 0,
               deductions: 0,

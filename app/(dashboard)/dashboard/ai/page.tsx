@@ -23,9 +23,11 @@ const STORAGE_KEY = "civis_ai_chat"
 const quickPrompts = [
   "Take me to pricing.",
   "Open gallery.",
+  "I'm lost.",
   "What can I do here?",
   "What should I do next?",
-  "Summarise this page.",
+  "How do I create an invoice?",
+  "Unlock accounting.",
   "Log me out.",
 ]
 
@@ -211,10 +213,10 @@ export default function CivisAIPage() {
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <Sparkles className="w-6 h-6 text-primary" />
-            Civis AI Concierge
+            Civis Guide
           </h1>
           <p className="text-muted-foreground mt-1">
-            Deterministic navigation, page guidance, and provider-backed drafting in one assistant surface.
+            Your AI-native co-pilot for navigation, setup guidance, and honest product help across Civis.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -229,7 +231,7 @@ export default function CivisAIPage() {
 
       <Card className="border-border/70 bg-gradient-to-br from-card via-card to-muted/30">
         <CardHeader>
-          <CardTitle>What Civis AI can do right now</CardTitle>
+          <CardTitle>What Civis Guide can do right now</CardTitle>
           <CardDescription>
             Civis always handles navigation and setup guidance honestly. Drafting, richer summaries, and deeper generation
             depend on provider configuration.

@@ -10,11 +10,13 @@ Date: 2026-06-07
 - Server-side route guards are live
 - Org and admin boundaries have been hardened
 - Approval lifecycle is server-backed
-- HR and Accounting locked-detail leak is fixed in code
-- AI deterministic command layer exists
+- HR and Accounting privacy locks are back with session-scoped unlocks
+- AI deterministic command layer exists and is now branded as Civis Guide
 - Pricing and Marketing are now more honest about what is live
+- Landing and dashboard first impression are materially stronger
 
 ## Remaining Blockers
+- Live validation for HR privacy PIN and Accounting privacy PIN
 - AI command validation on live Render
 - Invite flow validation
 - Approval flow validation after refresh

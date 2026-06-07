@@ -11,7 +11,7 @@ export function Footer() {
           {/* Brand */}
           <div className="md:col-span-1">
             <h3 className="text-xl font-bold text-primary mb-4">Civis</h3>
-            <p className="text-sm text-muted-foreground">The complete platform for business management</p>
+            <p className="text-sm text-muted-foreground">The AI-native operating centre for CRM, operations, finance, people, and approvals.</p>
           </div>
 
           {/* Product */}
@@ -29,8 +29,8 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition">
-                  Roadmap
+                <Link href="/use-cases" className="text-muted-foreground hover:text-foreground transition">
+                  Use Cases
                 </Link>
               </li>
             </ul>
@@ -41,17 +41,17 @@ export function Footer() {
             <h4 className="font-semibold">Solutions</h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition">
-                  For SMB
+                <Link href="/use-cases" className="text-muted-foreground hover:text-foreground transition">
+                  For growing teams
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition">
-                  For Enterprise
+                <Link href="/trust" className="text-muted-foreground hover:text-foreground transition">
+                  Trust & rollout
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition">
+                <Link href="/integrations" className="text-muted-foreground hover:text-foreground transition">
                   Integrations
                 </Link>
               </li>
@@ -63,18 +63,18 @@ export function Footer() {
             <h4 className="font-semibold">Company</h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition">
-                  About
+                <Link href="/features" className="text-muted-foreground hover:text-foreground transition">
+                  Product scope
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition">
-                  Blog
+                <Link href="/dashboard/docs" className="text-muted-foreground hover:text-foreground transition">
+                  Docs
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition">
-                  Contact
+                <Link href="/pricing" className="text-muted-foreground hover:text-foreground transition">
+                  Pricing
                 </Link>
               </li>
             </ul>
@@ -85,7 +85,7 @@ export function Footer() {
             <h4 className="font-semibold">Legal</h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition">
+                <Link href="/terms" className="text-muted-foreground hover:text-foreground transition">
                   Privacy
                 </Link>
               </li>
@@ -95,7 +95,7 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition">
+                <Link href="/trust" className="text-muted-foreground hover:text-foreground transition">
                   Security
                 </Link>
               </li>
@@ -106,13 +106,13 @@ export function Footer() {
         <div className="border-t border-border pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
           <p className="text-sm text-muted-foreground">© 2025 Civis. All rights reserved.</p>
           <div className="flex gap-6">
-            <Link href="#" className="text-muted-foreground hover:text-foreground transition">
+            <Link href="https://x.com" className="text-muted-foreground hover:text-foreground transition" aria-label="X">
               <Twitter className="w-5 h-5" />
             </Link>
-            <Link href="#" className="text-muted-foreground hover:text-foreground transition">
+            <Link href="https://linkedin.com" className="text-muted-foreground hover:text-foreground transition" aria-label="LinkedIn">
               <Linkedin className="w-5 h-5" />
             </Link>
-            <Link href="#" className="text-muted-foreground hover:text-foreground transition">
+            <Link href="https://github.com/Ikenna-Git/ik-crm-erp" className="text-muted-foreground hover:text-foreground transition" aria-label="GitHub">
               <Github className="w-5 h-5" />
             </Link>
           </div>

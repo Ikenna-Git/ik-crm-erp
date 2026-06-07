@@ -37,7 +37,7 @@ export function PricingPreview() {
     <section id="pricing" className="py-18 bg-background lg:py-24">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="mb-10 space-y-3 text-center">
-          <h2 className="text-3xl font-semibold sm:text-4xl">Pricing should feel understandable too.</h2>
+          <h2 className="text-3xl font-semibold sm:text-4xl">Pricing should feel understandable, premium, and honest.</h2>
           <p className="mx-auto max-w-2xl text-base leading-7 text-muted-foreground">
             These plans are framed around team size and rollout depth so buyers can understand where they fit quickly.
           </p>

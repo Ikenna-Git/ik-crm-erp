@@ -5,9 +5,9 @@ import { ArrowRight, CheckCircle2, ShieldCheck, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 const checklist = [
-  "Create your first workspace and invite the right admin",
-  "Start with CRM, finance, HR, ops, or client portal based on what your team needs first",
-  "Keep founder-level control while stakeholder admins manage their own companies",
+  "Create your first workspace and invite the right company admin",
+  "Configure the providers you actually need, then mark the rest as setup required",
+  "Keep founder-level control while workspace admins operate safely inside their own org",
 ]
 
 export function CTA() {
@@ -18,10 +18,9 @@ export function CTA() {
           <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
             <div className="space-y-6">
               <p className="text-sm font-semibold uppercase tracking-[0.22em] text-primary-foreground/80">Next step</p>
-              <h2 className="text-3xl font-semibold sm:text-4xl lg:text-5xl">Make Civis feel easier before you make it bigger.</h2>
+              <h2 className="text-3xl font-semibold sm:text-4xl lg:text-5xl">Run a calmer, clearer business workspace from day one.</h2>
               <p className="text-base leading-7 text-primary-foreground/90">
-                Start with a cleaner rollout, a better admin control story, and a product that stakeholders can understand
-                from the first demo.
+                Start with a governed rollout, a cleaner product story, and an AI guide that helps real teams know what to do next.
               </p>
               <div className="flex flex-col gap-4 sm:flex-row">
                 <Button size="lg" variant="secondary" asChild>
@@ -31,7 +30,7 @@ export function CTA() {
                   </Link>
                 </Button>
                 <Button size="lg" variant="secondary" asChild>
-                  <Link href="/features">View product scope</Link>
+                  <Link href="/trust">Review trust guide</Link>
                 </Button>
               </div>
             </div>

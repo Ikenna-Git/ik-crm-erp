@@ -96,6 +96,7 @@ type EmployeesTableProps = {
   onUpdateEmployee?: (id: string, data: Omit<Employee, "id">) => void
   onDeleteEmployee?: (id: string) => void
   canManage?: boolean
+  privacyUnlocked?: boolean
 }
 
 export function EmployeesTable({
@@ -105,6 +106,7 @@ export function EmployeesTable({
   onUpdateEmployee,
   onDeleteEmployee,
   canManage = false,
+  privacyUnlocked = false,
 }: EmployeesTableProps) {
   const [employees, setEmployees] = useState<Employee[]>(providedEmployees ?? [])
   const [currentPage, setCurrentPage] = useState(1)
@@ -142,7 +144,8 @@ export function EmployeesTable({
 
   const activeEmployees = employees.filter((e) => e.status === "active").length
   const totalSalary = employees.reduce((sum, e) => sum + e.salary, 0)
-  const displaySalary = canManage
+  const revealSensitive = canManage && privacyUnlocked
+  const displaySalary = revealSensitive
 
   const totalPages = Math.max(1, Math.ceil(sortedEmployees.length / pageSize))
   const pagedEmployees = sortedEmployees.slice((currentPage - 1) * pageSize, currentPage * pageSize)
@@ -152,7 +155,7 @@ export function EmployeesTable({
   }, [currentPage, totalPages])
 
   const openEditor = (employee?: Employee) => {
-    if (!canManage) return
+    if (!revealSensitive) return
     if (employee) {
       setEditingId(employee.id)
       setForm({
@@ -210,7 +213,7 @@ export function EmployeesTable({
   }
 
   const deleteEmployee = (id: string) => {
-    if (!canManage) return
+    if (!revealSensitive) return
     if (onDeleteEmployee) {
       onDeleteEmployee(id)
     } else {
@@ -223,17 +226,20 @@ export function EmployeesTable({
       <Card>
         <CardHeader>
           <CardTitle>HR Access</CardTitle>
-          <CardDescription>Employee detail access is enforced by workspace role, not local unlock codes.</CardDescription>
+          <CardDescription>HR detail access combines workspace role checks with a session-scoped privacy unlock.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          {canManage ? (
+          {revealSensitive ? (
             <div className="rounded-lg border border-border bg-muted/20 p-4 text-sm text-muted-foreground">
-              This workspace role can manage employee records, salaries, and contact details.
+              HR privacy is unlocked for this session. Employee details, salaries, and sensitive actions are visible again.
+            </div>
+          ) : canManage ? (
+            <div className="rounded-lg border border-dashed border-border bg-muted/10 p-4 text-sm text-muted-foreground">
+              This role can manage HR, but Civis is still privacy locked. Unlock HR privacy before viewing salaries, contacts, or row-level actions.
             </div>
           ) : (
             <div className="rounded-lg border border-dashed border-border bg-muted/10 p-4 text-sm text-muted-foreground">
-              This role can view the HR module shell, but personal contact details, salaries, and record actions stay
-              redacted until a same-workspace HR manager or admin grants manage access.
+              This role can view the HR module shell, but personal contact details, salaries, and record actions stay redacted until a same-workspace HR manager or admin grants manage access.
             </div>
           )}
         </CardContent>
@@ -286,7 +292,7 @@ export function EmployeesTable({
                     <td className="py-4 px-4">
                       <div>
                         <p className="font-medium">{employee.name}</p>
-                        <p className="text-xs text-muted-foreground">{canManage ? employee.email : "Contact details restricted"}</p>
+                        <p className="text-xs text-muted-foreground">{revealSensitive ? employee.email : "Contact details protected"}</p>
                       </div>
                     </td>
                     <td className="py-4 px-4">
@@ -309,7 +315,7 @@ export function EmployeesTable({
                     <td className="py-4 px-4 text-muted-foreground">{employee.startDate}</td>
                     <td className="py-4 px-4 font-semibold">{displaySalary ? formatNaira(employee.salary) : "****"}</td>
                     <td className="py-4 px-4">
-                      {canManage ? (
+                      {revealSensitive ? (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm" className="p-2">
@@ -332,7 +338,13 @@ export function EmployeesTable({
                           </DropdownMenuContent>
                         </DropdownMenu>
                       ) : (
-                        <Button variant="ghost" size="sm" className="p-2" disabled aria-label="Employee actions unavailable">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="p-2"
+                          disabled
+                          aria-label={canManage ? "Unlock HR privacy to manage employee actions" : "Employee actions unavailable"}
+                        >
                           <Lock className="w-4 h-4" />
                         </Button>
                       )}
@@ -361,8 +373,13 @@ export function EmployeesTable({
         }}
         title={selectedEmployee?.name || "Employee details"}
         description="Review employee information without exposing raw JSON."
-        locked={!canManage}
-        lockedDescription="Employee details and salaries stay hidden for roles without HR manage access."
+        locked={!revealSensitive}
+        lockedTitle="HR privacy locked"
+        lockedDescription={
+          canManage
+            ? "This record is protected. Unlock HR privacy to view employee details."
+            : "This record is protected. An authorized HR manager must unlock HR privacy to view employee details."
+        }
         sections={
           selectedEmployee
             ? [
@@ -384,7 +401,7 @@ export function EmployeesTable({
         }
       />
 
-      {showModal && canManage ? (
+      {showModal && revealSensitive ? (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-3xl mx-4">
             <CardHeader className="flex flex-row items-center justify-between pb-3">

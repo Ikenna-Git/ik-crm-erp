@@ -63,6 +63,7 @@ type Props = {
   onRequestApproval?: (invoice: Invoice) => Promise<void> | void
   showAmounts?: boolean
   canManage?: boolean
+  privacyUnlocked?: boolean
 }
 
 const formatNaira = (amount: number) =>
@@ -96,6 +97,7 @@ export function InvoicesTable({
   onRequestApproval,
   showAmounts = true,
   canManage = false,
+  privacyUnlocked = false,
 }: Props) {
   const [invoices, setInvoices] = useState<Invoice[]>(providedInvoices ?? [])
   const [currentPage, setCurrentPage] = useState(1)
@@ -114,6 +116,8 @@ export function InvoicesTable({
   useEffect(() => {
     if (providedInvoices) setInvoices(providedInvoices)
   }, [providedInvoices])
+
+  const revealSensitive = canManage && privacyUnlocked
 
   useEffect(() => {
     setCurrentPage(1)
@@ -174,6 +178,7 @@ export function InvoicesTable({
   }
 
   const handleDeleteInvoice = (id: string) => {
+    if (!revealSensitive) return
     if (onDeleteInvoice) {
       onDeleteInvoice(id)
     } else {
@@ -182,6 +187,7 @@ export function InvoicesTable({
   }
 
   const handleEditInvoice = (invoice: Invoice) => {
+    if (!revealSensitive) return
     setEditingId(invoice.id)
     setFormData({
       number: invoice.number,
@@ -246,12 +252,12 @@ export function InvoicesTable({
               variant="outline"
               className="flex items-center gap-2 bg-transparent"
               onClick={downloadInvoicesCSV}
-              disabled={!canManage}
+              disabled={!revealSensitive}
             >
               <Download className="w-4 h-4" />
               Export CSV
             </Button>
-            <Button size="sm" onClick={() => setShowModal(true)} className="flex items-center gap-2" disabled={!canManage}>
+            <Button size="sm" onClick={() => setShowModal(true)} className="flex items-center gap-2" disabled={!revealSensitive}>
               <Plus className="w-4 h-4" />
               Add Invoice
             </Button>
@@ -286,7 +292,7 @@ export function InvoicesTable({
                       </td>
                       <td className="py-4 px-4 text-muted-foreground">{invoice.dueDate || "—"}</td>
                       <td className="py-4 px-4">
-                        {canManage ? (
+                        {revealSensitive ? (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button variant="ghost" size="sm" className="p-2">
@@ -320,7 +326,13 @@ export function InvoicesTable({
                             </DropdownMenuContent>
                           </DropdownMenu>
                         ) : (
-                          <Button variant="ghost" size="sm" className="p-2" disabled aria-label="Invoice actions unavailable">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="p-2"
+                            disabled
+                            aria-label={canManage ? "Unlock Accounting privacy to manage invoice actions" : "Invoice actions unavailable"}
+                          >
                             <X className="w-4 h-4" />
                           </Button>
                         )}
@@ -350,8 +362,13 @@ export function InvoicesTable({
         }}
         title={selectedInvoice?.number || "Invoice details"}
         description="Review invoice metadata in a readable panel."
-        locked={!canManage}
-        lockedDescription="Invoice details, approvals, and exports are only available to finance managers and workspace admins."
+        locked={!revealSensitive}
+        lockedTitle="Accounting privacy locked"
+        lockedDescription={
+          canManage
+            ? "This record is protected. Unlock Accounting privacy to view invoice details."
+            : "This record is protected. An authorized finance manager must unlock Accounting privacy to view invoice details."
+        }
         sections={
           selectedInvoice
             ? [
@@ -373,7 +390,7 @@ export function InvoicesTable({
       />
 
       {/* Add Invoice Modal */}
-      {showModal && canManage ? (
+      {showModal && revealSensitive ? (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <Card className="w-full max-w-md mx-4">
             <CardHeader className="flex flex-row items-center justify-between pb-3">

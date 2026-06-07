@@ -194,13 +194,13 @@ export default function DashboardPage() {
         ]
       : []),
     {
-      title: "Billing still needs live provider validation",
-      detail: "Pricing is launch-safe, but public self-serve checkout should still be treated as not live.",
+      title: "Provider-backed flows still need validation",
+      detail: "SMTP, Cloudinary, Stripe, and rate limits should stay in setup-required mode until evidence is recorded.",
       href: "/pricing",
-      cta: "Review pricing",
+      cta: "Review launch scope",
     },
     {
-      title: "Backup and fake-data evidence still require sign-off",
+      title: "Backup, restore, and fake-data evidence still require sign-off",
       detail: isFounderView
         ? "Founder checks still need backup, restore drill, and fake-data review evidence."
         : "Ask the founder/admin to finish backup, restore drill, and fake-data review evidence before launch sign-off.",
@@ -224,9 +224,9 @@ export default function DashboardPage() {
         },
         {
           title: "Use Civis AI for deterministic navigation",
-          detail: "Try 'take me to pricing', 'open gallery', or 'what should I do next?' to validate the command layer.",
+          detail: "Try 'take me to pricing', 'open gallery', or 'what should I do next?' to validate the Civis Guide command layer.",
           href: "/dashboard/ai",
-          cta: "Open AI",
+          cta: "Open Civis Guide",
         },
       ]
     : [
@@ -238,7 +238,7 @@ export default function DashboardPage() {
         },
         {
           title: "Record one invoice and one expense",
-          detail: "That unlocks a more trustworthy Accounting and Operations summary.",
+          detail: "That gives Accounting and Operations a trustworthy starting point before you trust the summaries.",
           href: "/dashboard/accounting",
           cta: "Open Accounting",
         },
@@ -249,6 +249,26 @@ export default function DashboardPage() {
           cta: "Open Settings",
         },
       ]
+  const launchSetupPath = [
+    {
+      title: "Configure core providers",
+      detail: "SMTP, Cloudinary, Upstash, and billing should be marked live only after validation evidence exists.",
+      href: "/dashboard/settings",
+      cta: "Open setup",
+    },
+    {
+      title: "Validate role and privacy boundaries",
+      detail: "Invite a teammate, confirm org scoping, and unlock HR or Accounting privacy only if the role allows it.",
+      href: "/admin",
+      cta: "Review admin access",
+    },
+    {
+      title: "Run one end-to-end workflow",
+      detail: "Create a contact, invoice, approval, and portal update so Civis Pulse reflects real operating state.",
+      href: "/dashboard/operations",
+      cta: "Open command centre",
+    },
+  ]
   const trustStatus = [
     { label: "Route guards", value: "Active", tone: "text-emerald-600" },
     { label: "Org isolation", value: "Active", tone: "text-emerald-600" },
@@ -442,8 +462,26 @@ export default function DashboardPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Launch setup path</CardTitle>
+          <CardDescription>What to configure, validate, and prove before calling this workspace ready.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 lg:grid-cols-3">
+          {launchSetupPath.map((item) => (
+            <div key={item.title} className="rounded-2xl border border-border bg-background/70 p-4">
+              <p className="text-sm font-semibold">{item.title}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{item.detail}</p>
+              <Button asChild className="mt-4" size="sm" variant="outline">
+                <Link href={item.href}>{item.cta}</Link>
+              </Button>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Quick Start Checklist</CardTitle>
-          <CardDescription>Finish these steps to unlock the full Civis experience.</CardDescription>
+          <CardDescription>Finish these steps to unlock the full Civis experience without hiding what still needs setup.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between text-sm">
