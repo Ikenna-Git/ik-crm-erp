@@ -7,8 +7,13 @@
 - [x] Confirm logged-out `/admin` no longer returns `200`
 - [x] Confirm `/api/admin/orgs` still returns `401` when logged out
 - [x] Confirm `/api/admin/platform-status` still returns `401` when logged out
+- [ ] Confirm logged-out `/admin/system` is blocked
 - [ ] Run the browser checks in `docs/operations/p0-screen-check-runbook.md`
+- [ ] Re-test `ikenna.chilokwu@getpayedmail.com`
 - [ ] Confirm founder vs org owner admin boundaries on live Render
+- [ ] Confirm the invited account cannot access founder-only pages
+- [ ] Confirm the invited account cannot see users outside its own org
+- [ ] Confirm the invited account only has the role intended for that org
 - [ ] Confirm invite flow lands new users in invite org only
 - [ ] Confirm invoice approval lifecycle persists after refresh
 - [ ] Confirm expense approval lifecycle persists after refresh

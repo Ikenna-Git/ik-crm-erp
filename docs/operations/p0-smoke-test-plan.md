@@ -1,7 +1,15 @@
 # P0 Smoke Test Plan
 
-Date: 2026-06-07  
+Date: 2026-06-07
 Branch: `p0-automated-smoke-validation`
+
+## Current Access-Control Defect History
+
+- logged-out `/dashboard` previously returned `200`
+- logged-out `/admin` previously returned `200`
+- root cause: page protection lived in client-only layouts and redirected after render
+- fix applied: server-side guards in dashboard and admin layouts
+- live smoke retest on Render later confirmed `0 fail`
 
 ## Tooling Status
 
@@ -85,6 +93,15 @@ If the smoke runner shows only network-blocked results from a hosted shell, reru
 - another trusted machine/network that can reach the Render URL
 
 That is a connectivity limitation, not proof that the app failed its route checks.
+
+## Logged-Out Protected Expectations
+
+- `/dashboard` must redirect to `/login` or return `401/403`
+- `/dashboard/*` must redirect to `/login` or return `401/403`
+- `/admin` must redirect to `/login` or return `401/403`
+- `/admin/*` must redirect to `/login` or return `401/403`
+- `/api/admin/orgs` must return `401/403`
+- `/api/admin/platform-status` must return `401/403`
 
 ## Coverage Matrix
 

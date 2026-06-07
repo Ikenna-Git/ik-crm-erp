@@ -1,6 +1,6 @@
 # P0 Live Validation Log
 
-Date: 2026-06-07  
+Date: 2026-06-07
 Branch: `p0-automated-smoke-validation`
 
 Use this file during each Render validation pass.
@@ -14,6 +14,14 @@ Use this file during each Render validation pass.
   - `P0_SMOKE_TIMEOUT_MS`
   - `P0_SMOKE_RETRIES`
   - `P0_SMOKE_RETRY_DELAY_MS`
+
+## Route Guard Fix History
+
+- logged-out `/dashboard` previously returned `200`
+- logged-out `/admin` previously returned `200`
+- root cause: page protection lived in client-only layouts and redirected after render
+- fix applied on `main`: server-side guards in dashboard and admin layouts
+- live smoke evidence below confirms that the fix is deployed and active
 
 ## Session Header
 
@@ -37,15 +45,15 @@ Use this file during each Render validation pass.
 | Billing | Pricing page reachable | logged out | `/pricing` | `200-399` | `200` | Pass | Public route remained accessible | Live smoke runner | 2026-06-07 |
 | Admin and org boundary | Logged-out org API blocked | logged out | `/api/admin/orgs` | `401/403` | `401` | Pass | API auth behavior unchanged | Live smoke runner | 2026-06-07 |
 | Admin and org boundary | Logged-out platform status API blocked | logged out | `/api/admin/platform-status` | `401/403` | `401` | Pass | API auth behavior unchanged | Live smoke runner | 2026-06-07 |
-| Admin and org boundary | Org owner blocked from Founder Desk |  | `/admin`, `/admin/system` | Hidden/blocked |  |  |  |  |  |
-| Invite flow | Invited user lands in invite org only |  | invite link, `/signup` | Correct org only |  |  |  |  |  |
-| Accounting | Invoice approval lifecycle |  | accounting + operations pages | Persisted request/decision after refresh |  |  |  |  |  |
-| CRM | Contact/company/deal persistence |  | `/dashboard/crm` | CRUD survives refresh |  |  |  |  |  |
-| Operations | Approvals/workflows scope |  | `/dashboard/operations` | Org-scoped, honest UI |  |  |  |  |  |
-| Settings | Profile/workspace save honesty |  | `/dashboard/settings` | Persisted only where supported |  |  |  |  |  |
-| Uploads | Cloudinary behavior |  | `/dashboard/gallery` | Real upload or clear config error |  |  |  |  |  |
-| Notifications | Persistence |  | notifications UI / API | Survives refresh |  |  |  |  |  |
-| Billing | Missing or test Stripe behavior |  | pricing/checkout | Safe failure or validated test flow |  |  |  |  |  |
+| Admin and org boundary | Org owner blocked from Founder Desk |  | `/admin`, `/admin/system` | Hidden/blocked |  |  | Manual/browser role validation still required |  |  |
+| Invite flow | Invited user lands in invite org only |  | invite link, `/signup` | Correct org only |  |  | Manual/browser validation still required |  |  |
+| Accounting | Invoice approval lifecycle |  | accounting + operations pages | Persisted request/decision after refresh |  |  | Manual/browser validation still required |  |  |
+| CRM | Contact/company/deal persistence |  | `/dashboard/crm` | CRUD survives refresh |  |  | Manual/browser validation still required |  |  |
+| Operations | Approvals/workflows scope |  | `/dashboard/operations` | Org-scoped, honest UI |  |  | Manual/browser validation still required |  |  |
+| Settings | Profile/workspace save honesty |  | `/dashboard/settings` | Persisted only where supported |  |  | Manual/browser validation still required |  |  |
+| Uploads | Cloudinary behavior |  | `/dashboard/gallery` | Real upload or clear config error |  |  | Manual/provider validation still required |  |  |
+| Notifications | Persistence |  | notifications UI / API | Survives refresh |  |  | Manual/write validation still required |  |  |
+| Billing | Missing or test Stripe behavior |  | pricing/checkout | Safe failure or validated test flow |  |  | Manual/provider validation still required |  |  |
 
 ## Outcome
 
