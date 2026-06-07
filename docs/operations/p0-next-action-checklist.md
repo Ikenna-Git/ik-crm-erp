@@ -18,6 +18,9 @@
 - [ ] Confirm invoice approval lifecycle persists after refresh
 - [ ] Confirm expense approval lifecycle persists after refresh
 - [ ] Confirm CRM contact/company/deal CRUD survives refresh
+- [ ] Confirm no launch-facing screen still uses native `alert` / `confirm` / `prompt`
+- [ ] Confirm CRM/accounting/HR/inventory/projects detail views no longer show raw JSON popups
+- [ ] Confirm marketing campaign creation fails honestly instead of implying a saved draft
 - [ ] Confirm workflows remain org-scoped
 - [ ] Confirm notifications persist through DB-backed flow
 
@@ -67,7 +70,17 @@ Blocked/manual items still remaining from the smoke run:
 - [ ] Clean up repo-wide TypeScript / `.next/types` config debt in a separate pass
 - [ ] Add a browser automation tool later if the team wants true E2E coverage
 
-## 7. Go-Live Decision
+## 7. Prototype / Debug UI Sweep Follow-Up
+
+- [x] Remove raw JSON alerts from launch-facing record detail views
+- [x] Remove native browser prompts/confirms from launch-facing admin/settings flows
+- [x] Replace export alerts with in-app toast feedback
+- [x] Replace prompt-based copy flows for portal/webhook actions
+- [x] Replace demo-page native alerts/confirms
+- [x] Remove marketing console-backed fake create flow
+- [ ] Run the prototype/debug UI checks in `docs/operations/p0-prototype-debug-ui-sweep.md`
+
+## 8. Go-Live Decision
 
 - [ ] Fill `docs/operations/p0-go-live-evidence.md`
 - [ ] Fill `docs/operations/p0-live-validation-log.md`

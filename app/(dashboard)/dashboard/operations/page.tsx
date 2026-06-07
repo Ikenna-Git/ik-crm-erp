@@ -13,6 +13,7 @@ import { getSessionHeaders } from "@/lib/user-settings"
 import { useSession } from "next-auth/react"
 import { useCachedFetch } from "@/hooks/use-cached-fetch"
 import { formatNaira } from "@/lib/currency"
+import { toast } from "@/hooks/use-toast"
 
 type ApprovalItem = {
   id: string
@@ -524,8 +525,16 @@ export default function OperationsPage() {
   const copyWebhookSecret = async (secret: string) => {
     try {
       await navigator.clipboard.writeText(secret)
+      toast({
+        title: "Webhook secret copied",
+        description: "The webhook secret is now in your clipboard.",
+      })
     } catch {
-      window.prompt("Copy webhook secret:", secret)
+      toast({
+        title: "Copy failed",
+        description: "Clipboard access was blocked. Copy the webhook secret from the on-screen field.",
+        variant: "destructive",
+      })
     }
   }
 

@@ -22,6 +22,7 @@ import type { Expense } from "@/components/accounting/expenses-table"
 import { SectionErrorBoundary } from "@/components/shared/section-error-boundary"
 import { getSessionHeaders } from "@/lib/user-settings"
 import { formatNaira } from "@/lib/currency"
+import { toast } from "@/hooks/use-toast"
 
 const sectionLoader = (label: string) => () => <div className="text-sm text-muted-foreground">Loading {label}...</div>
 
@@ -591,12 +592,23 @@ export default function AccountingPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        alert(data.error || "Failed to send email")
+        toast({
+          title: "Accounting export failed",
+          description: data.error || "Failed to send email",
+          variant: "destructive",
+        })
         return
       }
-      alert(data.message || "Report sent")
+      toast({
+        title: "Accounting report queued",
+        description: data.message || "Report sent",
+      })
     } catch (err) {
-      alert("Export failed. Please try again.")
+      toast({
+        title: "Accounting export failed",
+        description: "Export failed. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 
@@ -626,12 +638,23 @@ export default function AccountingPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        alert(data.error || "Failed to send email")
+        toast({
+          title: "Compliance export failed",
+          description: data.error || "Failed to send email",
+          variant: "destructive",
+        })
         return
       }
-      alert(data.message || "Report sent")
+      toast({
+        title: "Compliance report queued",
+        description: data.message || "Report sent",
+      })
     } catch (err) {
-      alert("Export failed. Please try again.")
+      toast({
+        title: "Compliance export failed",
+        description: "Export failed. Please try again.",
+        variant: "destructive",
+      })
     }
   }
 

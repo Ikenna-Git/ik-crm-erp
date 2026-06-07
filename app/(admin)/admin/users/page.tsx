@@ -11,6 +11,16 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   ACCESS_PROFILE_DESCRIPTIONS,
   ACCESS_PROFILE_LABELS,
   ACCESS_PROFILES,
@@ -53,6 +63,7 @@ export default function AdminUsersPage() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [lastInvite, setLastInvite] = useState<InvitePayload | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; email: string } | null>(null)
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -216,8 +227,7 @@ export default function AdminUsersPage() {
     }
   }
 
-  const handleDelete = async (userId: string, email: string) => {
-    if (!window.confirm(`Remove ${email} from this workspace?`)) return
+  const handleDelete = async (userId: string) => {
     try {
       setError("")
       const response = await fetch(`/api/admin/users?id=${encodeURIComponent(userId)}`, {
@@ -225,6 +235,7 @@ export default function AdminUsersPage() {
       })
       const payload = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(payload?.error || "Failed to remove user")
+      setPendingDelete(null)
       setData((current) =>
         current
           ? {
@@ -492,7 +503,7 @@ export default function AdminUsersPage() {
                             size="sm"
                             className="text-rose-300 hover:text-rose-200"
                             disabled={isFounder || isSelf}
-                            onClick={() => handleDelete(member.id, member.email)}
+                            onClick={() => setPendingDelete({ id: member.id, email: member.email })}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -506,6 +517,28 @@ export default function AdminUsersPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={Boolean(pendingDelete)} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove user from workspace</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete
+                ? `Remove ${pendingDelete.email} from this workspace? They will lose access until they are invited again.`
+                : "Remove this user from the workspace?"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => pendingDelete && handleDelete(pendingDelete.id)}
+            >
+              Remove user
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

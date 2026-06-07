@@ -15,6 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { RecordDetailsDialog } from "@/components/shared/record-details-dialog"
 
 export interface Expense {
   id: string
@@ -105,6 +106,7 @@ export function ExpensesTable({
   const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null)
   const [formData, setFormData] = useState({
     description: "",
     category: "travel",
@@ -304,7 +306,7 @@ export function ExpensesTable({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => alert(JSON.stringify(expense, null, 2))}>
+                            <DropdownMenuItem onClick={() => setSelectedExpense(expense)}>
                               <Eye className="w-4 h-4 mr-2" />
                               View details
                             </DropdownMenuItem>
@@ -343,6 +345,33 @@ export function ExpensesTable({
           </div>
         </CardContent>
       </Card>
+
+      <RecordDetailsDialog
+        open={Boolean(selectedExpense)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedExpense(null)
+        }}
+        title={selectedExpense?.description || "Expense details"}
+        description="Review expense information in a readable panel."
+        sections={
+          selectedExpense
+            ? [
+                {
+                  title: "Expense summary",
+                  fields: [
+                    { label: "Description", value: selectedExpense.description },
+                    { label: "Category", value: selectedExpense.category },
+                    { label: "Amount", value: formatNaira(selectedExpense.amount) },
+                    { label: "Status", value: selectedExpense.status || "pending" },
+                    { label: "Approval", value: selectedExpense.approvalStatus || "Not requested" },
+                    { label: "Submitted by", value: selectedExpense.submittedBy || "—" },
+                    { label: "Date", value: selectedExpense.date || "—" },
+                  ],
+                },
+              ]
+            : []
+        }
+      />
 
       {/* Add Expense Modal */}
       {showModal && (

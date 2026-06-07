@@ -22,6 +22,8 @@ export default function TwoFactorAuthPage() {
   } | null>(null)
   const [verificationToken, setVerificationToken] = useState("")
   const [showSetup, setShowSetup] = useState(false)
+  const [showDisableDialog, setShowDisableDialog] = useState(false)
+  const [disablePassword, setDisablePassword] = useState("")
   const [error, setError] = useState("")
 
   useEffect(() => {
@@ -87,8 +89,7 @@ export default function TwoFactorAuthPage() {
   }
 
   const handleDisable2FA = async () => {
-    const password = prompt("Enter your password to disable 2FA:")
-    if (!password) return
+    if (!disablePassword) return
 
     setLoading(true)
     setError("")
@@ -97,7 +98,7 @@ export default function TwoFactorAuthPage() {
       const response = await fetch("/api/auth/2fa/disable", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password: disablePassword }),
       })
 
       const data = await response.json()
@@ -107,6 +108,8 @@ export default function TwoFactorAuthPage() {
       }
 
       setIsEnabled(false)
+      setDisablePassword("")
+      setShowDisableDialog(false)
       await update() // Refresh session
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to disable 2FA")
@@ -164,7 +167,7 @@ export default function TwoFactorAuthPage() {
                 {loading ? "Setting up..." : "Enable 2FA"}
               </Button>
             ) : (
-              <Button variant="destructive" onClick={handleDisable2FA} disabled={loading}>
+              <Button variant="destructive" onClick={() => setShowDisableDialog(true)} disabled={loading}>
                 <Shield className="h-4 w-4 mr-2" />
                 {loading ? "Disabling..." : "Disable 2FA"}
               </Button>
@@ -172,6 +175,44 @@ export default function TwoFactorAuthPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={showDisableDialog} onOpenChange={setShowDisableDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Disable two-factor authentication</DialogTitle>
+            <DialogDescription>
+              Enter your password to confirm. This removes the extra sign-in check from your account.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="disable-password">Password</Label>
+              <Input
+                id="disable-password"
+                type="password"
+                value={disablePassword}
+                onChange={(e) => setDisablePassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDisableDialog(false)
+                  setDisablePassword("")
+                }}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDisable2FA} disabled={loading || !disablePassword}>
+                {loading ? "Disabling..." : "Disable 2FA"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showSetup} onOpenChange={setShowSetup}>
         <DialogContent className="max-w-md">

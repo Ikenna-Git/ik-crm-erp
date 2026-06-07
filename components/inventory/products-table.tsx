@@ -15,6 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { RecordDetailsDialog } from "@/components/shared/record-details-dialog"
 
 export interface Product {
   id: string
@@ -89,6 +90,7 @@ export function ProductsTable({
   const [pageSize, setPageSize] = useState(10)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [formData, setFormData] = useState({
     sku: "",
     name: "",
@@ -277,7 +279,7 @@ export function ProductsTable({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => alert(JSON.stringify(product, null, 2))}>
+                            <DropdownMenuItem onClick={() => setSelectedProduct(product)}>
                               <Eye className="w-4 h-4 mr-2" />
                               View details
                             </DropdownMenuItem>
@@ -312,6 +314,33 @@ export function ProductsTable({
           </div>
         </CardContent>
       </Card>
+
+      <RecordDetailsDialog
+        open={Boolean(selectedProduct)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedProduct(null)
+        }}
+        title={selectedProduct?.name || "Product details"}
+        description="Review product information without exposing raw record JSON."
+        sections={
+          selectedProduct
+            ? [
+                {
+                  title: "Product summary",
+                  fields: [
+                    { label: "SKU", value: selectedProduct.sku },
+                    { label: "Name", value: selectedProduct.name },
+                    { label: "Category", value: selectedProduct.category },
+                    { label: "Price", value: formatNaira(selectedProduct.price) },
+                    { label: "Cost", value: formatNaira(selectedProduct.cost) },
+                    { label: "Supplier", value: selectedProduct.supplier },
+                    { label: "Status", value: selectedProduct.status },
+                  ],
+                },
+              ]
+            : []
+        }
+      />
 
       {/* Add Product Modal */}
       {showModal && (

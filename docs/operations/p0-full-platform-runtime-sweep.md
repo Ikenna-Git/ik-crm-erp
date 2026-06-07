@@ -1,7 +1,7 @@
 # P0 Full Platform Runtime Sweep
 
 Date: 2026-06-07  
-Branch: `p0-full-platform-runtime-sweep`
+Branch: `p0-remove-prototype-debug-ui`
 
 ## Scope
 
@@ -43,6 +43,19 @@ This sweep covers live-critical runtime behavior only:
 | AI | `/dashboard/ai` | `/api/ai/chat` | Missing provider should fail clearly or use explicit fallback messaging | Env/provider + explicit fallback text | Same org/session | Authenticated user | Needs live validation | No new defect patched in this pass | None | Validate disabled/missing-key behavior live |
 | Portal | `/portal/[code]` | `/api/portal/[code]/*` | Client portal stays scoped to its access code and org | DB + rate limiting | Portal workspace only | Portal user / code access | Needs live validation | No new defect confirmed in this pass | None | Recheck approvals and status updates live |
 | Billing / Stripe | `/pricing`, billing surfaces | billing APIs | Missing config must fail closed and not imply live checkout | Env/provider | Workspace scoped | Billing-eligible roles only | Needs live validation | No new defect patched in this pass | None | Recheck disabled/missing-config messaging live |
+
+## Prototype / Debug UI Sweep
+
+| Surface | Prior issue | Resolution | Status | Notes |
+| --- | --- | --- | --- | --- |
+| CRM, accounting, HR, inventory, projects detail actions | Raw JSON detail popups through native alerts | Replaced with shared in-app detail dialog | Fixed in code | See `docs/operations/p0-prototype-debug-ui-sweep.md` |
+| Exports in analytics, CRM, accounting, projects | Browser alert feedback | Replaced with toast feedback | Fixed in code | Live screen check still required |
+| Settings 2FA disable | Password captured through native prompt | Replaced with app dialog | Fixed in code | Server-side 2FA disable path preserved |
+| Admin user removal | Browser confirm | Replaced with `AlertDialog` | Fixed in code | Same delete API path |
+| Founder system org suspend/archive | Browser prompt for reason | Replaced with reason dialog | Fixed in code | Restore remains direct |
+| Operations webhook copy / portal link copy | Prompt used as copy fallback | Replaced with clipboard + toast | Fixed in code | No secret/link prompt shown anymore |
+| Demo actions | Native alerts/confirms | Replaced with toast + `AlertDialog` | Fixed in code | Demo page remains intentionally local/demo-scoped |
+| Marketing campaign creation | Console debug log and implied creation | Replaced with explicit unavailable toast | Fixed in code | Prevents fake-success launch behavior |
 
 ## Unsafe Local / Fake Runtime Findings
 
