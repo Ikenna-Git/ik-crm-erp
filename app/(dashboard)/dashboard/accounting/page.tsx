@@ -123,6 +123,8 @@ export default function AccountingPage() {
   const [privacyUnlocked, setPrivacyUnlocked] = useState(false)
   const [privacyLoading, setPrivacyLoading] = useState(true)
   const [privacyConfigured, setPrivacyConfigured] = useState(true)
+  const [privacyCanUnlock, setPrivacyCanUnlock] = useState(false)
+  const [privacyMessage, setPrivacyMessage] = useState("Checking privacy state...")
   const [privacyError, setPrivacyError] = useState("")
   const [importNotice, setImportNotice] = useState("")
   const [openInvoiceDialog, setOpenInvoiceDialog] = useState(false)
@@ -142,7 +144,8 @@ export default function AccountingPage() {
     date: "",
   })
   const canManageAccounting = hasModuleAccess(session?.user || {}, "accounting", "manage")
-  const canUseSensitiveAccounting = canManageAccounting && privacyUnlocked
+  const canManageSensitiveAccounting = canManageAccounting || privacyCanUnlock
+  const canUseSensitiveAccounting = canManageSensitiveAccounting && privacyUnlocked
 
   const parseJsonSafe = async (res: Response) => {
     const text = await res.text()
@@ -319,10 +322,16 @@ export default function AccountingPage() {
       const response = await parseJsonSafe(await fetch("/api/privacy-lock?module=accounting", { headers: { ...getSessionHeaders() } }))
       setPrivacyUnlocked(Boolean(response.unlocked))
       setPrivacyConfigured(response.configured !== false)
+      setPrivacyCanUnlock(Boolean(response.canUnlock))
+      setPrivacyMessage(typeof response.message === "string" ? response.message : "Accounting privacy is locked for this session.")
+      return response
     } catch (err: any) {
       setPrivacyUnlocked(false)
       setPrivacyConfigured(true)
+      setPrivacyCanUnlock(false)
+      setPrivacyMessage("Checking privacy state failed.")
       setPrivacyError(err?.message || "Failed to load Accounting privacy state")
+      return null
     } finally {
       setPrivacyLoading(false)
     }
@@ -343,7 +352,7 @@ export default function AccountingPage() {
       })
       const data = await parseJsonSafe(response)
       if (!response.ok) throw new Error(data.error || "Failed to unlock Accounting privacy")
-      setPrivacyUnlocked(true)
+      await loadPrivacyState()
       await loadData()
     } catch (err: any) {
       setPrivacyError(err?.message || "Failed to unlock Accounting privacy")
@@ -363,7 +372,7 @@ export default function AccountingPage() {
       })
       const data = await parseJsonSafe(response)
       if (!response.ok) throw new Error(data.error || "Failed to relock Accounting privacy")
-      setPrivacyUnlocked(false)
+      await loadPrivacyState()
       await loadData()
     } catch (err: any) {
       setPrivacyError(err?.message || "Failed to relock Accounting privacy")
@@ -916,14 +925,21 @@ export default function AccountingPage() {
       </div>
 
       <PrivacyLockPanel
-        moduleLabel="Accounting privacy"
-        unlockLabel="Unlock Accounting privacy"
+        title="Accounting privacy locked"
+        inputLabel="Enter Accounting privacy PIN"
+        unlockButtonLabel="Unlock Accounting"
+        lockAgainButtonLabel="Lock Accounting again"
         unlocked={privacyUnlocked}
-        canUnlock={canManageAccounting}
+        canUnlock={privacyCanUnlock}
         loading={privacyLoading}
         configured={privacyConfigured}
         error={privacyError}
-        helperText="Accounting uses a separate session-scoped privacy PIN so finance details stay hidden until an authorized manager explicitly unlocks them."
+        helperText="Invoice, expense, approval, and export details are protected until Accounting privacy is unlocked for this session."
+        statusMessage={privacyMessage}
+        unlockedDescription="Accounting unlocked for this session. Invoice, expense, approval, and export details are visible again for authorized users."
+        cannotUnlockMessage="Your role cannot unlock this privacy lock."
+        notConfiguredMessage="ACCOUNTING_PRIVACY_PIN is not configured."
+        loadingMessage="Checking privacy state..."
         onUnlock={unlockPrivacy}
         onLockAgain={lockPrivacyAgain}
       />
@@ -942,7 +958,7 @@ export default function AccountingPage() {
             <div className="rounded-lg border border-border bg-muted/20 p-4 text-sm text-muted-foreground">
               Accounting privacy is unlocked for this session. Financial amounts, approvals, exports, and row actions are visible again.
             </div>
-          ) : canManageAccounting ? (
+          ) : canManageSensitiveAccounting ? (
             <div className="rounded-lg border border-dashed border-border bg-muted/10 p-4 text-sm text-muted-foreground">
               This role can manage accounting, but Accounting privacy is still locked. Unlock Accounting privacy before viewing finance totals, exports, approvals, or row actions.
             </div>

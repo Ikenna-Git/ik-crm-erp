@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Edit, Trash2, Plus, X, Download, Eye, MoreHorizontal, CheckSquare } from "lucide-react"
+import { Edit, Trash2, Plus, X, Download, Eye, MoreHorizontal, CheckSquare, Lock } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { PaginationControls } from "@/components/shared/pagination-controls"
 import {
@@ -325,17 +325,17 @@ export function InvoicesTable({
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="p-2"
-                            disabled
-                            aria-label={canManage ? "Unlock Accounting privacy to manage invoice actions" : "Invoice actions unavailable"}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        )}
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="p-2"
+                          onClick={() => setSelectedInvoice(invoice)}
+                          aria-label={canManage ? "Unlock Accounting privacy to view protected invoice details" : "This invoice record is protected"}
+                        >
+                          <Lock className="w-4 h-4" />
+                        </Button>
+                      )}
                       </td>
                     </tr>
                   )
@@ -370,7 +370,7 @@ export function InvoicesTable({
             : "This record is protected. An authorized finance manager must unlock Accounting privacy to view invoice details."
         }
         sections={
-          selectedInvoice
+          revealSensitive && selectedInvoice
             ? [
                 {
                   title: "Invoice summary",

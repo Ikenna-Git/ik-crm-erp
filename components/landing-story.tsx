@@ -35,10 +35,17 @@ export function LandingStory() {
             <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">
               Civis is the AI-native operating centre for teams that need CRM, finance, operations, people, and approvals in one place.
             </h2>
+            <p className="max-w-xl text-base leading-7 text-muted-foreground">
+              Watch work move through your operating centre. Civis routes leads, approvals, privacy-aware records, and next actions through one connected system instead of scattered tools.
+            </p>
           </div>
           <div className="grid gap-4">
             {problems.map((problem) => (
-              <div key={problem} className="rounded-[28px] border border-border/80 bg-card/90 p-5 shadow-sm">
+              <div
+                key={problem}
+                data-cursor="card"
+                className="rounded-[28px] border border-border/80 bg-card/90 p-5 shadow-sm transition-transform duration-300 hover:-translate-y-1 hover:shadow-lg"
+              >
                 <p className="text-sm leading-7 text-muted-foreground">{problem}</p>
               </div>
             ))}
@@ -46,7 +53,7 @@ export function LandingStory() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="rounded-[32px] border border-border/80 bg-gradient-to-br from-card via-card to-muted/30 p-7 shadow-sm">
+          <div data-cursor="card" className="rounded-[32px] border border-border/80 bg-gradient-to-br from-card via-card to-muted/30 p-7 shadow-sm">
             <div className="flex items-center gap-3 text-sm font-semibold text-foreground">
               <Bot className="h-5 w-5 text-primary" />
               AI-native, not AI-painted
@@ -70,7 +77,11 @@ export function LandingStory() {
 
           <div className="grid gap-4">
             {workflows.map((workflow) => (
-              <div key={workflow.title} className="rounded-[28px] border border-border/80 bg-card p-6 shadow-sm">
+              <div
+                key={workflow.title}
+                data-cursor={workflow.title.includes("Protect") ? "lock" : "card"}
+                className="rounded-[28px] border border-border/80 bg-card p-6 shadow-sm transition-transform duration-300 hover:-translate-y-1 hover:shadow-lg"
+              >
                 <div className="flex items-center gap-3">
                   {workflow.title.includes("Sell") ? (
                     <BriefcaseBusiness className="h-5 w-5 text-primary" />

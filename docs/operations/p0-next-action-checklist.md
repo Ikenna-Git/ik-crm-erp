@@ -1,7 +1,7 @@
 # P0 Next Action Checklist
 
 Date: 2026-06-19
-Branch: `p0-customer-demo-readiness-launch-automation`
+Branch: `p0-fix-privacy-pin-and-launch-readiness-sweep`
 
 ## Immediate After Merge + Redeploy
 - [ ] Open `/admin/launch-readiness` as founder
@@ -9,6 +9,8 @@ Branch: `p0-customer-demo-readiness-launch-automation`
 - [ ] Run `BASE_URL=https://ik-crm-erp.onrender.com P0_SMOKE_DEBUG=1 npm run p0:smoke`
 - [ ] Confirm `/api/admin/launch-readiness` is founder-protected
 - [ ] Confirm provider diagnostics show configured / partial / missing only, with no secret leakage
+- [ ] Confirm HR PIN field is typeable for an authorized HR role
+- [ ] Confirm Accounting PIN field is typeable for an authorized finance role
 
 ## Founder Live Checks
 - [ ] Founder can open `/admin`
@@ -38,7 +40,9 @@ Branch: `p0-customer-demo-readiness-launch-automation`
 - [ ] Accounting approvals: request, approve/reject, refresh confirms state
 - [ ] Operations approvals: pending list is org-scoped and final states cannot be replayed
 - [ ] HR privacy PIN: wrong PIN, correct PIN, re-lock
+- [ ] HR privacy PIN: locked View Details stays protected
 - [ ] Accounting privacy PIN: wrong PIN, correct PIN, re-lock, exports respect lock
+- [ ] Accounting privacy PIN: locked View Details stays protected
 - [ ] Civis Guide deterministic commands:
   - [ ] take me to pricing
   - [ ] open gallery

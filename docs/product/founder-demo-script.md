@@ -3,6 +3,7 @@
 Date: 2026-06-19
 Audience: Founder demos, investor walkthroughs, serious customer previews
 Length: 7 to 10 minutes
+Branch: `p0-fix-privacy-pin-and-launch-readiness-sweep`
 
 ## Demo Path
 1. Landing page
@@ -61,6 +62,7 @@ Length: 7 to 10 minutes
 ### 11. HR privacy PIN
 - “Sensitive HR data is privacy locked by default.”
 - “Role permissions are the real boundary. The PIN is an extra operational safeguard for the current session.”
+- “Limited does not mean broken here. It means the feature exists, but launch-window evidence is still pending.”
 
 ### 12. Accounting privacy PIN
 - “Accounting stays privacy locked separately from HR.”
@@ -69,6 +71,7 @@ Length: 7 to 10 minutes
 ### 13. Admin Launch Readiness centre
 - “This is where founder-level launch decisions happen.”
 - “Configured does not mean proven. Missing evidence stays visible.”
+- “Action Required means we still need manual proof before launch approval. Missing means required configuration is absent. Preview Only means we are not pretending this release is production-ready there.”
 
 ### 14. Marketing preview-only explanation
 - “Marketing is visible because it is part of the roadmap, but it stays preview-only in this release.”

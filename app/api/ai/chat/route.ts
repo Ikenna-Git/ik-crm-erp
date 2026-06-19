@@ -389,7 +389,7 @@ const resolveGuidedHowTo = (prompt: string): DataResolution | null => {
   if (/unlock accounting|why can('?|’)t i see invoice|why can('?|’)t i see expense|why can('?|’)t i see finance/.test(value)) {
     return {
       message:
-        "Accounting is currently privacy locked. If you are authorized, unlock Accounting using the Accounting PIN. Until then, invoice and expense details stay protected. Would you like me to take you to Accounting now?",
+        "Accounting is currently privacy locked. If you are authorized, unlock Accounting using the Accounting PIN. If the PIN field is disabled, refresh the page, sign in again, or contact your workspace admin because your role may not be allowed to unlock it. Until then, invoice and expense details stay protected. Would you like me to take you to Accounting now?",
       action: moduleActions.accounting,
     }
   }
@@ -397,8 +397,32 @@ const resolveGuidedHowTo = (prompt: string): DataResolution | null => {
   if (/why can('?|’)t i see payroll|unlock hr|unlock payroll/.test(value)) {
     return {
       message:
-        "HR is currently privacy locked. If you are authorized, unlock HR using the HR PIN. Until then, employee and payroll details stay protected. Would you like me to open HR for you now?",
+        "HR is currently privacy locked. If you are authorized, unlock HR using the HR PIN. If the PIN field is disabled, refresh the page, sign in again, or contact your workspace admin because your role may not be allowed to unlock it. Until then, employee and payroll details stay protected. Would you like me to open HR for you now?",
       action: moduleActions.hr,
+    }
+  }
+
+  if (/what does limited mean|meaning of limited/.test(value)) {
+    return {
+      message: "Limited means the feature exists, but live evidence is still pending. It should not be treated as launch-approved yet.",
+    }
+  }
+
+  if (/what does action required mean|meaning of action required/.test(value)) {
+    return {
+      message: "Action Required means the item still needs manual validation, provider proof, or evidence before launch approval.",
+    }
+  }
+
+  if (/what does missing mean|meaning of missing/.test(value)) {
+    return {
+      message: "Missing means a required provider or configuration is not present, so the capability should not be treated as live.",
+    }
+  }
+
+  if (/what is preview only|what does preview only mean|meaning of preview only/.test(value)) {
+    return {
+      message: "Preview Only means the feature is intentionally non-production in this release. It should stay honest and must not show fake live success.",
     }
   }
 

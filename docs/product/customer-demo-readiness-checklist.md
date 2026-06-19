@@ -13,8 +13,8 @@ Date: 2026-06-19
 | CRM | Workspace user | Contact/company/deal flow persists after refresh | High |  |  |  |
 | Accounting | Finance user | Invoices/expenses load; approval flow behaves honestly | High |  |  |  |
 | Operations | Ops/admin | Approval queue is org-scoped and persistent | High |  |  |  |
-| HR privacy | HR manager | Locked by default, unlocked only after valid PIN | High |  |  |  |
-| Accounting privacy | Finance manager | Locked by default, unlocked only after valid PIN | High |  |  |  |
+| HR privacy | HR manager | Locked by default, PIN input typeable when authorized, unlocked only after valid PIN | High |  |  |  |
+| Accounting privacy | Finance manager | Locked by default, PIN input typeable when authorized, unlocked only after valid PIN | High |  |  |  |
 | Gallery | Allowed user | Upload succeeds if configured, fails clearly if not | Medium |  |  |  |
 | Settings | Authenticated | Supported settings persist or fail honestly | Medium |  |  |  |
 | Admin | Founder / org owner | Founder and workspace admin experiences remain separated | High |  |  |  |

@@ -42,6 +42,12 @@ export const CIVIS_KB: KnowledgeEntry[] = [
       "The HR module supports attendance tracking, leave status, and payroll visibility controls. Use the attendance tracker to log check-ins, mark leave types, and set reminders for return dates.",
   },
   {
+    title: "Privacy locks and launch statuses",
+    keywords: ["privacy", "pin", "locked", "limited", "action required", "missing", "preview only", "launch readiness"],
+    content:
+      "HR and Accounting use separate privacy PIN locks. If HR or Accounting details are hidden, the module may still be privacy locked or your role may not be allowed to unlock it. In launch readiness, Limited means the feature exists but live evidence is still pending. Action Required means manual validation or evidence is still needed before launch approval. Missing means required configuration is absent. Preview Only means the feature is intentionally non-production in this release.",
+  },
+  {
     title: "Playbooks and workflows",
     keywords: ["playbook", "workflow", "automation", "steps", "checklist"],
     content:

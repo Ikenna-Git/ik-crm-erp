@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Edit, Trash2, Plus, X, Download, MoreHorizontal, Eye, CheckSquare } from "lucide-react"
+import { Edit, Trash2, Plus, X, Download, MoreHorizontal, Eye, CheckSquare, Lock } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { PaginationControls } from "@/components/shared/pagination-controls"
 import {
@@ -337,17 +337,17 @@ export function ExpensesTable({
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
-                        ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="p-2"
-                            disabled
-                            aria-label={canManage ? "Unlock Accounting privacy to manage expense actions" : "Expense actions unavailable"}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        )}
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="p-2"
+                          onClick={() => setSelectedExpense(expense)}
+                          aria-label={canManage ? "Unlock Accounting privacy to view protected expense details" : "This expense record is protected"}
+                        >
+                          <Lock className="w-4 h-4" />
+                        </Button>
+                      )}
                       </td>
                     </tr>
                   )
@@ -382,7 +382,7 @@ export function ExpensesTable({
             : "This record is protected. An authorized finance manager must unlock Accounting privacy to view expense details."
         }
         sections={
-          selectedExpense
+          revealSensitive && selectedExpense
             ? [
                 {
                   title: "Expense summary",

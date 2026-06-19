@@ -4,6 +4,7 @@ import {
   canUnlockPrivacyModule,
   getPrivacyConfig,
   getPrivacyUnlockCookieName,
+  getPrivacyUnlockEnvKey,
   isPrivacyUnlocked,
   verifyPrivacyPin,
 } from "@/lib/privacy-lock"
@@ -38,11 +39,13 @@ export async function GET(request: Request) {
       unlocked,
       canUnlock,
       configured,
-      message: canUnlock
-        ? unlocked
-          ? `${config.label} is unlocked for this session.`
-          : `${config.label} is locked for this session.`
-        : `${config.label} can only be unlocked by an authorized workspace manager.`,
+      message: !configured
+        ? `${getPrivacyUnlockEnvKey(config.module)} is not configured.`
+        : canUnlock
+          ? unlocked
+            ? `${config.label} unlocked for this session.`
+            : `${config.label} is locked for this session.`
+          : "Your role cannot unlock this privacy lock.",
     })
   } catch (error) {
     if (isRequestUserError(error)) {
@@ -70,13 +73,13 @@ export async function POST(request: Request) {
 
     const pinCheck = verifyPrivacyPin(config.module, String(body.pin || ""))
     if (pinCheck.reason === "missing") {
-      return NextResponse.json(
-        { error: `${config.label} PIN is not configured yet. Add ${config.envKey} before using this lock.` },
-        { status: 503 },
-      )
+      return NextResponse.json({ error: `${config.envKey} is not configured.` }, { status: 503 })
     }
     if (!pinCheck.ok) {
-      return NextResponse.json({ error: "Incorrect PIN. Try again." }, { status: 400 })
+      return NextResponse.json(
+        { error: config.module === "hr" ? "Incorrect HR PIN. Try again." : "Incorrect Accounting PIN. Try again." },
+        { status: 400 },
+      )
     }
 
     const response = NextResponse.json({

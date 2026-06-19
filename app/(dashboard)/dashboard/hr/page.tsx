@@ -102,6 +102,8 @@ export default function HRPage() {
   const [privacyUnlocked, setPrivacyUnlocked] = useState(false)
   const [privacyLoading, setPrivacyLoading] = useState(true)
   const [privacyConfigured, setPrivacyConfigured] = useState(true)
+  const [privacyCanUnlock, setPrivacyCanUnlock] = useState(false)
+  const [privacyMessage, setPrivacyMessage] = useState("Checking privacy state...")
   const [privacyError, setPrivacyError] = useState("")
   const [openEmployeeDialog, setOpenEmployeeDialog] = useState(false)
   const [employeeForm, setEmployeeForm] = useState({
@@ -120,6 +122,7 @@ export default function HRPage() {
     deductions: "",
   })
   const canManageHr = hasModuleAccess(session?.user || {}, "hr", "manage")
+  const canManageSensitiveHr = canManageHr || privacyCanUnlock
 
   const loadPrivacyState = async () => {
     setPrivacyLoading(true)
@@ -128,10 +131,16 @@ export default function HRPage() {
       const response = await requestJson("/api/privacy-lock?module=hr")
       setPrivacyUnlocked(Boolean(response.unlocked))
       setPrivacyConfigured(response.configured !== false)
+      setPrivacyCanUnlock(Boolean(response.canUnlock))
+      setPrivacyMessage(typeof response.message === "string" ? response.message : "HR privacy is locked for this session.")
+      return response
     } catch (err) {
       setPrivacyUnlocked(false)
       setPrivacyConfigured(true)
+      setPrivacyCanUnlock(false)
+      setPrivacyMessage("Checking privacy state failed.")
       setPrivacyError(err instanceof Error ? err.message : "Failed to load HR privacy state")
+      return null
     } finally {
       setPrivacyLoading(false)
     }
@@ -174,7 +183,7 @@ export default function HRPage() {
         method: "POST",
         body: JSON.stringify({ module: "hr", pin }),
       })
-      setPrivacyUnlocked(true)
+      await loadPrivacyState()
       await loadData()
     } catch (err) {
       setPrivacyError(err instanceof Error ? err.message : "Failed to unlock HR privacy")
@@ -191,7 +200,7 @@ export default function HRPage() {
         method: "DELETE",
         body: JSON.stringify({ module: "hr" }),
       })
-      setPrivacyUnlocked(false)
+      await loadPrivacyState()
       await loadData()
     } catch (err) {
       setPrivacyError(err instanceof Error ? err.message : "Failed to relock HR privacy")
@@ -386,7 +395,7 @@ export default function HRPage() {
         <div className="flex gap-2">
           <Dialog open={openPayrollDialog} onOpenChange={setOpenPayrollDialog}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2 bg-transparent" disabled={!canManageHr || !privacyUnlocked}>
+              <Button variant="outline" className="flex items-center gap-2 bg-transparent" disabled={!canManageSensitiveHr || !privacyUnlocked}>
                 <Plus className="w-4 h-4" />
                 New Payroll
               </Button>
@@ -445,7 +454,7 @@ export default function HRPage() {
 
           <Dialog open={openEmployeeDialog} onOpenChange={setOpenEmployeeDialog}>
             <DialogTrigger asChild>
-              <Button className="flex items-center gap-2" disabled={!canManageHr || !privacyUnlocked}>
+              <Button className="flex items-center gap-2" disabled={!canManageSensitiveHr || !privacyUnlocked}>
                 <Plus className="w-4 h-4" />
                 New Employee
               </Button>
@@ -523,14 +532,21 @@ export default function HRPage() {
       {error ? <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div> : null}
 
       <PrivacyLockPanel
-        moduleLabel="HR privacy"
-        unlockLabel="Unlock HR privacy"
+        title="HR privacy locked"
+        inputLabel="Enter HR privacy PIN"
+        unlockButtonLabel="Unlock HR"
+        lockAgainButtonLabel="Lock HR again"
         unlocked={privacyUnlocked}
-        canUnlock={canManageHr}
+        canUnlock={privacyCanUnlock}
         loading={privacyLoading}
         configured={privacyConfigured}
         error={privacyError}
-        helperText="HR keeps employee and payroll data privacy locked until an authorized workspace manager unlocks it for the current session."
+        helperText="Employee and payroll details are protected until HR privacy is unlocked for this session."
+        statusMessage={privacyMessage}
+        unlockedDescription="HR unlocked for this session. Employee and payroll details are visible again for authorized users."
+        cannotUnlockMessage="Your role cannot unlock this privacy lock."
+        notConfiguredMessage="HR_PRIVACY_PIN is not configured."
+        loadingMessage="Checking privacy state..."
         onUnlock={unlockPrivacy}
         onLockAgain={lockPrivacyAgain}
       />
@@ -575,7 +591,7 @@ export default function HRPage() {
             onAddEmployee={addEmployee}
             onUpdateEmployee={handleUpdateEmployee}
             onDeleteEmployee={handleDeleteEmployee}
-            canManage={canManageHr}
+            canManage={canManageSensitiveHr}
             privacyUnlocked={privacyUnlocked}
           />
         </TabsContent>
@@ -587,7 +603,7 @@ export default function HRPage() {
             onAddPayroll={addPayrollRecord}
             onUpdatePayroll={handleUpdatePayroll}
             onDeletePayroll={handleDeletePayroll}
-            canManage={canManageHr}
+            canManage={canManageSensitiveHr}
             privacyUnlocked={privacyUnlocked}
           />
         </TabsContent>
