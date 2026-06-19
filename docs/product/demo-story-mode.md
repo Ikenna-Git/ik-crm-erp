@@ -1,59 +1,57 @@
 # Demo Story Mode
 
-Date: 2026-06-07
+Date: 2026-06-19
 
-## Best 5-minute Customer Demo
+## Best 5-Minute Customer Demo
 1. `/`
-   - Explain Civis as the AI-native CRM and ERP command centre.
+   - Show the premium landing page and explain Civis as one governed business workspace.
 2. `/pricing`
-   - Explain pricing clearly and state that public self-serve checkout is not live yet.
+   - State clearly that pricing is live to review, but checkout is only live if validated.
 3. `/dashboard`
-   - Show Civis Pulse, setup blockers, trust status, and suggested next actions.
-4. `/dashboard/crm`
-   - Show contacts, companies, deals, and flexible records.
-5. `/dashboard/accounting`
-   - Show invoices, expenses, approvals, and the Accounting privacy lock.
-6. `/dashboard/operations`
-   - Show approvals and command-centre follow-through.
-7. `/dashboard/ai`
-   - Use Civis Guide for navigation and “what should I do next?”
+   - Show Civis Pulse, setup blockers, and trust posture.
+4. `/dashboard/setup`
+   - Show that setup status is evidence-driven, not manually checked off.
+5. `/dashboard/crm`
+   - Show contact, company, and deal flow.
+6. `/dashboard/accounting`
+   - Show invoices/expenses and the Accounting privacy lock.
+7. `/dashboard/operations`
+   - Show approvals and operational follow-through.
 
-## Best 7-minute Founder / Investor Demo
-1. Landing page and product positioning.
-2. Pricing honesty and launch-safe claims.
-3. Overview with Civis Pulse and trust/status.
-4. CRM to Accounting flow.
-5. Operations approvals.
-6. Admin and founder-only separation.
-7. Civis Guide deterministic commands.
+## Best 7-Minute Founder / Investor Demo
+1. Landing and product positioning
+2. Pricing honesty
+3. Login and dashboard
+4. Civis Guide command moment
+5. CRM to Accounting to Operations workflow
+6. HR and Accounting privacy locks
+7. Founder-only Launch Readiness centre
 
-## Exact AI Commands To Demo
-- Take me to pricing
-- Open CRM
-- Open sales pipeline
-- Open accounting
-- What should I do next?
-- What can I do here?
-- Why can’t I see payroll details?
-- Log me out
+## Exact Civis Guide Commands To Demo
+- `take me to pricing`
+- `open CRM`
+- `open accounting`
+- `open HR`
+- `open settings`
+- `what should I do next?`
+- `what can I do here?`
+- `I'm lost`
+- `how do I create an invoice?`
+- `log me out`
 
-## What To Avoid Demoing
+## What To Avoid
 - Marketing as if it is production-backed
-- Public billing checkout as if it is validated live
-- Backup / restore as if proven
-- Provider-backed flows that have not been configured and tested
+- Billing as if it is live without Stripe proof
+- Backup / restore as if already evidenced
+- Provider-backed AI if only deterministic routing has been validated
+- Any claim that sounds like a customer testimonial unless it is real
 
-## What To Say About Preview-only Marketing
-“Marketing is included in the product direction, but it is still preview-only in this release. We keep it visible for roadmap clarity, not as a fake live module.”
-
-## What To Say About Billing Validation
-“Pricing is live to review. Public self-serve billing is not being overclaimed until Stripe validation evidence is complete.”
-
-## What To Say About Backup / Restore Blockers
-“The product surfaces the trust requirement honestly. Backup and restore are launch blockers until the evidence is recorded.”
-
-## What To Say If Provider Config Is Missing
-“This feature is configuration-aware. Civis will fail clearly instead of pretending it worked.”
-
-## What To Say About HR / Accounting Privacy PINs
-“Sensitive HR and Accounting data stay privacy locked by default. Role permissions are the real security boundary, and authorized managers can intentionally unlock a module for the current session when they need to work.”
+## Honest Lines To Use
+- “Action required.”
+- “Preview-only.”
+- “Requires configuration.”
+- “Privacy locked.”
+- “Evidence pending.”
+- “Ready for validation.”
+- “Role-aware.”
+- “Governed workspace.”

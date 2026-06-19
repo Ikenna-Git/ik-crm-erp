@@ -2,6 +2,12 @@ import { NextResponse } from "next/server"
 import { prisma, withPrismaRetry } from "@/lib/prisma"
 import { getBillingProviderReadiness } from "@/lib/billing"
 import { handleAccessRouteError, requireAdminRequest } from "@/lib/access-route"
+import {
+  getLaunchEvidence,
+  getModuleReadiness,
+  getProviderDiagnostics,
+  getSecurityAccessReadiness,
+} from "@/lib/launch-readiness"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable founder status." }, { status: 503 })
@@ -10,7 +16,7 @@ export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
 
   try {
-    await requireAdminRequest(request, { requireSuperAdmin: true })
+    const { user } = await requireAdminRequest(request, { requireSuperAdmin: true })
 
     const startedAt = Date.now()
 
@@ -205,13 +211,33 @@ export async function GET(request: Request) {
       },
     ]
 
+    const providerDiagnostics = getProviderDiagnostics()
+    const securityAndAccess = getSecurityAccessReadiness({
+      role: user.role,
+      email: user.email,
+      dbConnected: true,
+      inviteCount,
+    })
+    const productModules = getModuleReadiness({
+      role: user.role,
+      email: user.email,
+      dbConnected: true,
+      inviteCount,
+    })
+    const launchEvidence = getLaunchEvidence()
+
     return NextResponse.json({
       readiness,
       watchlist,
       aiProviders,
       billingProviders: billingProviderReadiness,
+      securityAndAccess,
+      providerDiagnostics,
+      productModules,
+      launchEvidence,
       meta: {
         inviteCount,
+        dbLatencyMs,
         largestWorkspace: largestWorkspace
           ? { name: largestWorkspace.name, users: largestWorkspace._count.users }
           : null,

@@ -1,20 +1,22 @@
 # Customer Demo Readiness Checklist
 
-Date: 2026-06-07
+Date: 2026-06-19
 
-| Page | Role | Expected behaviour | Demo risk | Pass / Fail | Evidence | Notes |
+| Page / flow | Role | Expected behaviour | Demo risk | Pass / Fail / Blocked | Evidence | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| Landing | public | Hero, proof, CTA, pricing honesty all feel credible | Medium |  |  |  |
-| Pricing | public | Sign-up CTA only, no implied live self-serve checkout | High |  |  |  |
-| Login | public | Auth works, no malformed responses | High |  |  |  |
-| Dashboard | authenticated | Civis Pulse loads with honest states | High |  |  |  |
-| AI assistant | authenticated | Deterministic commands navigate or log out correctly | High |  |  |  |
-| CRM | CRM user | Contacts / companies / deals persist after refresh | High |  |  |  |
-| Accounting | finance user | Invoices / expenses / approvals persist after refresh | High |  |  |  |
-| HR | HR manager | Confidential details visible only to authorized roles | High |  |  |  |
-| Operations | ops/admin | Approvals list and actions remain org-scoped | High |  |  |  |
-| Marketing | any allowed user | Preview-only messaging, no fake success | Medium |  |  |  |
-| Settings | authenticated | Supported settings persist, unsupported ones stay honest | Medium |  |  |  |
-| Admin | founder / org owner | Founder controls and workspace controls remain separated | High |  |  |  |
-| Locked states | restricted user | No details leak from dialogs, menus, or APIs | High |  |  |  |
-| Provider states | relevant role | Missing config fails safely and clearly | High |  |  |  |
+| Landing | Public | Premium, responsive, no fake claims, CTA links work | Medium |  |  |  |
+| Pricing | Public | Honest pricing, no implied live billing unless validated | High |  |  |  |
+| Login | Public | Real auth entry, no malformed response | High |  |  |  |
+| Dashboard | Authenticated | Civis Pulse loads with honest blockers and next actions | High |  |  |  |
+| Setup centre | Authenticated | Real statuses only, no manual fake completion | High |  |  |  |
+| AI assistant | Authenticated | Deterministic commands work; provider mode stays honest | High |  |  |  |
+| CRM | Workspace user | Contact/company/deal flow persists after refresh | High |  |  |  |
+| Accounting | Finance user | Invoices/expenses load; approval flow behaves honestly | High |  |  |  |
+| Operations | Ops/admin | Approval queue is org-scoped and persistent | High |  |  |  |
+| HR privacy | HR manager | Locked by default, unlocked only after valid PIN | High |  |  |  |
+| Accounting privacy | Finance manager | Locked by default, unlocked only after valid PIN | High |  |  |  |
+| Gallery | Allowed user | Upload succeeds if configured, fails clearly if not | Medium |  |  |  |
+| Settings | Authenticated | Supported settings persist or fail honestly | Medium |  |  |  |
+| Admin | Founder / org owner | Founder and workspace admin experiences remain separated | High |  |  |  |
+| Launch readiness | Founder | Provider diagnostics and evidence gaps visible, no secret leak | High |  |  |  |
+| Marketing | Any allowed user | Preview-only state is explicit, no fake success | Medium |  |  |  |

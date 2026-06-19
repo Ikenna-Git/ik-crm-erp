@@ -21,6 +21,7 @@ import {
   Sparkles,
   Mail,
   ShieldCheck,
+  Rocket,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { hasModuleAccess, type AccessModule } from "@/lib/access-control"
@@ -28,6 +29,7 @@ import { isAdmin } from "@/lib/authz"
 
 const baseNavigation = [
   { section: "Command", name: "Overview", href: "/dashboard", icon: BarChart3, module: "overview" as AccessModule },
+  { section: "Command", name: "Setup", href: "/dashboard/setup", icon: Rocket, module: "overview" as AccessModule },
   { section: "Command", name: "Civis Guide", href: "/dashboard/ai", icon: Sparkles, module: "ai" as AccessModule },
   { section: "Revenue", name: "CRM", href: "/dashboard/crm", icon: Users, module: "crm" as AccessModule },
   { section: "Revenue", name: "Marketing", href: "/dashboard/marketing", icon: Mail, module: "marketing" as AccessModule },
