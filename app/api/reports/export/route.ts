@@ -5,7 +5,7 @@ import { buildAccountingRows, buildCrmRows, buildVatRows, buildAuditRows } from 
 import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
 import { createAuditLog } from "@/lib/audit"
-import { isPrivacyUnlocked } from "@/lib/privacy-lock"
+import { isPrivacyUnlockedForOrg } from "@/lib/privacy-lock"
 
 const REQUIRED_ENVS = ["SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASS", "SMTP_FROM"] as const
 
@@ -50,7 +50,10 @@ export async function POST(request: Request) {
 
     const { org, user } = await requireModuleAccess(request, exportAccess.module, exportAccess.level)
 
-    if (exportAccess.module === "accounting" && !isPrivacyUnlocked(request, "accounting")) {
+    if (
+      exportAccess.module === "accounting" &&
+      !(await isPrivacyUnlockedForOrg({ request, orgId: org.id, module: "accounting" }))
+    ) {
       return NextResponse.json(
         { error: "Accounting privacy is locked. Unlock Accounting privacy before exporting sensitive finance data." },
         { status: 423 },

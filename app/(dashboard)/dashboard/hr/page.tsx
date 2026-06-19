@@ -24,6 +24,7 @@ import { HrQualityScorecard } from "@/components/hr/hr-quality-scorecard"
 import { CompliancePack } from "@/components/hr/compliance-pack"
 import { PrivacyLockPanel } from "@/components/shared/privacy-lock-panel"
 import { hasModuleAccess } from "@/lib/access-control"
+import { isAdmin } from "@/lib/authz"
 
 const today = () => new Date().toISOString().slice(0, 10)
 const toDateString = (value?: string | null) => (value ? String(value).slice(0, 10) : today())
@@ -545,7 +546,13 @@ export default function HRPage() {
         statusMessage={privacyMessage}
         unlockedDescription="HR unlocked for this session. Employee and payroll details are visible again for authorized users."
         cannotUnlockMessage="Your role cannot unlock this privacy lock."
-        notConfiguredMessage="HR_PRIVACY_PIN is not configured."
+        notConfiguredMessage={
+          isAdmin(session?.user?.role)
+            ? "HR privacy PIN is not configured for this organisation."
+            : "HR privacy PIN is not configured for this organisation. Ask an organisation owner/admin to set it in Workspace Admin Center → Privacy Locks."
+        }
+        notConfiguredActionHref={isAdmin(session?.user?.role) ? "/dashboard/admin#privacy-locks" : undefined}
+        notConfiguredActionLabel={isAdmin(session?.user?.role) ? "Set HR privacy PIN" : undefined}
         loadingMessage="Checking privacy state..."
         onUnlock={unlockPrivacy}
         onLockAgain={lockPrivacyAgain}

@@ -38,7 +38,6 @@ const signalPaths = [
   { id: "lead", from: { x: 50, y: 8 }, mid: { x: 58, y: 22 }, to: { x: 50, y: 50 }, delay: "0s", label: "Lead" },
   { id: "invoice", from: { x: 50, y: 50 }, mid: { x: 68, y: 36 }, to: { x: 83, y: 28 }, delay: "1.25s", label: "Invoice" },
   { id: "approval", from: { x: 83, y: 28 }, mid: { x: 83, y: 46 }, to: { x: 83, y: 67 }, delay: "2.1s", label: "Approval" },
-  { id: "task", from: { x: 83, y: 67 }, mid: { x: 67, y: 75 }, to: { x: 50, y: 87 }, delay: "3.2s", label: "Task" },
 ]
 
 const trustCards = [
@@ -68,6 +67,7 @@ export function OperatingEngineVisual() {
     let nextX = 0
     let nextY = 0
     let active = false
+    let rect = shell.getBoundingClientRect()
 
     const update = () => {
       frameRef.current = null
@@ -76,12 +76,15 @@ export function OperatingEngineVisual() {
       shell.style.setProperty("--my", `${nextY}px`)
     }
 
+    const syncRect = () => {
+      rect = shell.getBoundingClientRect()
+    }
+
     const onMove = (event: PointerEvent) => {
-      const rect = shell.getBoundingClientRect()
       const x = event.clientX - rect.left
       const y = event.clientY - rect.top
-      const offsetX = ((x / rect.width) - 0.5) * 18
-      const offsetY = ((y / rect.height) - 0.5) * 18
+      const offsetX = ((x / rect.width) - 0.5) * 12
+      const offsetY = ((y / rect.height) - 0.5) * 12
       nextX = offsetX
       nextY = offsetY
       shell.style.setProperty("--glow-x", `${Math.max(0, Math.min(100, (x / rect.width) * 100))}%`)
@@ -99,12 +102,31 @@ export function OperatingEngineVisual() {
       if (frameRef.current == null) frameRef.current = window.requestAnimationFrame(update)
     }
 
+    const onEnter = () => syncRect()
+    const onResize = () => syncRect()
+    const onVisibility = () => {
+      if (document.hidden) {
+        active = false
+        nextX = 0
+        nextY = 0
+        shell.style.setProperty("--mx", "0px")
+        shell.style.setProperty("--my", "0px")
+      }
+    }
+
+    syncRect()
+    shell.addEventListener("pointerenter", onEnter)
     shell.addEventListener("pointermove", onMove)
     shell.addEventListener("pointerleave", onLeave)
+    window.addEventListener("resize", onResize)
+    document.addEventListener("visibilitychange", onVisibility)
 
     return () => {
+      shell.removeEventListener("pointerenter", onEnter)
       shell.removeEventListener("pointermove", onMove)
       shell.removeEventListener("pointerleave", onLeave)
+      window.removeEventListener("resize", onResize)
+      document.removeEventListener("visibilitychange", onVisibility)
       if (frameRef.current != null) window.cancelAnimationFrame(frameRef.current)
     }
   }, [])
@@ -114,7 +136,7 @@ export function OperatingEngineVisual() {
       ref={shellRef}
       aria-hidden="true"
       data-cursor="card"
-      className="landing-engine relative isolate overflow-hidden rounded-[34px] border border-border/80 bg-[linear-gradient(160deg,rgba(255,255,255,0.96),rgba(241,245,249,0.72))] p-4 shadow-[0_32px_120px_rgba(15,23,42,0.14)] dark:bg-[linear-gradient(160deg,rgba(17,17,19,0.96),rgba(26,26,29,0.94))] sm:p-6"
+      className="landing-engine relative isolate overflow-hidden rounded-[34px] border border-border/80 bg-[linear-gradient(160deg,rgba(255,255,255,0.96),rgba(241,245,249,0.78))] p-4 shadow-[0_24px_72px_rgba(15,23,42,0.12)] dark:bg-[linear-gradient(160deg,rgba(17,17,19,0.96),rgba(26,26,29,0.94))] sm:p-6"
       style={
         {
           "--mx": "0px",
@@ -124,7 +146,7 @@ export function OperatingEngineVisual() {
         } as CSSProperties
       }
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_var(--glow-x)_var(--glow-y),rgba(76,139,255,0.18),transparent_22%),linear-gradient(180deg,rgba(76,139,255,0.06),transparent_40%),linear-gradient(90deg,rgba(61,214,140,0.06),transparent_38%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_var(--glow-x)_var(--glow-y),rgba(76,139,255,0.12),transparent_20%),linear-gradient(180deg,rgba(76,139,255,0.04),transparent_40%),linear-gradient(90deg,rgba(61,214,140,0.04),transparent_38%)]" />
       <div className="pointer-events-none absolute inset-0 opacity-55 [background-image:linear-gradient(rgba(148,163,184,0.15)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.15)_1px,transparent_1px)] [background-size:34px_34px] [mask-image:radial-gradient(circle_at_center,black,transparent_85%)]" />
 
       <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
@@ -133,9 +155,8 @@ export function OperatingEngineVisual() {
             className="absolute inset-0 transition-transform duration-300 ease-out"
             style={{ transform: "translate3d(calc(var(--mx) * -0.18), calc(var(--my) * -0.18), 0)" }}
           >
-            <div className="landing-ring absolute left-1/2 top-1/2 h-[76%] w-[76%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary/20" />
-            <div className="landing-ring absolute left-1/2 top-1/2 h-[58%] w-[58%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-accent/20 [animation-duration:22s]" />
-            <div className="landing-ring absolute left-1/2 top-1/2 h-[42%] w-[42%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-slate-400/20 [animation-duration:18s]" />
+            <div className="landing-ring absolute left-1/2 top-1/2 h-[72%] w-[72%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary/16" />
+            <div className="landing-ring absolute left-1/2 top-1/2 h-[48%] w-[48%] -translate-x-1/2 -translate-y-1/2 rounded-full border border-accent/16 [animation-duration:24s]" />
           </div>
 
           <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -149,8 +170,8 @@ export function OperatingEngineVisual() {
                     y1={node.y}
                     x2={target.x}
                     y2={target.y}
-                    stroke="rgba(100,116,139,0.34)"
-                    strokeWidth="0.28"
+                    stroke="rgba(100,116,139,0.26)"
+                    strokeWidth="0.22"
                     strokeDasharray="1.1 1.8"
                   />
                 )),
@@ -160,13 +181,13 @@ export function OperatingEngineVisual() {
                 <path
                   d={`M ${path.from.x} ${path.from.y} Q ${path.mid.x} ${path.mid.y} ${path.to.x} ${path.to.y}`}
                   fill="none"
-                  stroke="rgba(76,139,255,0.48)"
-                  strokeWidth="0.55"
+                  stroke="rgba(76,139,255,0.38)"
+                  strokeWidth="0.45"
                   strokeDasharray="1.8 1.8"
                 />
-                <circle r="1.15" fill="rgba(61,214,140,0.95)">
+                <circle r="0.85" fill="rgba(61,214,140,0.82)">
                   <animateMotion
-                    dur="6.8s"
+                    dur="8.5s"
                     begin={path.delay}
                     repeatCount="indefinite"
                     path={`M ${path.from.x} ${path.from.y} Q ${path.mid.x} ${path.mid.y} ${path.to.x} ${path.to.y}`}
@@ -180,7 +201,7 @@ export function OperatingEngineVisual() {
             className="absolute left-1/2 top-1/2 z-20 w-[min(74vw,320px)] -translate-x-1/2 -translate-y-1/2 transition-transform duration-300 ease-out"
             style={{ transform: "translate3d(calc(-50% + var(--mx) * 0.32), calc(-50% + var(--my) * 0.32), 0)" }}
           >
-            <div data-cursor="card" className="rounded-[30px] border border-primary/20 bg-slate-950 px-5 py-5 text-white shadow-[0_16px_70px_rgba(15,23,42,0.42)]">
+            <div data-cursor="card" className="rounded-[30px] border border-primary/20 bg-slate-950 px-5 py-5 text-white shadow-[0_16px_44px_rgba(15,23,42,0.3)]">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-slate-300">Civis operating engine</p>

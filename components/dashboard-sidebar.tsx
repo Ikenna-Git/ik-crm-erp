@@ -59,7 +59,7 @@ export function DashboardSidebar() {
           : "Workspace member"
   const navigation = [
     ...baseNavigation.filter((item) => hasModuleAccess(session?.user || {}, item.module, "view")),
-    ...(isAdmin(session?.user?.role) ? [{ name: "Admin", href: "/admin", icon: ShieldCheck }] : []),
+    ...(isAdmin(session?.user?.role) ? [{ name: "Admin", href: "/dashboard/admin", icon: ShieldCheck }] : []),
   ]
   const groupedNavigation = navigation.reduce<Record<string, typeof navigation>>((acc, item) => {
     const section = "section" in item && item.section ? item.section : "Admin"

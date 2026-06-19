@@ -212,18 +212,18 @@
 
   .landing-page-ambient {
     background:
-      radial-gradient(circle at 12% 14%, rgba(76, 139, 255, 0.1), transparent 24%),
-      radial-gradient(circle at 82% 8%, rgba(61, 214, 140, 0.1), transparent 18%),
-      radial-gradient(circle at 78% 72%, rgba(76, 139, 255, 0.09), transparent 24%);
+      radial-gradient(circle at 12% 14%, rgba(76, 139, 255, 0.08), transparent 22%),
+      radial-gradient(circle at 82% 8%, rgba(61, 214, 140, 0.08), transparent 16%),
+      radial-gradient(circle at 78% 72%, rgba(76, 139, 255, 0.07), transparent 22%);
   }
 
   .landing-hero-mesh {
     background:
-      radial-gradient(circle at 14% 18%, rgba(76, 139, 255, 0.17), transparent 26%),
-      radial-gradient(circle at 74% 20%, rgba(61, 214, 140, 0.1), transparent 18%),
-      radial-gradient(circle at 86% 76%, rgba(76, 139, 255, 0.14), transparent 22%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.36), transparent 55%);
-    animation: civis-glow-scan 16s ease-in-out infinite;
+      radial-gradient(circle at 14% 18%, rgba(76, 139, 255, 0.12), transparent 24%),
+      radial-gradient(circle at 74% 20%, rgba(61, 214, 140, 0.08), transparent 16%),
+      radial-gradient(circle at 86% 76%, rgba(76, 139, 255, 0.1), transparent 20%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.28), transparent 52%);
+    animation: civis-glow-scan 22s ease-in-out infinite;
   }
 
   .landing-engine::after {
@@ -234,14 +234,14 @@
     background-image:
       linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
       linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
-    background-size: 30px 30px;
-    animation: civis-grid-drift 20s linear infinite;
+    background-size: 34px 34px;
+    animation: civis-grid-drift 36s linear infinite;
     mask-image: radial-gradient(circle at center, black, transparent 82%);
-    opacity: 0.55;
+    opacity: 0.34;
   }
 
   .landing-ring {
-    animation: civis-orbit 26s linear infinite;
+    animation: civis-orbit 32s linear infinite;
     transform-origin: center;
   }
 
@@ -250,7 +250,7 @@
       transform 180ms ease,
       filter 180ms ease,
       opacity 180ms ease;
-    filter: drop-shadow(0 0 20px rgba(76, 139, 255, 0.18));
+    filter: drop-shadow(0 0 12px rgba(76, 139, 255, 0.14));
   }
 
   :root[data-cursor-style="command"] .civis-cursor-core {
@@ -269,13 +269,13 @@
 
   :root[data-cursor-state="link"] .civis-cursor-shell,
   :root[data-cursor-state="card"] .civis-cursor-shell {
-    transform: scale(1.16);
-    filter: drop-shadow(0 0 24px rgba(76, 139, 255, 0.28));
+    transform: scale(1.12);
+    filter: drop-shadow(0 0 14px rgba(76, 139, 255, 0.2));
   }
 
   :root[data-cursor-state="lock"] .civis-cursor-shell {
     transform: scale(0.94);
-    filter: grayscale(0.12) drop-shadow(0 0 18px rgba(239, 68, 68, 0.2));
+    filter: grayscale(0.12) drop-shadow(0 0 12px rgba(239, 68, 68, 0.16));
   }
 
   :root[data-cursor-state="lock"] .civis-cursor-core {

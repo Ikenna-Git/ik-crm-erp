@@ -1,14 +1,17 @@
 # P0 Next Action Checklist
 
 Date: 2026-06-19
-Branch: `p0-fix-privacy-pin-and-launch-readiness-sweep`
+Branch: `p0-permanent-admin-centre-privacy-pins-and-motion-performance`
 
 ## Immediate After Merge + Redeploy
 - [ ] Open `/admin/launch-readiness` as founder
 - [ ] Open `/dashboard/setup` as workspace admin or org owner
+- [ ] Open `/dashboard/admin` as workspace admin or org owner
 - [ ] Run `BASE_URL=https://ik-crm-erp.onrender.com P0_SMOKE_DEBUG=1 npm run p0:smoke`
 - [ ] Confirm `/api/admin/launch-readiness` is founder-protected
 - [ ] Confirm provider diagnostics show configured / partial / missing only, with no secret leakage
+- [ ] Confirm HR PIN can be set from `/dashboard/admin#privacy-locks`
+- [ ] Confirm Accounting PIN can be set from `/dashboard/admin#privacy-locks`
 - [ ] Confirm HR PIN field is typeable for an authorized HR role
 - [ ] Confirm Accounting PIN field is typeable for an authorized finance role
 
@@ -26,6 +29,7 @@ Branch: `p0-fix-privacy-pin-and-launch-readiness-sweep`
 - [ ] Org owner cannot access `/api/admin/orgs`
 - [ ] Org owner cannot access `/api/admin/platform-status`
 - [ ] Org owner sees only same-org users on `/admin/users`
+- [ ] Org owner sees privacy lock controls inside `/dashboard/admin`
 
 ## Restricted User Live Checks
 - [ ] Restricted user cannot access `/admin`
@@ -40,8 +44,10 @@ Branch: `p0-fix-privacy-pin-and-launch-readiness-sweep`
 - [ ] Accounting approvals: request, approve/reject, refresh confirms state
 - [ ] Operations approvals: pending list is org-scoped and final states cannot be replayed
 - [ ] HR privacy PIN: wrong PIN, correct PIN, re-lock
+- [ ] HR privacy PIN: rotate or force-lock invalidates old unlock session
 - [ ] HR privacy PIN: locked View Details stays protected
 - [ ] Accounting privacy PIN: wrong PIN, correct PIN, re-lock, exports respect lock
+- [ ] Accounting privacy PIN: rotate or force-lock invalidates old unlock session
 - [ ] Accounting privacy PIN: locked View Details stays protected
 - [ ] Civis Guide deterministic commands:
   - [ ] take me to pricing
@@ -72,3 +78,4 @@ Branch: `p0-fix-privacy-pin-and-launch-readiness-sweep`
 - [ ] Fake-data review recorded
 - [ ] Launch blocker register updated
 - [ ] Go-live decision updated from current evidence, not optimism
+- [ ] Landing performance checked with system cursor default and custom cursor opt-in

@@ -8,14 +8,14 @@ export const CIVIS_CURSOR_STORAGE_KEY = "civis_cursor_style"
 export const CIVIS_CURSOR_EVENT = "civis-cursor-style-change"
 
 const readStoredStyle = (): CursorStyle => {
-  if (typeof window === "undefined") return "command"
+  if (typeof window === "undefined") return "system"
   const raw = window.localStorage.getItem(CIVIS_CURSOR_STORAGE_KEY)
   if (raw === "system" || raw === "command" || raw === "precision") return raw
-  return "command"
+  return "system"
 }
 
 export function CivisCursor() {
-  const [style, setStyle] = useState<CursorStyle>("command")
+  const [style, setStyle] = useState<CursorStyle>("system")
   const cursorRef = useRef<HTMLDivElement | null>(null)
   const frameRef = useRef<number | null>(null)
   const pointRef = useRef({ x: 0, y: 0 })
@@ -44,7 +44,7 @@ export function CivisCursor() {
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)")
     const fine = window.matchMedia("(pointer: fine)")
-    const enabled = style !== "system" && fine.matches && !reduced.matches
+    const enabled = style !== "system" && fine.matches && !reduced.matches && !document.hidden
     enabledRef.current = enabled
     root.dataset.cursorStyle = enabled ? style : "system"
 

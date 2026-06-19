@@ -11,13 +11,15 @@ Date: 2026-06-19
    - Show Civis Pulse, setup blockers, and trust posture.
 4. `/dashboard/setup`
    - Show that setup status is evidence-driven, not manually checked off, and that configured does not mean proven.
-5. `/dashboard/crm`
+5. `/dashboard/admin`
+   - Show that organisation admins manage privacy locks, invites, access review, and offboarding inside Civis.
+6. `/dashboard/crm`
    - Show contact, company, and deal flow.
-6. `/dashboard/accounting`
+7. `/dashboard/accounting`
    - Show invoices/expenses and the Accounting privacy lock.
-7. `/dashboard/operations`
+8. `/dashboard/operations`
    - Show approvals and operational follow-through.
-8. `/admin/launch-readiness`
+9. `/admin/launch-readiness`
    - Show why Limited, Action Required, Missing, and Preview Only are intentionally honest launch labels.
 
 ## Best 7-Minute Founder / Investor Demo
@@ -35,6 +37,7 @@ Date: 2026-06-19
 - `open accounting`
 - `open HR`
 - `open settings`
+- `open admin`
 - `what should I do next?`
 - `what can I do here?`
 - `I'm lost`

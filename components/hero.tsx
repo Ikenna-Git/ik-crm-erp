@@ -77,7 +77,7 @@ export function Hero() {
         </div>
 
         <div className="relative">
-          <div data-cursor="card" className="absolute -left-5 top-6 hidden rounded-3xl border border-border/70 bg-background/85 p-4 shadow-xl backdrop-blur md:block">
+          <div data-cursor="card" className="absolute -left-5 top-6 hidden rounded-3xl border border-border/70 bg-background/90 p-4 shadow-lg md:block">
             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
               <Sparkles className="h-4 w-4 text-accent" />
               Ops summary
@@ -89,7 +89,7 @@ export function Hero() {
             <OperatingEngineVisual />
           </div>
 
-          <div data-cursor="card" className="absolute -bottom-5 right-0 hidden w-64 rounded-3xl border border-border/70 bg-background/90 p-4 shadow-xl backdrop-blur md:block">
+          <div data-cursor="card" className="absolute -bottom-5 right-0 hidden w-64 rounded-3xl border border-border/70 bg-background/92 p-4 shadow-lg md:block">
             <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Admin flow</p>
             <p className="mt-2 text-sm font-medium text-foreground">Privacy-aware by design for sensitive HR and Accounting records, with founder launch-readiness controls kept separate from workspace admin actions.</p>
           </div>

@@ -261,6 +261,8 @@ export function getProviderDiagnostics(): ProviderDiagnostic[] {
 
 export function getSecurityAccessReadiness(context: LaunchContext): ReadinessItem[] {
   const founder = canViewFounderControls(context.role, context.email)
+  const hrPinConfigured = (context.counts?.hrPrivacyConfigured || 0) > 0
+  const accountingPinConfigured = (context.counts?.accountingPrivacyConfigured || 0) > 0
   return [
     {
       id: "route-guards",
@@ -292,20 +294,28 @@ export function getSecurityAccessReadiness(context: LaunchContext): ReadinessIte
     {
       id: "hr-privacy-pin",
       label: "HR privacy PIN",
-      status: "limited",
-      reason: "HR privacy lock and API redaction exist; live locked, wrong-PIN, unlocked, and re-lock evidence is still required.",
-      nextAction: "Validate HR locked, wrong-PIN, unlocked, View Details, and re-lock behaviour.",
+      status: hrPinConfigured ? "limited" : "action-required",
+      reason: hrPinConfigured
+        ? "HR privacy PIN is managed per organisation. Validate locked, wrong-PIN, unlocked, and re-lock evidence before calling it ready."
+        : "HR privacy PIN is not configured for this organisation yet. Set it in Workspace Admin Center → Privacy Locks.",
+      nextAction: hrPinConfigured
+        ? "Validate HR locked, wrong-PIN, unlocked, View Details, and re-lock behaviour."
+        : "Open Workspace Admin Center → Privacy Locks and configure the HR privacy PIN.",
       evidenceNote: "Action required.",
-      href: "/dashboard/hr",
+      href: "/dashboard/admin#privacy-locks",
     },
     {
       id: "accounting-privacy-pin",
       label: "Accounting privacy PIN",
-      status: "limited",
-      reason: "Accounting privacy lock and API redaction exist; live locked, wrong-PIN, unlocked, export, approval, and re-lock evidence is still required.",
-      nextAction: "Validate Accounting locked, wrong-PIN, unlocked, View Details, exports, approvals, and re-lock behaviour.",
+      status: accountingPinConfigured ? "limited" : "action-required",
+      reason: accountingPinConfigured
+        ? "Accounting privacy PIN is managed per organisation. Validate locked/unlocked/export/approval evidence before treating it as ready."
+        : "Accounting privacy PIN is not configured for this organisation yet. Set it in Workspace Admin Center → Privacy Locks.",
+      nextAction: accountingPinConfigured
+        ? "Validate Accounting locked, wrong-PIN, unlocked, View Details, exports, approvals, and re-lock behaviour."
+        : "Open Workspace Admin Center → Privacy Locks and configure the Accounting privacy PIN.",
       evidenceNote: "Action required.",
-      href: "/dashboard/accounting",
+      href: "/dashboard/admin#privacy-locks",
     },
     {
       id: "founder-boundary",
@@ -315,6 +325,15 @@ export function getSecurityAccessReadiness(context: LaunchContext): ReadinessIte
       nextAction: "Use the org-owner account for a fresh live regression pass.",
       evidenceNote: "Fresh evidence still required after redeploy.",
       href: founder ? "/admin/system" : "/dashboard/admin",
+    },
+    {
+      id: "workspace-admin-controls",
+      label: "Workspace admin controls",
+      status: "limited",
+      reason: "Privacy locks, offboarding guidance, and role review now live inside Workspace Admin Center, but browser validation still needs capture.",
+      nextAction: "Validate privacy-lock management, offboarding checklist usage, and role review links in Workspace Admin Center.",
+      evidenceNote: "Action required.",
+      href: "/dashboard/admin",
     },
   ]
 }
@@ -542,7 +561,70 @@ export function getWorkspaceSetupItems(context: LaunchContext): ReadinessItem[] 
           ? "This workspace already has more than one user."
           : "A second user is needed to validate org-scoped onboarding and admin boundaries.",
       nextAction: "Invite one teammate using workspace admin controls.",
-      href: "/dashboard/settings",
+      href: "/dashboard/admin",
+    },
+    {
+      id: "hr-privacy-pin",
+      label: "Set HR privacy PIN",
+      status: (counts.hrPrivacyConfigured || 0) > 0 ? "ready" : "action-required",
+      reason:
+        (counts.hrPrivacyConfigured || 0) > 0
+          ? "HR privacy PIN is configured for this organisation."
+          : "HR privacy PIN must be managed inside Civis, not through hidden deployment setup.",
+      nextAction:
+        (counts.hrPrivacyConfigured || 0) > 0
+          ? "Validate locked, wrong-PIN, unlocked, and re-lock behaviour in HR."
+          : "Open Workspace Admin Center → Privacy Locks and set the HR PIN.",
+      href: "/dashboard/admin#privacy-locks",
+    },
+    {
+      id: "accounting-privacy-pin",
+      label: "Set Accounting privacy PIN",
+      status: (counts.accountingPrivacyConfigured || 0) > 0 ? "ready" : "action-required",
+      reason:
+        (counts.accountingPrivacyConfigured || 0) > 0
+          ? "Accounting privacy PIN is configured for this organisation."
+          : "Accounting privacy PIN must be managed per organisation inside Civis before sensitive finance data is treated as ready.",
+      nextAction:
+        (counts.accountingPrivacyConfigured || 0) > 0
+          ? "Validate locked, wrong-PIN, unlocked, export, approval, and re-lock behaviour in Accounting."
+          : "Open Workspace Admin Center → Privacy Locks and set the Accounting PIN.",
+      href: "/dashboard/admin#privacy-locks",
+    },
+    {
+      id: "review-hr-access",
+      label: "Review HR access",
+      status: "action-required",
+      reason: "Confirm which workspace users can manage HR data before launch and after staff changes.",
+      nextAction: "Open Workspace Admin Center and review HR-access users plus role assignments.",
+      href: "/dashboard/admin#roles-and-permissions",
+    },
+    {
+      id: "review-accounting-access",
+      label: "Review Accounting access",
+      status: "action-required",
+      reason: "Confirm which users can unlock Accounting privacy, approve finance work, and export sensitive data.",
+      nextAction: "Open Workspace Admin Center and review Accounting access, approvals, and exports.",
+      href: "/dashboard/admin#roles-and-permissions",
+    },
+    {
+      id: "review-admin-users",
+      label: "Review admin users",
+      status: (counts.users || 0) > 1 ? "limited" : "action-required",
+      reason:
+        (counts.users || 0) > 1
+          ? "More than one user exists, but privileged access still needs a human review."
+          : "You still need at least one additional user before admin-boundary review is meaningful.",
+      nextAction: "Review current admins, pending invites, and access profiles in Workspace Admin Center.",
+      href: "/dashboard/admin#users-and-invites",
+    },
+    {
+      id: "rotate-privacy-after-staff-change",
+      label: "Rotate privacy PINs after staff changes",
+      status: "action-required",
+      reason: "Offboarding sensitive staff should always include PIN rotation and force-lock of active unlock sessions.",
+      nextAction: "Use the Offboarding & Access Review checklist after HR or finance staffing changes.",
+      href: "/dashboard/admin#offboarding-and-access-review",
     },
     {
       id: "smtp",
@@ -555,7 +637,7 @@ export function getWorkspaceSetupItems(context: LaunchContext): ReadinessItem[] 
             ? "SMTP is still missing or partial, so email flows are not fully launch-ready."
             : "SMTP requires deployment-level configuration outside the normal workspace UI.",
       nextAction: isFounder ? "Finish SMTP config, then send a live invite or digest." : "Ask the founder/admin to complete SMTP setup.",
-      href: isFounder ? "/admin/launch-readiness" : "/dashboard/settings",
+      href: isFounder ? "/admin/launch-readiness" : "/dashboard/admin#setup-and-launch-readiness",
     },
     {
       id: "cloudinary",
@@ -583,7 +665,7 @@ export function getWorkspaceSetupItems(context: LaunchContext): ReadinessItem[] 
               ? "Rate limiting still needs deployment-level configuration."
               : "Remote rate-limit configuration requires founder/admin deployment access.",
       nextAction: isFounder ? "Finish or validate the shared rate-limit store." : "Ask the founder/admin to validate rate limiting.",
-      href: isFounder ? "/admin/launch-readiness" : "/dashboard/settings",
+      href: isFounder ? "/admin/launch-readiness" : "/dashboard/admin#setup-and-launch-readiness",
     },
     {
       id: "stripe",
@@ -605,17 +687,17 @@ export function getWorkspaceSetupItems(context: LaunchContext): ReadinessItem[] 
       id: "hr-pin",
       label: "Review HR privacy PIN",
       status: "action-required",
-      reason: "HR privacy lock exists, but the team still needs to validate unlock and re-lock behavior.",
+      reason: "HR privacy PIN is managed per organisation. Configure it in Privacy Locks and validate locked/unlocked evidence.",
       nextAction: "Validate wrong PIN, correct PIN, and re-lock behavior in HR.",
-      href: "/dashboard/hr",
+      href: "/dashboard/admin#privacy-locks",
     },
     {
       id: "accounting-pin",
       label: "Review Accounting privacy PIN",
       status: "action-required",
-      reason: "Accounting privacy lock exists, but final live validation is still required.",
+      reason: "Accounting privacy PIN is managed per organisation. Configure it in Privacy Locks and validate locked/unlocked/export/approval evidence.",
       nextAction: "Validate wrong PIN, correct PIN, exports, and re-lock behavior in Accounting.",
-      href: "/dashboard/accounting",
+      href: "/dashboard/admin#privacy-locks",
     },
     {
       id: "roles",
@@ -626,7 +708,7 @@ export function getWorkspaceSetupItems(context: LaunchContext): ReadinessItem[] 
           ? "Multiple users exist, but role/boundary validation still needs evidence."
           : "Role validation is difficult with only one user in the workspace.",
       nextAction: "Review workspace users and validate at least one non-founder account.",
-      href: "/admin/users",
+      href: "/dashboard/admin#roles-and-permissions",
     },
     {
       id: "first-approval",

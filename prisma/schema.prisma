@@ -48,6 +48,11 @@ enum ContactStatus {
   CUSTOMER
 }
 
+enum PrivacyLockModule {
+  hr
+  accounting
+}
+
 enum ExpenseStatus {
   PENDING
   APPROVED
@@ -144,6 +149,7 @@ model Org {
   automationWorkflows AutomationWorkflow[]
   webhookEndpoints WebhookEndpoint[]
   crmFields    CrmField[]
+  privacyLockSettings OrgPrivacyLockSetting[]
 }
 
 model User {
@@ -181,6 +187,27 @@ model User {
   portalUpdates ClientPortalUpdate[]
   accounts Account[]
   sessions Session[]
+  updatedPrivacyLockSettings OrgPrivacyLockSetting[] @relation("PrivacyLockUpdatedBy")
+  rotatedPrivacyLockSettings OrgPrivacyLockSetting[] @relation("PrivacyLockRotatedBy")
+  @@index([orgId])
+}
+
+model OrgPrivacyLockSetting {
+  id                  String            @id @default(uuid())
+  org                 Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  orgId               String
+  module              PrivacyLockModule
+  pinHash             String
+  pinVersion          Int               @default(1)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  updatedByUser       User?             @relation("PrivacyLockUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  updatedByUserId     String?
+  lastRotatedAt       DateTime?
+  lastRotatedByUser   User?             @relation("PrivacyLockRotatedBy", fields: [lastRotatedByUserId], references: [id], onDelete: SetNull)
+  lastRotatedByUserId String?
+
+  @@unique([orgId, module])
   @@index([orgId])
 }
 

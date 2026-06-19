@@ -13,7 +13,7 @@ const options: Array<{ value: CursorStyle; label: string }> = [
 ]
 
 export function CursorStyleToggle() {
-  const [value, setValue] = useState<CursorStyle>("command")
+  const [value, setValue] = useState<CursorStyle>("system")
   const [enabled, setEnabled] = useState(true)
 
   useEffect(() => {
@@ -49,7 +49,7 @@ export function CursorStyleToggle() {
             Experience cursor
           </p>
           <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-            Optional on desktop pointer devices only. Inputs and text fields keep the normal system cursor.
+            System cursor is the default. Civis cursor styles stay optional on desktop pointer devices only, and text inputs keep the normal cursor.
           </p>
         </div>
         <span className="rounded-full bg-muted px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">

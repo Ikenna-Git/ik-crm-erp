@@ -4,7 +4,7 @@ Date: 2026-06-07
 Branch: `p0-automated-smoke-validation`
 
 Updated: 2026-06-19
-Launch-readiness branch: `p0-fix-privacy-pin-and-launch-readiness-sweep`
+Launch-readiness branch: `p0-permanent-admin-centre-privacy-pins-and-motion-performance`
 
 ## Current Access-Control Defect History
 
@@ -125,6 +125,7 @@ That is a connectivity limitation, not proof that the app failed its route check
 | Notifications persistence | No | Yes | Creation/read state is a write flow |
 | Billing / Stripe | Partial docs only | Yes | Remains blocked until Stripe test env is validated |
 | HR / Accounting privacy PIN inputs | No | Yes | Browser validation must confirm the PIN field is actually typeable and server-authorized |
+| Workspace Admin Center | No | Yes | Verify privacy lock management, access review links, and offboarding guidance in browser |
 
 ## P0 Areas To Validate
 

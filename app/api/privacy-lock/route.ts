@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server"
+
+import { createAuditLog } from "@/lib/audit"
 import { getUserFromRequest, isRequestUserError } from "@/lib/request-user"
 import {
+  buildSignedPrivacyUnlockCookie,
   canUnlockPrivacyModule,
   getPrivacyConfig,
+  getPrivacyLockStatusForOrg,
+  getPrivacyLocksAdminUrl,
+  getPrivacyUnlockCookieTtlSeconds,
   getPrivacyUnlockCookieName,
-  getPrivacyUnlockEnvKey,
-  isPrivacyUnlocked,
-  verifyPrivacyPin,
+  isPrivacyUnlockedForOrg,
+  verifyPrivacyPinForOrg,
 } from "@/lib/privacy-lock"
 
 const cookieBase = {
@@ -28,10 +33,16 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { user } = await getUserFromRequest(request)
+    const { org, user } = await getUserFromRequest(request)
     const canUnlock = canUnlockPrivacyModule(user, config.module)
-    const unlocked = canUnlock && isPrivacyUnlocked(request, config.module)
-    const configured = Boolean(process.env[config.envKey])
+    const [unlocked, status] = await Promise.all([
+      canUnlock ? isPrivacyUnlockedForOrg({ request, orgId: org.id, module: config.module }) : Promise.resolve(false),
+      getPrivacyLockStatusForOrg(org.id, config.module),
+    ])
+    const configured = status.configured
+
+    const adminMessage = `Set it in Civis from Workspace Admin Center → Privacy Locks.`
+    const memberMessage = `Ask an organisation owner/admin to set it in Workspace Admin Center → Privacy Locks.`
 
     return NextResponse.json({
       module: config.module,
@@ -39,8 +50,13 @@ export async function GET(request: Request) {
       unlocked,
       canUnlock,
       configured,
+      source: status.source,
+      pinVersion: status.pinVersion,
+      settingsUrl: getPrivacyLocksAdminUrl(),
       message: !configured
-        ? `${getPrivacyUnlockEnvKey(config.module)} is not configured.`
+        ? canUnlock
+          ? `${config.label} PIN is not configured for this organisation. ${adminMessage}`
+          : `${config.label} PIN is not configured for this organisation. ${memberMessage}`
         : canUnlock
           ? unlocked
             ? `${config.label} unlocked for this session.`
@@ -63,7 +79,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { user } = await getUserFromRequest(request)
+    const { org, user } = await getUserFromRequest(request)
     if (!canUnlockPrivacyModule(user, config.module)) {
       return NextResponse.json(
         { error: `You do not have permission to unlock ${config.label.toLowerCase()}.` },
@@ -71,9 +87,19 @@ export async function POST(request: Request) {
       )
     }
 
-    const pinCheck = verifyPrivacyPin(config.module, String(body.pin || ""))
+    const pinCheck = await verifyPrivacyPinForOrg({
+      orgId: org.id,
+      module: config.module,
+      candidate: String(body.pin || ""),
+    })
     if (pinCheck.reason === "missing") {
-      return NextResponse.json({ error: `${config.envKey} is not configured.` }, { status: 503 })
+      return NextResponse.json(
+        {
+          error: `${config.label} PIN is not configured for this organisation.`,
+          settingsUrl: getPrivacyLocksAdminUrl(),
+        },
+        { status: 503 },
+      )
     }
     if (!pinCheck.ok) {
       return NextResponse.json(
@@ -87,7 +113,27 @@ export async function POST(request: Request) {
       unlocked: true,
       message: `${config.label} unlocked for this session.`,
     })
-    response.cookies.set(getPrivacyUnlockCookieName(config.module), "1", cookieBase)
+    response.cookies.set(
+      getPrivacyUnlockCookieName(config.module),
+      buildSignedPrivacyUnlockCookie({
+        orgId: org.id,
+        module: config.module,
+        pinVersion: pinCheck.pinVersion ?? 0,
+        ttlSeconds: getPrivacyUnlockCookieTtlSeconds(),
+      }),
+      {
+        ...cookieBase,
+        maxAge: getPrivacyUnlockCookieTtlSeconds(),
+      },
+    )
+    await createAuditLog({
+      orgId: org.id,
+      userId: user.id,
+      action: `${config.module.toUpperCase()}_PRIVACY_UNLOCKED`,
+      entity: "OrgPrivacyLockSetting",
+      entityId: config.module,
+      metadata: { module: config.module, source: pinCheck.source },
+    })
     return response
   } catch (error) {
     if (isRequestUserError(error)) {
@@ -105,7 +151,7 @@ export async function DELETE(request: Request) {
   }
 
   try {
-    await getUserFromRequest(request)
+    const { org, user } = await getUserFromRequest(request)
     const response = NextResponse.json({
       module: config.module,
       unlocked: false,
@@ -114,6 +160,14 @@ export async function DELETE(request: Request) {
     response.cookies.set(getPrivacyUnlockCookieName(config.module), "", {
       ...cookieBase,
       maxAge: 0,
+    })
+    await createAuditLog({
+      orgId: org.id,
+      userId: user.id,
+      action: `${config.module.toUpperCase()}_PRIVACY_LOCKED`,
+      entity: "OrgPrivacyLockSetting",
+      entityId: config.module,
+      metadata: { module: config.module },
     })
     return response
   } catch (error) {

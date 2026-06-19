@@ -1,7 +1,7 @@
 # Live Evidence Capture Guide
 
 Date: 2026-06-19
-Branch: `p0-fix-privacy-pin-and-launch-readiness-sweep`
+Branch: `p0-permanent-admin-centre-privacy-pins-and-motion-performance`
 
 Use this guide after redeploy. Do not mark any item complete without the actual result and evidence note.
 
@@ -35,6 +35,7 @@ Use this guide after redeploy. Do not mark any item complete without the actual 
 | `/admin/system` | Org owner | Blocked / forbidden / redirect |  |  |  |  |  |
 | `/admin/launch-readiness` | Org owner | Blocked / forbidden / redirect |  |  |  |  |  |
 | `/admin/users` | Org owner | Same-org users only |  |  |  |  |  |
+| `/dashboard/admin` | Org owner or admin | Workspace Admin Center loads with users, privacy locks, setup, and offboarding sections |  |  |  |  |  |
 
 ## Restricted User Checks
 | Test | Role | Expected result | Actual result | Pass / Fail / Blocked | Screenshot / note | Date | Owner |
@@ -71,6 +72,7 @@ Use this guide after redeploy. Do not mark any item complete without the actual 
 | Correct PIN | Authorized HR role | HR unlocks only |  |  |  |  |  |
 | View Details while locked | Authorized HR role | Locked dialog shows protection message only |  |  |  |  |  |
 | Re-lock | Authorized HR role | Details hide again |  |  |  |  |  |
+| Rotate PIN | Org admin | Existing unlocked HR sessions become locked again |  |  |  |  |  |
 
 ## Accounting Privacy PIN
 | Test | Role | Expected result | Actual result | Pass / Fail / Blocked | Screenshot / note | Date | Owner |
@@ -80,6 +82,14 @@ Use this guide after redeploy. Do not mark any item complete without the actual 
 | Correct PIN | Authorized finance role | Accounting unlocks only |  |  |  |  |  |
 | View Details while locked | Authorized finance role | Locked dialog shows protection message only |  |  |  |  |  |
 | Re-lock | Authorized finance role | Details and exports respect lock again |  |  |  |  |  |
+| Rotate PIN | Org admin | Existing unlocked Accounting sessions become locked again |  |  |  |  |  |
+
+## Landing Performance
+| Test | Role | Expected result | Actual result | Pass / Fail / Blocked | Screenshot / note | Date | Owner |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `/` default cursor | Public | System cursor by default |  |  |  |  |  |
+| `/` custom cursor opt-in | Public desktop | Custom cursor only after user selection |  |  |  |  |  |
+| `/` reduced motion | Public with reduced motion | Custom cursor disabled and landing animation reduced |  |  |  |  |  |
 
 ## Civis Guide
 | Test | Role | Expected result | Actual result | Pass / Fail / Blocked | Screenshot / note | Date | Owner |
