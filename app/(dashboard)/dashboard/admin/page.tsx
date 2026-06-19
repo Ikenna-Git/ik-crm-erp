@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation"
+import { WorkspaceAdminCentre } from "@/components/admin/workspace-admin-centre"
 
-export default function LegacyAdminPage() {
-  redirect("/admin")
+export default function DashboardAdminPage() {
+  return <WorkspaceAdminCentre />
 }

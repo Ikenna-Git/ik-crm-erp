@@ -26,6 +26,7 @@ import { getSessionHeaders } from "@/lib/user-settings"
 import { formatNaira } from "@/lib/currency"
 import { toast } from "@/hooks/use-toast"
 import { hasModuleAccess } from "@/lib/access-control"
+import { isAdmin } from "@/lib/authz"
 
 const sectionLoader = (label: string) => () => <div className="text-sm text-muted-foreground">Loading {label}...</div>
 
@@ -938,7 +939,13 @@ export default function AccountingPage() {
         statusMessage={privacyMessage}
         unlockedDescription="Accounting unlocked for this session. Invoice, expense, approval, and export details are visible again for authorized users."
         cannotUnlockMessage="Your role cannot unlock this privacy lock."
-        notConfiguredMessage="ACCOUNTING_PRIVACY_PIN is not configured."
+        notConfiguredMessage={
+          isAdmin(session?.user?.role)
+            ? "Accounting privacy PIN is not configured for this organisation."
+            : "Accounting privacy PIN is not configured for this organisation. Ask an organisation owner/admin to set it in Workspace Admin Center → Privacy Locks."
+        }
+        notConfiguredActionHref={isAdmin(session?.user?.role) ? "/dashboard/admin#privacy-locks" : undefined}
+        notConfiguredActionLabel={isAdmin(session?.user?.role) ? "Set Accounting privacy PIN" : undefined}
         loadingMessage="Checking privacy state..."
         onUnlock={unlockPrivacy}
         onLockAgain={lockPrivacyAgain}

@@ -142,7 +142,8 @@ export default function SetupPage() {
               </div>
               <p className="mt-2 text-sm leading-7 text-muted-foreground">
                 Provider-backed items may still require founder deployment access. That is why they stay blocked or
-                action required here instead of pretending the workspace admin can finish them alone.
+                action required here instead of pretending the workspace admin can finish them alone. Organisation-owned
+                controls like privacy locks should now be completed from Workspace Admin Center inside Civis.
               </p>
             </div>
           </div>

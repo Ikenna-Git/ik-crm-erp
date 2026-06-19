@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useState } from "react"
 import { AlertTriangle, LockKeyhole, ShieldCheck, UnlockKeyhole } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -21,6 +22,8 @@ type PrivacyLockPanelProps = {
   unlockedDescription?: string
   cannotUnlockMessage?: string
   notConfiguredMessage?: string
+  notConfiguredActionHref?: string
+  notConfiguredActionLabel?: string
   loadingMessage?: string
   onUnlock: (pin: string) => Promise<void> | void
   onLockAgain: () => Promise<void> | void
@@ -41,6 +44,8 @@ export function PrivacyLockPanel({
   unlockedDescription,
   cannotUnlockMessage,
   notConfiguredMessage,
+  notConfiguredActionHref,
+  notConfiguredActionLabel,
   loadingMessage = "Checking privacy state...",
   onUnlock,
   onLockAgain,
@@ -78,7 +83,12 @@ export function PrivacyLockPanel({
 
         {!configured ? (
           <div className="rounded-2xl border border-dashed border-amber-500/40 bg-amber-500/5 p-4 text-sm text-amber-700 dark:text-amber-300">
-            {notConfiguredMessage || "This PIN is not configured yet."}
+            <p>{notConfiguredMessage || "This PIN is not configured yet."}</p>
+            {notConfiguredActionHref && notConfiguredActionLabel ? (
+              <Button asChild size="sm" variant="outline" className="mt-3 bg-transparent">
+                <Link href={notConfiguredActionHref}>{notConfiguredActionLabel}</Link>
+              </Button>
+            ) : null}
           </div>
         ) : null}
 

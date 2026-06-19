@@ -11,6 +11,9 @@ export function Footer() {
         <div className="mb-10">
           <CursorStyleToggle />
         </div>
+        <p className="mb-8 max-w-3xl text-sm text-muted-foreground">
+          Motion-heavy cursor effects are now opt-in so the landing page stays calmer by default on laptops and lower-power devices.
+        </p>
         <div className="grid md:grid-cols-5 gap-8 mb-12">
           {/* Brand */}
           <div className="md:col-span-1">

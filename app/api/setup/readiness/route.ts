@@ -14,12 +14,14 @@ export async function GET(request: Request) {
   try {
     const { org, user } = await getUserFromRequest(request)
 
-    const [contacts, companies, deals, users, approvals] = await Promise.all([
+    const [contacts, companies, deals, users, approvals, hrPrivacyLocks, accountingPrivacyLocks] = await Promise.all([
       prisma.contact.count({ where: { orgId: org.id } }),
       prisma.company.count({ where: { orgId: org.id } }),
       prisma.deal.count({ where: { orgId: org.id } }),
       prisma.user.count({ where: { orgId: org.id } }),
       listApprovalItemsForOrg(org.id).catch(() => []),
+      prisma.orgPrivacyLockSetting.count({ where: { orgId: org.id, module: "hr" } }),
+      prisma.orgPrivacyLockSetting.count({ where: { orgId: org.id, module: "accounting" } }),
     ])
 
     const setupItems = getWorkspaceSetupItems({
@@ -30,6 +32,8 @@ export async function GET(request: Request) {
         companies,
         deals,
         users,
+        hrPrivacyConfigured: hrPrivacyLocks,
+        accountingPrivacyConfigured: accountingPrivacyLocks,
         pendingApprovals: approvals.filter((item) => item.status === "pending").length,
         completedApprovals: approvals.filter((item) => item.status !== "pending").length,
       },

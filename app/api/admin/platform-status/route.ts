@@ -16,11 +16,11 @@ export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
 
   try {
-    const { user } = await requireAdminRequest(request, { requireSuperAdmin: true })
+    const { org, user } = await requireAdminRequest(request, { requireSuperAdmin: true })
 
     const startedAt = Date.now()
 
-    const [inviteCount, missingNotifyCount, suspendedOrgCount, archivedOrgCount, orgWorkflowSummary, privilegedWithout2FA, pendingUserActivations] = await Promise.all([
+    const [inviteCount, missingNotifyCount, suspendedOrgCount, archivedOrgCount, orgWorkflowSummary, privilegedWithout2FA, pendingUserActivations, hrPrivacyConfigured, accountingPrivacyConfigured] = await Promise.all([
       prisma.verificationToken.count({
         where: {
           identifier: { startsWith: "invite:" },
@@ -53,6 +53,8 @@ export async function GET(request: Request) {
           accounts: { none: {} },
         },
       }),
+      prisma.orgPrivacyLockSetting.count({ where: { orgId: org.id, module: "hr" } }),
+      prisma.orgPrivacyLockSetting.count({ where: { orgId: org.id, module: "accounting" } }),
     ])
 
     await withPrismaRetry("admin.platformStatus.health", () => prisma.$queryRaw`SELECT 1`, 2)
@@ -217,6 +219,10 @@ export async function GET(request: Request) {
       email: user.email,
       dbConnected: true,
       inviteCount,
+      counts: {
+        hrPrivacyConfigured,
+        accountingPrivacyConfigured,
+      },
     })
     const productModules = getModuleReadiness({
       role: user.role,

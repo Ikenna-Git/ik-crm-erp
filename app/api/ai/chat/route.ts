@@ -7,7 +7,7 @@ import { createAuditLog } from "@/lib/audit"
 import { prisma } from "@/lib/prisma"
 import { getRateLimitKey, rateLimit, retryAfterSeconds } from "@/lib/rate-limit"
 import { hasModuleAccess } from "@/lib/access-control"
-import { isPrivacyUnlocked } from "@/lib/privacy-lock"
+import { isPrivacyUnlockedForOrg } from "@/lib/privacy-lock"
 
 type AiMode = "qna" | "summary" | "email" | "tour"
 type AiAction = {
@@ -82,6 +82,8 @@ const buildSystemPrompt = (mode: AiMode, userName: string, orgName: string, know
     `Do not pretend an action completed unless Civis actually performed it. ` +
     `Respect role boundaries, org boundaries, and privacy locks for HR/payroll and Accounting. ` +
     `If HR or Accounting is locked, explain the lock clearly and only guide authorized users toward the correct module PIN unlock. ` +
+    `HR and Accounting privacy PINs are organisation-managed inside Workspace Admin Center → Privacy Locks, not a customer-facing deployment setting. ` +
+    `Knowing a privacy PIN does not grant role access, and PIN rotation is a standard offboarding step for sensitive teams. ` +
     `Keep responses concise but complete, and usually end with a useful next-step question. ` +
     `Use NGN for currency and address the user as ${userName}.`
   const modePrompt = {
@@ -389,7 +391,7 @@ const resolveGuidedHowTo = (prompt: string): DataResolution | null => {
   if (/unlock accounting|why can('?|’)t i see invoice|why can('?|’)t i see expense|why can('?|’)t i see finance/.test(value)) {
     return {
       message:
-        "Accounting is currently privacy locked. If you are authorized, unlock Accounting using the Accounting PIN. If the PIN field is disabled, refresh the page, sign in again, or contact your workspace admin because your role may not be allowed to unlock it. Until then, invoice and expense details stay protected. Would you like me to take you to Accounting now?",
+        "Accounting is currently privacy locked. If you are authorized, unlock Accounting using the Accounting PIN. If the PIN is not configured yet, ask an organisation owner/admin to set it in Workspace Admin Center → Privacy Locks. If the PIN field is disabled, your role may not be allowed to unlock it even if the PIN exists. Would you like me to take you to Accounting now?",
       action: moduleActions.accounting,
     }
   }
@@ -397,7 +399,7 @@ const resolveGuidedHowTo = (prompt: string): DataResolution | null => {
   if (/why can('?|’)t i see payroll|unlock hr|unlock payroll/.test(value)) {
     return {
       message:
-        "HR is currently privacy locked. If you are authorized, unlock HR using the HR PIN. If the PIN field is disabled, refresh the page, sign in again, or contact your workspace admin because your role may not be allowed to unlock it. Until then, employee and payroll details stay protected. Would you like me to open HR for you now?",
+        "HR is currently privacy locked. If you are authorized, unlock HR using the HR PIN. If the PIN is not configured yet, ask an organisation owner/admin to set it in Workspace Admin Center → Privacy Locks. If the PIN field is disabled, your role may not be allowed to unlock it even if the PIN exists. Would you like me to open HR for you now?",
       action: moduleActions.hr,
     }
   }
@@ -1151,9 +1153,14 @@ export async function POST(request: Request) {
       typeof body?.context?.currentPath === "string" && body.context.currentPath
         ? body.context.currentPath
         : request.headers.get("x-current-path") || "/dashboard"
-    const hrUnlocked = accessSubject ? hasModuleAccess(accessSubject, "hr", "manage") && isPrivacyUnlocked(request, "hr") : false
+    const hrUnlocked =
+      accessSubject && org
+        ? hasModuleAccess(accessSubject, "hr", "manage") && (await isPrivacyUnlockedForOrg({ request, orgId: org.id, module: "hr" }))
+        : false
     const financeUnlocked = accessSubject
-      ? hasModuleAccess(accessSubject, "accounting", "manage") && isPrivacyUnlocked(request, "accounting")
+      ? hasModuleAccess(accessSubject, "accounting", "manage") &&
+        org &&
+        (await isPrivacyUnlockedForOrg({ request, orgId: org.id, module: "accounting" }))
       : false
 
     if (requestedMode === "qna") {
