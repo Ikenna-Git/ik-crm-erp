@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
+import Link from "next/link"
 import { AlertTriangle, Bot, Building2, Copy, Cpu, Mail, ShieldCheck, Sparkles } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -232,6 +233,15 @@ export default function AdminSystemPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-50">
+              <p className="font-medium text-white">Launch approval lives in the dedicated readiness centre.</p>
+              <p className="mt-2 text-emerald-100/90">
+                Use Launch Readiness for provider diagnostics, evidence gaps, and module-by-module launch posture.
+              </p>
+              <Button asChild className="mt-4">
+                <Link href="/admin/launch-readiness">Open launch readiness</Link>
+              </Button>
+            </div>
             {statusLoading ? (
               <p className="text-sm text-slate-300">Loading founder status...</p>
             ) : (

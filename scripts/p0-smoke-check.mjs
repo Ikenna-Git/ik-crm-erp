@@ -103,6 +103,22 @@ const pushResult = (status, area, item, detail, route = "", extra = {}) => {
   results.push({ status, area, item, detail, route, ...extra })
 }
 
+const hasSensitiveLeak = (value) => {
+  if (!value || typeof value !== "object") return false
+  if (Array.isArray(value)) return value.some((item) => hasSensitiveLeak(item))
+  return Object.entries(value).some(([key, item]) => {
+    const lowered = key.toLowerCase()
+    if (
+      ["secret", "token", "password", "apikey", "api_key", "privatekey", "private_key", "dsn"].includes(lowered) &&
+      typeof item === "string" &&
+      item.trim()
+    ) {
+      return true
+    }
+    return typeof item === "object" && item !== null ? hasSensitiveLeak(item) : false
+  })
+}
+
 const requestOnce = async (path, options = {}) => {
   const controller = new AbortController()
   const startedAt = Date.now()
@@ -247,6 +263,53 @@ const expectWithCookie = async ({ path, area, item, cookie, expectedStatuses, bl
   )
 }
 
+const expectJsonWithCookie = async ({ path, area, item, cookie, validate }) => {
+  if (!cookie) {
+    pushResult("BLOCKED", area, item, "MISSING_COOKIE :: Cookie env for this role check was not provided", path, {
+      reason: "MISSING_COOKIE",
+    })
+    return
+  }
+
+  const result = await requestWithRetry(path, {
+    headers: {
+      cookie,
+    },
+  })
+
+  if (!result.ok) {
+    pushResult("BLOCKED", area, item, formatNetworkDetail(result), path, { reason: result.reason })
+    return
+  }
+
+  const res = result.response
+  let payload = null
+  try {
+    payload = await res.json()
+  } catch {
+    pushResult("FAIL", area, item, `Expected JSON response :: status=${res.status} :: elapsed=${formatElapsed(result.elapsedMs)}`, path)
+    return
+  }
+
+  if (!res.ok) {
+    pushResult("FAIL", area, item, formatResponseDetail({ label: "Expected success JSON, got", res, elapsedMs: result.elapsedMs }), path)
+    return
+  }
+
+  if (hasSensitiveLeak(payload)) {
+    pushResult("FAIL", area, item, `Secret-like key detected in JSON payload :: status=${res.status} :: elapsed=${formatElapsed(result.elapsedMs)}`, path)
+    return
+  }
+
+  const validation = validate(payload)
+  if (!validation.ok) {
+    pushResult("FAIL", area, item, `${validation.detail} :: elapsed=${formatElapsed(result.elapsedMs)}`, path)
+    return
+  }
+
+  pushResult("PASS", area, item, `Validated JSON shape :: status=${res.status} :: elapsed=${formatElapsed(result.elapsedMs)}`, path)
+}
+
 const runWarmup = async () => {
   const warmup = await requestWithRetry("/")
   if (!warmup.ok) {
@@ -281,11 +344,17 @@ const run = async () => {
 
     await expectProtectedBlocked("/dashboard", "Auth and access", "Logged-out dashboard access is blocked")
     await expectProtectedBlocked("/admin", "Auth and access", "Logged-out admin access is blocked")
+    await expectProtectedBlocked("/admin/system", "Auth and access", "Logged-out founder system page access is blocked")
     await expectProtectedBlocked("/api/admin/orgs", "Admin and org boundary", "Logged-out admin org API access is blocked")
     await expectProtectedBlocked(
       "/api/admin/platform-status",
       "Admin and org boundary",
       "Logged-out platform status API access is blocked",
+    )
+    await expectProtectedBlocked(
+      "/api/admin/launch-readiness",
+      "Admin and org boundary",
+      "Logged-out launch readiness API access is blocked",
     )
   } else {
     markBlockedByWarmup("/", "Public routes", "Homepage loads", warmup.result)
@@ -293,11 +362,18 @@ const run = async () => {
     markBlockedByWarmup("/pricing", "Billing", "Pricing page loads", warmup.result)
     markBlockedByWarmup("/dashboard", "Auth and access", "Logged-out dashboard access is blocked", warmup.result)
     markBlockedByWarmup("/admin", "Auth and access", "Logged-out admin access is blocked", warmup.result)
+    markBlockedByWarmup("/admin/system", "Auth and access", "Logged-out founder system page access is blocked", warmup.result)
     markBlockedByWarmup("/api/admin/orgs", "Admin and org boundary", "Logged-out admin org API access is blocked", warmup.result)
     markBlockedByWarmup(
       "/api/admin/platform-status",
       "Admin and org boundary",
       "Logged-out platform status API access is blocked",
+      warmup.result,
+    )
+    markBlockedByWarmup(
+      "/api/admin/launch-readiness",
+      "Admin and org boundary",
+      "Logged-out launch readiness API access is blocked",
       warmup.result,
     )
   }
@@ -324,6 +400,33 @@ const run = async () => {
       cookie: cookieEnv.founder,
       expectedStatuses: [200],
     })
+    await expectJsonWithCookie({
+      path: "/api/admin/platform-status",
+      area: "Admin and org boundary",
+      item: "Founder platform status API returns safe provider diagnostics",
+      cookie: cookieEnv.founder,
+      validate: (payload) => {
+        if (!Array.isArray(payload?.providerDiagnostics)) {
+          return { ok: false, detail: "providerDiagnostics array missing" }
+        }
+        if (!Array.isArray(payload?.securityAndAccess)) {
+          return { ok: false, detail: "securityAndAccess array missing" }
+        }
+        return { ok: true }
+      },
+    })
+    await expectJsonWithCookie({
+      path: "/api/admin/launch-readiness",
+      area: "Admin and org boundary",
+      item: "Founder launch readiness API returns safe launch sections",
+      cookie: cookieEnv.founder,
+      validate: (payload) => {
+        if (!Array.isArray(payload?.launchEvidence) || !Array.isArray(payload?.productModules)) {
+          return { ok: false, detail: "launch readiness sections missing" }
+        }
+        return { ok: true }
+      },
+    })
 
     await expectWithCookie({
       path: "/admin/system",
@@ -347,6 +450,13 @@ const run = async () => {
       blockedStatuses: [401, 403],
     })
     await expectWithCookie({
+      path: "/api/admin/launch-readiness",
+      area: "Admin and org boundary",
+      item: "Org owner cannot access launch readiness API",
+      cookie: cookieEnv.orgOwner,
+      blockedStatuses: [401, 403],
+    })
+    await expectWithCookie({
       path: "/admin/users",
       area: "Admin and org boundary",
       item: "Org owner can access workspace users page",
@@ -358,9 +468,12 @@ const run = async () => {
       ["Founder can access admin root", "/admin"],
       ["Founder can access system page", "/admin/system"],
       ["Founder can access platform org API", "/api/admin/orgs"],
+      ["Founder platform status API returns safe provider diagnostics", "/api/admin/platform-status"],
+      ["Founder launch readiness API returns safe launch sections", "/api/admin/launch-readiness"],
       ["Org owner cannot access system page", "/admin/system"],
       ["Org owner cannot access platform org API", "/api/admin/orgs"],
       ["Org owner cannot access platform status API", "/api/admin/platform-status"],
+      ["Org owner cannot access launch readiness API", "/api/admin/launch-readiness"],
       ["Org owner can access workspace users page", "/admin/users"],
     ]) {
       markBlockedByWarmup(roleCheck[1], "Admin and org boundary", roleCheck[0], warmup.result)
@@ -410,24 +523,39 @@ const run = async () => {
     "Manual validation required because notification creation is a write operation",
   )
   pushResult(
-    "BLOCKED",
+    "WARNING",
     "Environment validation",
     "Server-side env presence",
-    "Remote server env values cannot be verified safely from this script; use the evidence pack checklist",
+    "Provider configuration still needs manual review in the launch readiness centre; the smoke script checks only safe route behavior and response shape.",
+  )
+  pushResult(
+    "WARNING",
+    "Marketing",
+    "Preview-only status",
+    "Marketing remains preview-only and should stay clearly labeled during live validation.",
+    "/dashboard/marketing",
+  )
+  pushResult(
+    "WARNING",
+    "Launch evidence",
+    "Fresh live evidence still required",
+    "Smoke pass alone is not launch approval. Invite, CRM, approvals, privacy locks, and backup evidence still need manual confirmation.",
   )
 
   let failed = 0
   let blocked = 0
+  let warnings = 0
 
   for (const result of results) {
     if (result.status === "FAIL") failed += 1
     if (result.status === "BLOCKED") blocked += 1
+    if (result.status === "WARNING") warnings += 1
     const routeSuffix = result.route ? ` [${result.route}]` : ""
     console.log(`${result.status} ${result.area} :: ${result.item}${routeSuffix} :: ${result.detail}`)
   }
 
   console.log("")
-  console.log(`Summary: ${results.length} checks, ${failed} fail, ${blocked} blocked`)
+  console.log(`Summary: ${results.length} checks, ${failed} fail, ${blocked} blocked, ${warnings} warning`)
 
   if (failed > 0) {
     process.exit(1)

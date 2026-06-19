@@ -6,7 +6,7 @@ import Link from "next/link"
 import { useEffect, useMemo } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
-import { ArrowLeftRight, Building2, Cpu, CreditCard, LockKeyhole, ShieldCheck, Users } from "lucide-react"
+import { AlertTriangle, ArrowLeftRight, Building2, Cpu, CreditCard, LockKeyhole, ShieldCheck, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -20,6 +20,7 @@ const navItems = [
   { href: "/admin/billing", label: "Billing", icon: CreditCard, superOnly: false },
   { href: "/admin/security", label: "Risk & Access", icon: LockKeyhole, superOnly: false },
   { href: "/admin/system", label: "Founder Desk", icon: Cpu, superOnly: true },
+  { href: "/admin/launch-readiness", label: "Launch Readiness", icon: AlertTriangle, superOnly: true },
 ]
 
 export function AdminShell({ children }: { children: React.ReactNode }) {

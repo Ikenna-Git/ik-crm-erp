@@ -12,9 +12,7 @@ import { getSessionHeaders } from "@/lib/user-settings"
 import { KPI_CATALOG, getDefaultKpis } from "@/lib/kpis"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Progress } from "@/components/ui/progress"
 import { useSession } from "next-auth/react"
-import { DEFAULT_ONBOARDING_TASKS, type OnboardingTask } from "@/lib/user-settings"
 import { PremiumEmptyState } from "@/components/shared/premium-empty-state"
 import { canViewFounderControls } from "@/lib/authz"
 
@@ -71,6 +69,19 @@ type RecentActivityItem = {
   status: keyof typeof activityStatusStyles
 }
 
+type SetupItem = {
+  id: string
+  label: string
+  status: string
+  reason: string
+  nextAction: string
+  href?: string
+}
+
+type SetupReadinessResponse = {
+  setupItems: SetupItem[]
+}
+
 export default function DashboardPage() {
   const { data: session } = useSession()
   const role = session?.user?.role
@@ -79,8 +90,8 @@ export default function DashboardPage() {
   const [kpiDialogOpen, setKpiDialogOpen] = useState(false)
   const [kpiError, setKpiError] = useState("")
   const [kpiSaving, setKpiSaving] = useState(false)
-  const [onboarding, setOnboarding] = useState<OnboardingTask[]>(DEFAULT_ONBOARDING_TASKS)
-  const [onboardingError, setOnboardingError] = useState("")
+  const [setupReadiness, setSetupReadiness] = useState<SetupReadinessResponse | null>(null)
+  const [setupError, setSetupError] = useState("")
 
   const commandState = useCachedFetch(
     "civis_dashboard_command_live",
@@ -116,7 +127,6 @@ export default function DashboardPage() {
           const defaults = getDefaultKpis(role)
           setKpiLayout(defaults)
           setKpiDraft(defaults)
-          setOnboarding(DEFAULT_ONBOARDING_TASKS)
           return
         }
         const data = await res.json().catch(() => ({}))
@@ -124,22 +134,36 @@ export default function DashboardPage() {
         const incoming = Array.isArray(data.kpis) && data.kpis.length ? data.kpis : getDefaultKpis(role)
         setKpiLayout(incoming)
         setKpiDraft(incoming)
-        if (Array.isArray(data.onboarding) && data.onboarding.length) {
-          setOnboarding(data.onboarding)
-        } else {
-          setOnboarding(DEFAULT_ONBOARDING_TASKS)
-        }
       } catch (err: any) {
         setKpiError(err?.message || "Failed to load KPI settings")
         const defaults = getDefaultKpis(role)
         setKpiLayout(defaults)
         setKpiDraft(defaults)
-        setOnboarding(DEFAULT_ONBOARDING_TASKS)
-        setOnboardingError("Failed to load onboarding checklist")
       }
     }
     loadKpis()
   }, [role])
+
+  useEffect(() => {
+    const loadSetup = async () => {
+      try {
+        setSetupError("")
+        const res = await fetch("/api/setup/readiness", { headers: { ...getSessionHeaders() } })
+        if (res.status === 503) {
+          setSetupReadiness({ setupItems: [] })
+          return
+        }
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data?.error || "Failed to load setup readiness")
+        setSetupReadiness(data)
+      } catch (err: any) {
+        setSetupError(err?.message || "Failed to load setup readiness")
+        setSetupReadiness({ setupItems: [] })
+      }
+    }
+
+    loadSetup()
+  }, [])
 
   useEffect(() => {
     if (kpiDialogOpen) {
@@ -168,8 +192,9 @@ export default function DashboardPage() {
     setKpiDraft((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]))
   }
 
-  const completedOnboarding = onboarding.filter((task) => task.done).length
-  const onboardingProgress = onboarding.length ? Math.round((completedOnboarding / onboarding.length) * 100) : 0
+  const verifiedSetupCount = setupReadiness?.setupItems?.filter((item) => item.status === "ready").length || 0
+  const setupActionCount =
+    setupReadiness?.setupItems?.filter((item) => item.status === "action-required" || item.status === "blocked").length || 0
   const isFounderView = canViewFounderControls(session?.user?.role, session?.user?.email)
   const todayPriorities = decisionFeed.slice(0, 3)
   const setupBlockers = [
@@ -253,8 +278,8 @@ export default function DashboardPage() {
     {
       title: "Configure core providers",
       detail: "SMTP, Cloudinary, Upstash, and billing should be marked live only after validation evidence exists.",
-      href: "/dashboard/settings",
-      cta: "Open setup",
+      href: "/dashboard/setup",
+      cta: "Open setup center",
     },
     {
       title: "Validate role and privacy boundaries",
@@ -277,28 +302,6 @@ export default function DashboardPage() {
     { label: "Restore drill", value: "Action required", tone: "text-amber-600" },
     { label: "Fake-data review", value: "Action required", tone: "text-amber-600" },
   ]
-
-  const toggleOnboardingTask = async (id: string) => {
-    const current = onboarding
-    const next = onboarding.map((task) => (task.id === id ? { ...task, done: !task.done } : task))
-    setOnboarding(next)
-    setOnboardingError("")
-    try {
-      const res = await fetch("/api/user/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", ...getSessionHeaders() },
-        body: JSON.stringify({ onboarding: next }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data?.error || "Failed to update onboarding")
-      if (Array.isArray(data.onboarding)) {
-        setOnboarding(data.onboarding)
-      }
-    } catch (err: any) {
-      setOnboardingError(err?.message || "Failed to save onboarding updates")
-      setOnboarding(current)
-    }
-  }
 
   const saveKpis = async () => {
     setKpiSaving(true)
@@ -480,31 +483,50 @@ export default function DashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Quick Start Checklist</CardTitle>
-          <CardDescription>Finish these steps to unlock the full Civis experience without hiding what still needs setup.</CardDescription>
+          <CardTitle>Setup Readiness Snapshot</CardTitle>
+          <CardDescription>
+            These statuses come from real workspace and configuration signals, not manual checkmarks.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
-              {completedOnboarding} of {onboarding.length} completed
-            </span>
-            <span className="font-semibold">{onboardingProgress}%</span>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-2xl border border-border bg-background/70 p-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Verified</p>
+              <p className="mt-2 text-3xl font-semibold">{verifiedSetupCount}</p>
+              <p className="mt-2 text-sm text-muted-foreground">Items the app can confirm as done.</p>
+            </div>
+            <div className="rounded-2xl border border-border bg-background/70 p-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Action required</p>
+              <p className="mt-2 text-3xl font-semibold">{setupActionCount}</p>
+              <p className="mt-2 text-sm text-muted-foreground">Signals still blocking a clean launch story.</p>
+            </div>
+            <div className="rounded-2xl border border-border bg-background/70 p-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Workspace setup</p>
+              <p className="mt-2 text-3xl font-semibold">{setupReadiness?.setupItems?.length || 0}</p>
+              <Button asChild className="mt-4" size="sm" variant="outline">
+                <Link href="/dashboard/setup">Open setup center</Link>
+              </Button>
+            </div>
           </div>
-          <Progress value={onboardingProgress} />
-          {onboardingError ? <p className="text-xs text-destructive">{onboardingError}</p> : null}
+          {setupError ? <p className="text-xs text-destructive">{setupError}</p> : null}
           <div className="grid gap-3 md:grid-cols-2">
-            {onboarding.map((task) => (
-              <div key={task.id} className="flex gap-3 rounded-lg border border-border bg-background p-3">
-                <Checkbox checked={task.done} onCheckedChange={() => toggleOnboardingTask(task.id)} />
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">{task.title}</p>
-                  <p className="text-xs text-muted-foreground">{task.description}</p>
-                  {task.href ? (
-                    <Button asChild variant="link" className="h-auto p-0 text-primary">
-                      <Link href={task.href}>Open</Link>
-                    </Button>
-                  ) : null}
+            {(setupReadiness?.setupItems || []).slice(0, 6).map((item) => (
+              <div key={item.id} className="rounded-lg border border-border bg-background p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">{item.label}</p>
+                    <p className="text-xs text-muted-foreground">{item.reason}</p>
+                  </div>
+                  <span className="rounded-full bg-muted px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    {item.status.replace(/-/g, " ")}
+                  </span>
                 </div>
+                <p className="mt-3 text-xs text-muted-foreground">{item.nextAction}</p>
+                {item.href ? (
+                  <Button asChild variant="link" className="mt-2 h-auto p-0 text-primary">
+                    <Link href={item.href}>Open</Link>
+                  </Button>
+                ) : null}
               </div>
             ))}
           </div>

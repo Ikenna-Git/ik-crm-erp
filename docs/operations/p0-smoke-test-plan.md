@@ -3,6 +3,9 @@
 Date: 2026-06-07
 Branch: `p0-automated-smoke-validation`
 
+Updated: 2026-06-19
+Launch-readiness branch: `p0-customer-demo-readiness-launch-automation`
+
 ## Current Access-Control Defect History
 
 - logged-out `/dashboard` previously returned `200`
@@ -49,6 +52,7 @@ Notes:
 - the script does not mutate production data by default
 - write-heavy flows remain manual/browser validations and are marked `BLOCKED` by the script
 - pre-HTTP fetch failures are `BLOCKED`, not `FAIL`
+- `WARNING` is used for preview-only or evidence-pending states that are not route failures
 - `FAIL` means the app responded but the response did not match the expected behavior
 
 ### Timeout and retry tuning
@@ -102,6 +106,8 @@ That is a connectivity limitation, not proof that the app failed its route check
 - `/admin/*` must redirect to `/login` or return `401/403`
 - `/api/admin/orgs` must return `401/403`
 - `/api/admin/platform-status` must return `401/403`
+- `/admin/system` must redirect to `/login` or return `401/403`
+- `/api/admin/launch-readiness` must return `401/403`
 
 ## Coverage Matrix
 
@@ -109,6 +115,7 @@ That is a connectivity limitation, not proof that the app failed its route check
 | --- | --- | --- | --- |
 | Auth and access | Yes | Yes | Script checks logged-out route blocking and optional cookie-based founder/org-owner access |
 | Admin and org boundary | Partial | Yes | Script checks safe route/API access; team-list content still needs browser validation |
+| Founder launch readiness | Partial | Yes | Script checks protection and safe JSON shape only |
 | Invite flow | No | Yes | Must validate create invite, accept invite, org attachment, role assignment manually |
 | Accounting approvals | No | Yes | Script intentionally avoids mutating approval state |
 | CRM CRUD | No | Yes | Script does not create/edit/delete production-like records by default |
@@ -129,12 +136,19 @@ That is a connectivity limitation, not proof that the app failed its route check
 
 ### B. Admin and org boundary
 - `SUPER_ADMIN` can access Founder Desk/platform controls
+- `SUPER_ADMIN` can access `/admin/launch-readiness`
 - `ORG_OWNER` cannot access Founder Desk
 - `ORG_OWNER` cannot access `/admin/system`
+- `ORG_OWNER` cannot access `/admin/launch-readiness`
 - `ORG_OWNER` cannot access `/api/admin/orgs`
 - `ORG_OWNER` cannot access `/api/admin/platform-status`
 - `ORG_OWNER /admin/users` shows same-org users only
 - founder user is hidden from org owner team list
+
+### B2. Launch readiness API safety
+- founder `/api/admin/platform-status` returns safe provider diagnostics only
+- founder `/api/admin/launch-readiness` returns launch sections only
+- neither endpoint returns env secrets or raw secret-like keys
 
 ### C. Invite flow
 - founder creates/selects org
@@ -199,3 +213,17 @@ That is a connectivity limitation, not proof that the app failed its route check
 - Cloudinary configured or marked blocked
 - observability configured or marked blocked
 - Stripe configured or marked blocked
+
+## Browser Validation Plan
+
+No Playwright/Cypress setup is being introduced in this branch.
+
+Use a manual browser pass for:
+- landing page loads without horizontal overflow on laptop and mobile
+- pricing page loads
+- login page loads
+- logged-out `/dashboard` redirects
+- logged-out `/admin` redirects
+- CTA links exist on landing
+- `/admin/launch-readiness` loads for founder
+- `/dashboard/setup` loads for workspace admin

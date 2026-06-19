@@ -7,7 +7,6 @@ import { useSession } from "next-auth/react"
 import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { OfflineBanner } from "@/components/offline-banner"
-import { GuidedOnboarding } from "@/components/guided-onboarding"
 import { AiAssistPopover } from "@/components/ai-assist-popover"
 import { getDashboardModuleFromPath, getFirstAccessibleDashboardPath, hasModuleAccess } from "@/lib/access-control"
 import { userUpdatedEventName } from "@/lib/user-settings"
@@ -66,7 +65,6 @@ export function DashboardLayoutShell({
         <DashboardHeader />
         <main className="flex-1 overflow-auto">{children}</main>
         <AiAssistPopover />
-        <GuidedOnboarding />
       </div>
     </div>
   )
