@@ -109,10 +109,11 @@ export function getProviderDiagnostics(): ProviderDiagnostic[] {
       feature: "Core product persistence",
       status: process.env.DATABASE_URL ? "configured" : "missing",
       reason: process.env.DATABASE_URL
-        ? "The primary database connection string is present."
+        ? "DATABASE_URL is present, so the app can reach its primary persistence layer."
         : "Without DATABASE_URL, authenticated modules cannot persist real product state.",
-      nextAction: process.env.DATABASE_URL ? "Run live migration/build validation before launch." : "Add DATABASE_URL and verify Prisma connectivity.",
-      evidenceNote: process.env.DATABASE_URL ? "Runtime validation still required." : "Action required.",
+      nextAction: process.env.DATABASE_URL ? "Capture fresh build, runtime, and launch-window database evidence before sign-off." : "Add DATABASE_URL and verify Prisma connectivity.",
+      evidenceNote: process.env.DATABASE_URL ? "Configured, evidence pending." : "Action required.",
+      href: "/admin/launch-readiness",
     },
     {
       id: "auth",
@@ -128,6 +129,7 @@ export function getProviderDiagnostics(): ProviderDiagnostic[] {
         : "Invite links and session handling stay fragile until auth base URL and secret are both present.",
       nextAction: "Verify login, invite acceptance, and redirect behaviour on the deployed environment.",
       evidenceNote: "Live auth validation required.",
+      href: "/admin/launch-readiness",
     },
     {
       id: "smtp",
@@ -145,6 +147,7 @@ export function getProviderDiagnostics(): ProviderDiagnostic[] {
           ? "Send a live invite or digest and capture evidence."
           : "Complete SMTP configuration, then validate one real email flow.",
       evidenceNote: smtpStatus === "configured" ? "Provider configured, evidence pending." : "Action required.",
+      href: "/admin/launch-readiness",
     },
     {
       id: "cloudinary",
@@ -162,6 +165,7 @@ export function getProviderDiagnostics(): ProviderDiagnostic[] {
           ? "Upload one real file and capture the result."
           : "Complete Cloudinary configuration before treating uploads as launch-ready.",
       evidenceNote: cloudinaryStatus === "configured" ? "Provider configured, evidence pending." : "Action required.",
+      href: cloudinaryStatus === "configured" ? "/dashboard/gallery" : "/admin/launch-readiness",
     },
     {
       id: "upstash",
@@ -184,6 +188,7 @@ export function getProviderDiagnostics(): ProviderDiagnostic[] {
           : "Finish remote rate-limit configuration or document the limited mode clearly.",
       evidenceNote:
         upstashStatus === "configured" ? "Provider configured, evidence pending." : upstashStatus === "limited" ? "Warning." : "Action required.",
+      href: "/admin/launch-readiness",
     },
     {
       id: "ai",
@@ -193,17 +198,18 @@ export function getProviderDiagnostics(): ProviderDiagnostic[] {
       reason:
         aiStatus === "configured"
           ? "At least one provider key is present."
-          : aiStatus === "disabled"
+        : aiStatus === "disabled"
             ? "Provider-backed AI is intentionally disabled."
-            : aiStatus === "limited"
+          : aiStatus === "limited"
               ? "Civis Guide can still use local deterministic routing, but not full provider responses."
-              : "No provider keys are present for external model responses.",
+              : "No provider keys are present. Deterministic Civis Guide commands still work, but external model responses are disabled or limited.",
       nextAction:
         aiStatus === "configured"
           ? `Validate the configured provider path${aiProvider ? ` for ${aiProvider}` : ""}.`
           : "Keep Civis Guide messaging honest about deterministic-only or disabled mode.",
       evidenceNote:
         aiStatus === "configured" ? "Provider configured, evidence pending." : aiStatus === "disabled" ? "Intentional." : "Action required.",
+      href: "/dashboard/ai",
     },
     {
       id: "stripe",
@@ -213,23 +219,24 @@ export function getProviderDiagnostics(): ProviderDiagnostic[] {
       reason:
         stripeStatus === "test"
           ? `Stripe keys are present in test mode${stripePrices.length ? ` with ${stripePrices.length} price reference${stripePrices.length === 1 ? "" : "s"}` : ""}.`
-          : stripeStatus === "configured"
+        : stripeStatus === "configured"
             ? "Stripe appears configured with non-test keys."
-            : stripeStatus === "partial"
+          : stripeStatus === "partial"
               ? "Stripe is only partially configured, so billing must not be presented as live."
-              : "Stripe is not configured.",
+              : "Stripe is not configured. Do not imply live checkout.",
       nextAction:
         stripeStatus === "test"
           ? "Validate test checkout and webhook handling before describing billing as ready."
           : stripeStatus === "configured"
             ? "Confirm live/test mode explicitly and capture billing evidence."
-            : "Keep pricing honest and avoid implying live checkout.",
+          : "Keep pricing honest and avoid implying live checkout.",
       evidenceNote:
         stripeStatus === "test"
           ? "Test-configured, live evidence pending."
           : stripeStatus === "configured"
             ? "Evidence pending."
             : "Action required.",
+      href: "/pricing",
     },
     {
       id: "observability",
@@ -239,14 +246,15 @@ export function getProviderDiagnostics(): ProviderDiagnostic[] {
       reason:
         observabilityStatus === "configured"
           ? "At least two alert or monitoring channels are configured."
-          : observabilityStatus === "partial"
+        : observabilityStatus === "partial"
             ? "Only part of the monitoring/alerting stack is configured."
-            : "No monitoring or alerting endpoints are configured.",
+            : "No monitoring or alerting endpoints are configured. Runtime alerting is not fully set up.",
       nextAction:
         observabilityStatus === "configured"
           ? "Record one handled incident or alert delivery proof."
           : "Add Sentry or webhook-based alerts before broader rollout.",
       evidenceNote: observabilityStatus === "configured" ? "Provider configured, evidence pending." : "Action required.",
+      href: "/admin/launch-readiness",
     },
   ]
 }
@@ -258,8 +266,8 @@ export function getSecurityAccessReadiness(context: LaunchContext): ReadinessIte
       id: "route-guards",
       label: "Protected route guards",
       status: "ready",
-      reason: "Dashboard and admin route groups already enforce logged-out protection server-side.",
-      nextAction: "Keep the live smoke pack in the release checklist after every deploy.",
+      reason: "Server-side route guards and live smoke evidence already show logged-out protection on protected pages and APIs.",
+      nextAction: "Re-run the live smoke pack after every redeploy and attach the fresh evidence.",
       evidenceNote: "Documented smoke evidence exists for logged-out protection.",
       href: "/admin/launch-readiness",
     },
@@ -267,25 +275,26 @@ export function getSecurityAccessReadiness(context: LaunchContext): ReadinessIte
       id: "org-isolation",
       label: "Org isolation",
       status: "ready",
-      reason: "Workspace admin and founder-only boundaries are enforced server-side across current admin routes.",
-      nextAction: "Re-run invite and org-owner validation after redeploy.",
+      reason: "Server-side org scoping and founder versus workspace boundaries are in place, but fresh invite/org-owner evidence is still needed.",
+      nextAction: "Re-run invite acceptance and org-owner validation after redeploy.",
       evidenceNote: "Role-boundary evidence still needs fresh live confirmation.",
-      href: founder ? "/admin/users" : "/dashboard/settings",
+      href: founder ? "/admin/users" : "/dashboard/setup",
     },
     {
       id: "rbac",
       label: "Role-based access",
       status: "ready",
-      reason: "SUPER_ADMIN, ORG_OWNER, ADMIN, and USER scopes are modeled directly in access helpers and API routes.",
+      reason: "SUPER_ADMIN, ORG_OWNER, ADMIN, and USER scopes are enforced in access helpers and current admin/API routes.",
       nextAction: "Validate one founder, one org-owner, and one restricted-user session live.",
       evidenceNote: "Action required for fresh live role evidence.",
+      href: founder ? "/admin" : "/dashboard/admin",
     },
     {
       id: "hr-privacy-pin",
       label: "HR privacy PIN",
       status: "limited",
-      reason: "The product has an HR privacy lock and API redaction path, but launch evidence still needs to be captured.",
-      nextAction: "Run the HR privacy workflow and record wrong-PIN and correct-PIN evidence.",
+      reason: "HR privacy lock and API redaction exist; live locked, wrong-PIN, unlocked, and re-lock evidence is still required.",
+      nextAction: "Validate HR locked, wrong-PIN, unlocked, View Details, and re-lock behaviour.",
       evidenceNote: "Action required.",
       href: "/dashboard/hr",
     },
@@ -293,8 +302,8 @@ export function getSecurityAccessReadiness(context: LaunchContext): ReadinessIte
       id: "accounting-privacy-pin",
       label: "Accounting privacy PIN",
       status: "limited",
-      reason: "Accounting privacy lock and redaction are present, but exports and detail views still need final validation evidence.",
-      nextAction: "Validate locked, wrong-PIN, unlocked, and re-lock states.",
+      reason: "Accounting privacy lock and API redaction exist; live locked, wrong-PIN, unlocked, export, approval, and re-lock evidence is still required.",
+      nextAction: "Validate Accounting locked, wrong-PIN, unlocked, View Details, exports, approvals, and re-lock behaviour.",
       evidenceNote: "Action required.",
       href: "/dashboard/accounting",
     },
@@ -302,7 +311,7 @@ export function getSecurityAccessReadiness(context: LaunchContext): ReadinessIte
       id: "founder-boundary",
       label: "Founder versus workspace admin boundary",
       status: "ready",
-      reason: "Founder-only platform surfaces are separated from workspace-admin controls.",
+      reason: "Founder-only platform surfaces are separated from workspace-admin controls, but fresh org-owner regression evidence is still required.",
       nextAction: "Use the org-owner account for a fresh live regression pass.",
       evidenceNote: "Fresh evidence still required after redeploy.",
       href: founder ? "/admin/system" : "/dashboard/admin",
@@ -327,8 +336,8 @@ export function getModuleReadiness(context: LaunchContext): ReadinessItem[] {
       id: "accounting",
       label: "Accounting",
       status: "limited",
-      reason: "Accounting pages and approval flows exist, but launch sign-off still depends on live approval evidence.",
-      nextAction: "Validate invoice and expense approval lifecycles end-to-end.",
+      reason: "Accounting pages, privacy lock, and approval flows exist, but launch sign-off still depends on live approval and privacy evidence.",
+      nextAction: "Validate invoice and expense approvals plus Accounting privacy unlock and re-lock.",
       evidenceNote: "Action required.",
       href: "/dashboard/accounting",
     },
@@ -345,8 +354,8 @@ export function getModuleReadiness(context: LaunchContext): ReadinessItem[] {
       id: "hr",
       label: "HR",
       status: "limited",
-      reason: "HR backend and privacy lock are present, but final privacy validation evidence is still pending.",
-      nextAction: "Test locked and unlocked employee detail behavior with an authorized user.",
+      reason: "HR backend and privacy lock are present, but final locked and unlocked privacy validation evidence is still pending.",
+      nextAction: "Validate locked and unlocked employee and payroll detail behaviour with an authorized user.",
       evidenceNote: "Action required.",
       href: "/dashboard/hr",
     },
@@ -396,7 +405,7 @@ export function getModuleReadiness(context: LaunchContext): ReadinessItem[] {
       reason:
         ai === "configured"
           ? "Deterministic commands work and provider-backed paths are available, but live evidence still needs capture."
-          : "Deterministic command routing is available even without external providers.",
+          : "Deterministic command routing is available even without external providers; external model responses are disabled or limited.",
       nextAction:
         ai === "configured"
           ? "Validate deterministic commands plus one provider-backed answer."
@@ -434,6 +443,7 @@ export function getLaunchEvidence(): ReadinessItem[] {
       reason: "A previous live smoke pass documented logged-out protection and zero route-level failures.",
       nextAction: "Re-run the smoke script after each redeploy and attach the fresh output.",
       evidenceNote: "See docs/operations/p0-live-validation-log.md.",
+      href: "/admin/launch-readiness",
     },
     {
       id: "invite-flow",
@@ -442,6 +452,7 @@ export function getLaunchEvidence(): ReadinessItem[] {
       reason: "Invite and acceptance flows still need a fresh launch-window validation pass.",
       nextAction: "Run founder invite, acceptance, and role/org validation with screenshots.",
       evidenceNote: "Action required.",
+      href: "/dashboard/settings",
     },
     {
       id: "approval-lifecycle",
@@ -450,6 +461,7 @@ export function getLaunchEvidence(): ReadinessItem[] {
       reason: "Accounting and Operations approvals need fresh persisted-state evidence.",
       nextAction: "Record request, approve/reject, and refresh behavior.",
       evidenceNote: "Action required.",
+      href: "/dashboard/operations",
     },
     {
       id: "crm-persistence",
@@ -458,6 +470,7 @@ export function getLaunchEvidence(): ReadinessItem[] {
       reason: "CRM CRUD still needs live create/edit/delete evidence for this launch window.",
       nextAction: "Run one contact/company/deal cycle and capture the refresh result.",
       evidenceNote: "Action required.",
+      href: "/dashboard/crm",
     },
     {
       id: "fake-data-review",
@@ -466,6 +479,7 @@ export function getLaunchEvidence(): ReadinessItem[] {
       reason: "Sample or demo data still requires a final human review before sign-off.",
       nextAction: "Review visible seed/demo data and log the result.",
       evidenceNote: "Action required.",
+      href: "/dashboard/demo",
     },
     {
       id: "backup-evidence",
@@ -474,6 +488,7 @@ export function getLaunchEvidence(): ReadinessItem[] {
       reason: "Backup proof is not yet recorded in the current launch pack.",
       nextAction: "Document the latest successful backup evidence.",
       evidenceNote: "Action required.",
+      href: "/admin/launch-readiness",
     },
     {
       id: "restore-drill",
@@ -482,6 +497,7 @@ export function getLaunchEvidence(): ReadinessItem[] {
       reason: "Restore drill sign-off is not yet documented for launch approval.",
       nextAction: "Run or document the restore drill and record the outcome.",
       evidenceNote: "Action required.",
+      href: "/admin/launch-readiness",
     },
     {
       id: "provider-validation",
@@ -490,6 +506,7 @@ export function getLaunchEvidence(): ReadinessItem[] {
       reason: "Configured providers still require live proof instead of assumed readiness.",
       nextAction: "Capture one validated email, upload, rate-limit, and billing check where applicable.",
       evidenceNote: "Action required.",
+      href: "/dashboard/setup",
     },
   ]
 }
@@ -530,10 +547,10 @@ export function getWorkspaceSetupItems(context: LaunchContext): ReadinessItem[] 
     {
       id: "smtp",
       label: "Configure email / SMTP",
-      status: smtp === "configured" ? "ready" : isFounder ? "action-required" : "blocked",
+      status: smtp === "configured" ? "limited" : isFounder ? "action-required" : "blocked",
       reason:
         smtp === "configured"
-          ? "SMTP is configured."
+          ? "SMTP is configured, but email delivery still needs live evidence."
           : isFounder
             ? "SMTP is still missing or partial, so email flows are not fully launch-ready."
             : "SMTP requires deployment-level configuration outside the normal workspace UI.",
@@ -543,23 +560,23 @@ export function getWorkspaceSetupItems(context: LaunchContext): ReadinessItem[] 
     {
       id: "cloudinary",
       label: "Configure uploads / Cloudinary",
-      status: cloudinary === "configured" ? "ready" : isFounder ? "action-required" : "blocked",
+      status: cloudinary === "configured" ? "limited" : isFounder ? "action-required" : "blocked",
       reason:
         cloudinary === "configured"
-          ? "Upload credentials are configured."
+          ? "Upload credentials are configured, but real upload evidence is still pending."
           : isFounder
             ? "Cloudinary is not fully configured, so uploads should still be treated as blocked."
             : "Upload configuration requires deployment-level access.",
       nextAction: isFounder ? "Complete Cloudinary setup and validate one upload." : "Ask the founder/admin to complete upload setup.",
-      href: isFounder ? "/admin/launch-readiness" : "/dashboard/gallery",
+      href: cloudinary === "configured" ? "/dashboard/gallery" : isFounder ? "/admin/launch-readiness" : "/dashboard/gallery",
     },
     {
       id: "rate-limit",
       label: "Configure rate limit / Upstash",
-      status: upstash === "configured" ? "ready" : upstash === "limited" ? "limited" : isFounder ? "action-required" : "blocked",
+      status: upstash === "configured" ? "limited" : upstash === "limited" ? "limited" : isFounder ? "action-required" : "blocked",
       reason:
         upstash === "configured"
-          ? "Shared rate limiting is configured."
+          ? "Shared rate limiting is configured, but live protected-endpoint evidence is still pending."
           : upstash === "limited"
             ? "Rate limiting is present but not using a shared remote store."
             : isFounder
@@ -625,8 +642,8 @@ export function getWorkspaceSetupItems(context: LaunchContext): ReadinessItem[] 
     {
       id: "marketing-preview",
       label: "Review Marketing preview-only status",
-      status: "ready",
-      reason: "Marketing is intentionally positioned as preview-only rather than pretending to be live.",
+      status: "limited",
+      reason: "Marketing is intentionally preview-only in this release and must stay clearly non-production.",
       nextAction: "Keep preview-only messaging intact during demos.",
       href: "/dashboard/marketing",
     },

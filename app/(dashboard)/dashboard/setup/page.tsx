@@ -32,6 +32,12 @@ const badgeTone: Record<string, string> = {
   "action-required": "bg-rose-500/15 text-rose-300 hover:bg-rose-500/15",
   blocked: "bg-slate-500/15 text-slate-300 hover:bg-slate-500/15",
   optional: "bg-sky-500/15 text-sky-300 hover:bg-sky-500/15",
+  "preview-only": "bg-sky-500/15 text-sky-300 hover:bg-sky-500/15",
+  missing: "bg-rose-500/15 text-rose-300 hover:bg-rose-500/15",
+  configured: "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15",
+  partial: "bg-amber-500/15 text-amber-300 hover:bg-amber-500/15",
+  disabled: "bg-slate-500/15 text-slate-300 hover:bg-slate-500/15",
+  test: "bg-violet-500/15 text-violet-300 hover:bg-violet-500/15",
 }
 
 const titleCase = (value: string) =>
@@ -102,6 +108,11 @@ export default function SetupPage() {
               <Button asChild variant="outline">
                 <Link href="/dashboard/ai">Ask Civis Guide what to do next</Link>
               </Button>
+              {data.workspace.role === "SUPER_ADMIN" ? (
+                <Button asChild variant="outline">
+                  <Link href="/admin/launch-readiness">Open founder launch readiness</Link>
+                </Button>
+              ) : null}
             </div>
           </div>
 
@@ -141,7 +152,7 @@ export default function SetupPage() {
       <Card>
         <CardHeader>
           <CardTitle>First-run checklist</CardTitle>
-          <CardDescription>Each item links to the real place to validate it.</CardDescription>
+          <CardDescription>Each item links to the real place to validate it. Limited means the feature exists, but live evidence is still pending.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 lg:grid-cols-2">
           {data.setupItems.map((item) => (

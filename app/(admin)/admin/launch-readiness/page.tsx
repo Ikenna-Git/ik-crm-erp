@@ -123,10 +123,11 @@ export default function AdminLaunchReadinessPage() {
   }, [])
 
   const counts = useMemo(() => {
-    if (!data) return { ready: 0, action: 0 }
+    if (!data) return { ready: 0, limited: 0, action: 0 }
     const all = [...data.securityAndAccess, ...data.providerDiagnostics, ...data.productModules, ...data.launchEvidence]
     return {
       ready: all.filter((item) => item.status === "ready" || item.status === "configured").length,
+      limited: all.filter((item) => item.status === "limited" || item.status === "partial" || item.status === "preview-only" || item.status === "test").length,
       action: all.filter((item) => item.status === "action-required" || item.status === "missing" || item.status === "blocked").length,
     }
   }, [data])
@@ -167,6 +168,14 @@ export default function AdminLaunchReadinessPage() {
             </div>
             <div className="rounded-3xl border border-white/10 bg-slate-950/55 p-4">
               <div className="flex items-center gap-2 text-sm font-medium text-white">
+                <ShieldCheck className="h-4 w-4 text-amber-300" />
+                Limited / pending
+              </div>
+              <p className="mt-3 text-4xl font-semibold text-white">{counts.limited}</p>
+              <p className="mt-2 text-sm text-slate-300">Features that exist but still need live evidence or provider validation.</p>
+            </div>
+            <div className="rounded-3xl border border-white/10 bg-slate-950/55 p-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-white">
                 <AlertTriangle className="h-4 w-4 text-rose-300" />
                 Action required
               </div>
@@ -193,6 +202,31 @@ export default function AdminLaunchReadinessPage() {
                 {data.meta.largestWorkspace ? `${data.meta.largestWorkspace.users} users` : "Action required for live usage evidence."}
               </p>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-white/10 bg-white/5 text-slate-100">
+        <CardContent className="grid gap-3 p-6 md:grid-cols-2 xl:grid-cols-5">
+          <div className="rounded-2xl border border-white/10 bg-slate-950/55 p-4 text-sm text-slate-300">
+            <p className="font-medium text-white">Ready</p>
+            <p className="mt-1">Working and already backed by code or live evidence.</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-slate-950/55 p-4 text-sm text-slate-300">
+            <p className="font-medium text-white">Limited</p>
+            <p className="mt-1">Feature exists, but live evidence or provider validation is still pending.</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-slate-950/55 p-4 text-sm text-slate-300">
+            <p className="font-medium text-white">Action Required</p>
+            <p className="mt-1">Manual validation, evidence, or sign-off is still needed before launch approval.</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-slate-950/55 p-4 text-sm text-slate-300">
+            <p className="font-medium text-white">Missing</p>
+            <p className="mt-1">Required provider or configuration is absent, so the capability cannot be claimed as live.</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-slate-950/55 p-4 text-sm text-slate-300">
+            <p className="font-medium text-white">Preview Only</p>
+            <p className="mt-1">Intentionally non-production in this release. No fake live success should be implied.</p>
           </div>
         </CardContent>
       </Card>

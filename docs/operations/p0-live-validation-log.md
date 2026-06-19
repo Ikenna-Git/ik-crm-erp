@@ -1,7 +1,19 @@
 # P0 Live Validation Log
 
 Date: 2026-06-19
-Branch: `p0-customer-demo-readiness-launch-automation`
+Branch: `p0-fix-privacy-pin-and-launch-readiness-sweep`
+
+## New Launch-Window Finding
+- Live manual validation found a real browser blocker:
+  - HR privacy PIN input could not be typed
+  - Accounting privacy PIN input could not be typed
+- Root cause:
+  - the client pages were gating PIN input and unlocked UI from client-side role shape instead of the server `/api/privacy-lock` `canUnlock` result
+- Fix made on this branch:
+  - HR and Accounting pages now store `privacyCanUnlock` and `privacyMessage` from the server
+  - the unlock panel now explains loading, unauthorized, and missing-config states clearly
+  - locked detail dialogs open in protected mode without exposing sensitive fields
+  - readiness/setup surfaces were updated to keep privacy items limited until fresh live evidence is captured
 
 ## Recorded Evidence Already On File
 - Smoke test against `https://ik-crm-erp.onrender.com`
@@ -18,6 +30,8 @@ Branch: `p0-customer-demo-readiness-launch-automation`
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `/admin/launch-readiness` | Founder | Loads and shows safe provider/module/evidence sections |  |  |  |  |  |
 | `/dashboard/setup` | Org owner or admin | Loads and shows honest setup statuses |  |  |  |  |  |
+| `/dashboard/hr` PIN input | Authorized HR role | PIN field enabled when server says unlock is allowed |  |  |  |  |  |
+| `/dashboard/accounting` PIN input | Authorized finance role | PIN field enabled when server says unlock is allowed |  |  |  |  |  |
 | Invite flow | Founder + invited user | Invited user lands in correct org and role only |  |  |  |  |  |
 | CRM CRUD | Workspace user | Create/edit/refresh persists contact/company/deal |  |  |  |  |  |
 | Accounting approvals | Finance / ops | Request + approve/reject persists after refresh |  |  |  |  |  |

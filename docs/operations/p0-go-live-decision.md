@@ -1,7 +1,7 @@
 # P0 Go-Live Decision
 
 Date: 2026-06-19
-Branch: `p0-customer-demo-readiness-launch-automation`
+Branch: `p0-fix-privacy-pin-and-launch-readiness-sweep`
 
 ## Current Decision
 - Go live now: `No`
@@ -9,6 +9,7 @@ Branch: `p0-customer-demo-readiness-launch-automation`
 - Customer-ready now: `Not yet`
 
 ## Why Go-Live Is Still Blocked
+- HR and Accounting PIN-input regression was fixed in code, but fresh live privacy evidence is still required
 - Invite flow still needs fresh live evidence
 - CRM create/edit/refresh evidence still needs capture
 - Accounting and Operations approval lifecycle still needs fresh live evidence
@@ -25,6 +26,7 @@ Branch: `p0-customer-demo-readiness-launch-automation`
 - Civis Guide deterministic navigation
 - Launch Readiness centre
 - Workspace Setup centre
+- Honest launch-status meanings: Ready, Limited, Action Required, Missing, Preview Only
 
 ## What Must Be Framed Carefully
 - SMTP, Cloudinary, Upstash, Stripe, AI provider, and observability states

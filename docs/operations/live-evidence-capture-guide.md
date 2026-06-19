@@ -1,7 +1,7 @@
 # Live Evidence Capture Guide
 
 Date: 2026-06-19
-Branch: `p0-customer-demo-readiness-launch-automation`
+Branch: `p0-fix-privacy-pin-and-launch-readiness-sweep`
 
 Use this guide after redeploy. Do not mark any item complete without the actual result and evidence note.
 
@@ -66,15 +66,19 @@ Use this guide after redeploy. Do not mark any item complete without the actual 
 ## HR Privacy PIN
 | Test | Role | Expected result | Actual result | Pass / Fail / Blocked | Screenshot / note | Date | Owner |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| PIN input enabled | Authorized HR role | Input is typeable when server allows unlock |  |  |  |  |  |
 | Wrong PIN | Authorized HR role | Error shown, no unlock |  |  |  |  |  |
 | Correct PIN | Authorized HR role | HR unlocks only |  |  |  |  |  |
+| View Details while locked | Authorized HR role | Locked dialog shows protection message only |  |  |  |  |  |
 | Re-lock | Authorized HR role | Details hide again |  |  |  |  |  |
 
 ## Accounting Privacy PIN
 | Test | Role | Expected result | Actual result | Pass / Fail / Blocked | Screenshot / note | Date | Owner |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| PIN input enabled | Authorized finance role | Input is typeable when server allows unlock |  |  |  |  |  |
 | Wrong PIN | Authorized finance role | Error shown, no unlock |  |  |  |  |  |
 | Correct PIN | Authorized finance role | Accounting unlocks only |  |  |  |  |  |
+| View Details while locked | Authorized finance role | Locked dialog shows protection message only |  |  |  |  |  |
 | Re-lock | Authorized finance role | Details and exports respect lock again |  |  |  |  |  |
 
 ## Civis Guide

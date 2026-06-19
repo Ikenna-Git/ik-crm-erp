@@ -7,27 +7,41 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 
 type PrivacyLockPanelProps = {
-  moduleLabel: string
-  unlockLabel: string
+  title: string
+  inputLabel: string
+  unlockButtonLabel: string
+  lockAgainButtonLabel: string
   unlocked: boolean
   canUnlock: boolean
   loading?: boolean
   configured?: boolean
   error?: string
   helperText: string
+  statusMessage?: string
+  unlockedDescription?: string
+  cannotUnlockMessage?: string
+  notConfiguredMessage?: string
+  loadingMessage?: string
   onUnlock: (pin: string) => Promise<void> | void
   onLockAgain: () => Promise<void> | void
 }
 
 export function PrivacyLockPanel({
-  moduleLabel,
-  unlockLabel,
+  title,
+  inputLabel,
+  unlockButtonLabel,
+  lockAgainButtonLabel,
   unlocked,
   canUnlock,
   loading = false,
   configured = true,
   error,
   helperText,
+  statusMessage,
+  unlockedDescription,
+  cannotUnlockMessage,
+  notConfiguredMessage,
+  loadingMessage = "Checking privacy state...",
   onUnlock,
   onLockAgain,
 }: PrivacyLockPanelProps) {
@@ -45,7 +59,7 @@ export function PrivacyLockPanel({
         <div>
           <CardTitle className="flex items-center gap-2">
             {unlocked ? <ShieldCheck className="h-5 w-5 text-emerald-600" /> : <LockKeyhole className="h-5 w-5 text-primary" />}
-            {moduleLabel}
+            {title}
           </CardTitle>
           <CardDescription className="mt-1">{helperText}</CardDescription>
         </div>
@@ -58,35 +72,39 @@ export function PrivacyLockPanel({
         </span>
       </CardHeader>
       <CardContent className="space-y-4">
+        {loading ? (
+          <div className="rounded-2xl border border-border bg-muted/10 p-4 text-sm text-muted-foreground">{loadingMessage}</div>
+        ) : null}
+
         {!configured ? (
           <div className="rounded-2xl border border-dashed border-amber-500/40 bg-amber-500/5 p-4 text-sm text-amber-700 dark:text-amber-300">
-            This PIN is not configured yet. Add the server-side module PIN before using this lock in live environments.
+            {notConfiguredMessage || "This PIN is not configured yet."}
           </div>
         ) : null}
 
         {unlocked ? (
           <div className="flex flex-col gap-3 rounded-2xl border border-border bg-background/70 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-medium">Sensitive data is visible for this session.</p>
+              <p className="text-sm font-medium">{statusMessage || "Unlocked for this session."}</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                Role permissions still apply. Lock again when you finish reviewing this module.
+                {unlockedDescription || "Role permissions still apply. Lock again when you finish reviewing this module."}
               </p>
             </div>
             <Button variant="outline" className="bg-transparent" onClick={() => void onLockAgain()} disabled={loading}>
-              Lock again
+              {lockAgainButtonLabel}
             </Button>
           </div>
         ) : (
           <div className="grid gap-3 rounded-2xl border border-border bg-background/70 p-4 sm:grid-cols-[1fr_auto] sm:items-end">
             <div className="space-y-2">
-              <label className="text-sm font-medium">{unlockLabel}</label>
+              <label className="text-sm font-medium">{inputLabel}</label>
               <Input
                 type="password"
                 autoComplete="off"
                 inputMode="numeric"
                 value={pin}
                 onChange={(event) => setPin(event.target.value)}
-                placeholder={canUnlock ? "Enter module PIN" : "Workspace manage access required"}
+                placeholder={canUnlock ? inputLabel : cannotUnlockMessage || "Your role cannot unlock this privacy lock."}
                 disabled={!canUnlock || !configured || loading}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
@@ -98,14 +116,14 @@ export function PrivacyLockPanel({
             </div>
             <Button onClick={() => void handleUnlock()} disabled={!canUnlock || !configured || !pin.trim() || loading}>
               <UnlockKeyhole className="mr-2 h-4 w-4" />
-              {loading ? "Checking..." : "Unlock"}
+              {loading ? "Checking..." : unlockButtonLabel}
             </Button>
           </div>
         )}
 
-        {!canUnlock ? (
+        {!canUnlock && configured && !loading ? (
           <div className="rounded-2xl border border-dashed border-border bg-muted/10 p-4 text-sm text-muted-foreground">
-            This workspace role can use the module shell, but only an authorized manager can unlock confidential records.
+            {cannotUnlockMessage || "Your role cannot unlock this privacy lock."}
           </div>
         ) : null}
 

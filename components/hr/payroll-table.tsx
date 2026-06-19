@@ -199,6 +199,7 @@ export function PayrollTable({
   }
 
   const handleDeletePayroll = (id: string) => {
+    if (!revealSensitive) return
     if (onDeletePayroll) {
       onDeletePayroll(id)
     } else {
@@ -366,8 +367,8 @@ export function PayrollTable({
                           variant="ghost"
                           size="sm"
                           className="p-2"
-                          disabled
-                          aria-label={canManage ? "Unlock HR privacy to manage payroll actions" : "Payroll actions unavailable"}
+                          onClick={() => setSelectedPayroll(record)}
+                          aria-label={canManage ? "Unlock HR privacy to view protected payroll details" : "This payroll record is protected"}
                         >
                           <Lock className="w-4 h-4" />
                         </Button>
@@ -405,7 +406,7 @@ export function PayrollTable({
             : "This record is protected. An authorized HR manager must unlock HR privacy to view payroll details."
         }
         sections={
-          selectedPayroll
+          revealSensitive && selectedPayroll
             ? [
                 {
                   title: "Payroll summary",

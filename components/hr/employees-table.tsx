@@ -342,8 +342,8 @@ export function EmployeesTable({
                           variant="ghost"
                           size="sm"
                           className="p-2"
-                          disabled
-                          aria-label={canManage ? "Unlock HR privacy to manage employee actions" : "Employee actions unavailable"}
+                          onClick={() => setSelectedEmployee(employee)}
+                          aria-label={canManage ? "Unlock HR privacy to view protected employee details" : "This employee record is protected"}
                         >
                           <Lock className="w-4 h-4" />
                         </Button>
@@ -381,7 +381,7 @@ export function EmployeesTable({
             : "This record is protected. An authorized HR manager must unlock HR privacy to view employee details."
         }
         sections={
-          selectedEmployee
+          revealSensitive && selectedEmployee
             ? [
                 {
                   title: "Employee profile",
