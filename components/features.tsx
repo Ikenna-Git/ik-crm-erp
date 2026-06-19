@@ -56,6 +56,7 @@ export function Features() {
             return (
               <div
                 key={feature.title}
+                data-cursor="card"
                 className="group rounded-[28px] border border-border/80 bg-card/90 p-6 shadow-sm transition hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg"
               >
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">

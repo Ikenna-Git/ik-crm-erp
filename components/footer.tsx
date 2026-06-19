@@ -2,11 +2,15 @@
 
 import Link from "next/link"
 import { Github, Linkedin, Twitter } from "lucide-react"
+import { CursorStyleToggle } from "@/components/shared/cursor-style-toggle"
 
 export function Footer() {
   return (
     <footer className="border-t border-border bg-muted/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
+        <div className="mb-10">
+          <CursorStyleToggle />
+        </div>
         <div className="grid md:grid-cols-5 gap-8 mb-12">
           {/* Brand */}
           <div className="md:col-span-1">
