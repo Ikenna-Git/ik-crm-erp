@@ -7,6 +7,8 @@ import { ArrowRight, CheckCircle2, ExternalLink, LockKeyhole, Rocket } from "luc
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { LiquidGlassPanel } from "@/components/ui/liquid-glass-panel"
+import { getApiErrorMessage, requestJson } from "@/lib/api-client"
 
 type SetupItem = {
   id: string
@@ -56,12 +58,10 @@ export default function SetupPage() {
       try {
         setLoading(true)
         setError("")
-        const response = await fetch("/api/setup/readiness")
-        const payload = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(payload?.error || "Failed to load setup readiness")
+        const payload = await requestJson<SetupReadinessResponse>("/api/setup/readiness")
         setData(payload)
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load setup readiness")
+        setError(getApiErrorMessage(err, "Failed to load setup readiness"))
       } finally {
         setLoading(false)
       }
@@ -86,7 +86,7 @@ export default function SetupPage() {
 
   return (
     <div className="p-6 space-y-6">
-      <Card className="overflow-hidden border-border/70 bg-gradient-to-br from-card via-card to-muted/25">
+      <LiquidGlassPanel className="overflow-hidden p-0">
         <CardContent className="grid gap-6 p-6 lg:grid-cols-[1.1fr_0.9fr] lg:p-8">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
@@ -147,6 +147,34 @@ export default function SetupPage() {
               </p>
             </div>
           </div>
+        </CardContent>
+      </LiquidGlassPanel>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Industry / Role Setup Patterns</CardTitle>
+          <CardDescription>Use these to decide how Civis should operate for this workspace before you start editing fields blindly.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 lg:grid-cols-3">
+          {[
+            {
+              title: "Sales-led CRM",
+              detail: "Start with contacts, companies, deals, and invoice linkage. Best for pipeline-first teams.",
+            },
+            {
+              title: "Delivery-led Projects",
+              detail: "Link projects back to CRM deals, add proof links, and keep deployment/documentation URLs visible.",
+            },
+            {
+              title: "Finance-controlled rollout",
+              detail: "Use privacy locks, approvals, invoice document fields, and exports to keep finance ownership explicit.",
+            },
+          ].map((item) => (
+            <div key={item.title} className="rounded-2xl border border-border bg-background/70 p-4">
+              <p className="font-medium">{item.title}</p>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.detail}</p>
+            </div>
+          ))}
         </CardContent>
       </Card>
 

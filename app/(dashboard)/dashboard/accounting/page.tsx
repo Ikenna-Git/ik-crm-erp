@@ -120,6 +120,9 @@ export default function AccountingPage() {
   const searchQuery = ""
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
+  const [crmCompanies, setCrmCompanies] = useState<Array<{ id: string; label: string }>>([])
+  const [crmDeals, setCrmDeals] = useState<Array<{ id: string; label: string }>>([])
+  const [projectOptions, setProjectOptions] = useState<Array<{ id: string; label: string }>>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [privacyUnlocked, setPrivacyUnlocked] = useState(false)
@@ -201,6 +204,7 @@ export default function AccountingPage() {
     terms: safeString(inv?.terms),
     lineItems: Array.isArray(inv?.lineItems) ? inv.lineItems : [],
     relatedLinks: Array.isArray(inv?.relatedLinks) ? inv.relatedLinks : [],
+    relatedRecords: inv?.relatedRecords && typeof inv.relatedRecords === "object" ? inv.relatedRecords : {},
     status: String(inv?.status || "DRAFT").toLowerCase() as Invoice["status"],
     approvalStatus:
       inv?.approvalStatus === "pending" || inv?.approvalStatus === "approved" || inv?.approvalStatus === "rejected"
@@ -282,9 +286,12 @@ export default function AccountingPage() {
       setLoading(true)
       setImportNotice("")
       const headers = { ...getSessionHeaders() }
-      const [invJson, expJson] = await Promise.all([
+      const [invJson, expJson, companiesJson, dealsJson, projectsJson] = await Promise.all([
         requestJson<any>("/api/accounting/invoices", { headers }),
         requestJson<any>("/api/accounting/expenses", { headers }),
+        requestJson<any>("/api/crm/companies", { headers }),
+        requestJson<any>("/api/crm/deals", { headers }),
+        requestJson<any>("/api/projects", { headers }),
       ])
 
       const mappedInvoices = Array.isArray(invJson?.invoices) ? invJson.invoices.map(mapInvoice) : []
@@ -293,6 +300,21 @@ export default function AccountingPage() {
 
       setInvoices(mappedInvoices)
       setExpenses(mappedExpenses)
+      setCrmCompanies(
+        Array.isArray(companiesJson?.companies)
+          ? companiesJson.companies.map((company: any) => ({ id: company.id, label: company.name || company.id }))
+          : [],
+      )
+      setCrmDeals(
+        Array.isArray(dealsJson?.deals)
+          ? dealsJson.deals.map((deal: any) => ({ id: deal.id, label: deal.title || deal.id }))
+          : [],
+      )
+      setProjectOptions(
+        Array.isArray(projectsJson?.projects)
+          ? projectsJson.projects.map((project: any) => ({ id: project.id, label: project.name || project.id }))
+          : [],
+      )
     } catch (err: any) {
       console.error("Failed to load accounting data", err)
       setError(getApiErrorMessage(err, "Failed to load accounting data"))
@@ -382,6 +404,11 @@ export default function AccountingPage() {
           dueDate: payload.dueDate,
           issueDate: payload.date,
           status: payload.status,
+          notes: payload.notes,
+          terms: payload.terms,
+          lineItems: payload.lineItems,
+          relatedLinks: payload.relatedLinks,
+          relatedRecords: payload.relatedRecords,
         }),
       })
       const mapped = mapInvoice(data.invoice)
@@ -459,6 +486,11 @@ export default function AccountingPage() {
           status: data.status,
           dueDate: data.dueDate,
           issueDate: data.date,
+          notes: data.notes,
+          terms: data.terms,
+          lineItems: data.lineItems,
+          relatedLinks: data.relatedLinks,
+          relatedRecords: data.relatedRecords,
         }),
       })
       const updated = mapInvoice(json.invoice)
@@ -960,6 +992,9 @@ export default function AccountingPage() {
             <InvoicesTable
               searchQuery={searchQuery}
               invoices={invoices}
+              crmCompanies={crmCompanies}
+              crmDeals={crmDeals}
+              projects={projectOptions}
               showAmounts={canUseSensitiveAccounting}
               onAddInvoice={createInvoice}
               onUpdateInvoice={handleUpdateInvoice}

@@ -200,6 +200,8 @@ type ContactsTableProps = {
   ) => void
   onDeleteContact?: (id: string) => void
   onUpdateContact?: (id: string, data: Partial<Contact>) => void
+  relatedProjectsByContactId?: Record<string, string[]>
+  relatedInvoicesByContactId?: Record<string, string[]>
   crmView?: CrmViewSettings
   onViewChange?: (view: CrmViewSettings) => void
 }
@@ -210,6 +212,8 @@ export function ContactsTable({
   onAddContact,
   onDeleteContact,
   onUpdateContact,
+  relatedProjectsByContactId = {},
+  relatedInvoicesByContactId = {},
   crmView,
   onViewChange,
 }: ContactsTableProps) {
@@ -955,6 +959,24 @@ export function ContactsTable({
                     { label: "Status", value: selectedContact.status },
                     { label: "Revenue", value: formatNaira(selectedContact.revenue || 0) },
                     { label: "Last contact", value: selectedContact.lastContact || "—" },
+                    {
+                      label: "Related projects",
+                      value: relatedProjectsByContactId[selectedContact.id]?.length
+                        ? relatedProjectsByContactId[selectedContact.id].join(", ")
+                        : "No linked projects yet",
+                    },
+                    {
+                      label: "Related invoices",
+                      value: relatedInvoicesByContactId[selectedContact.id]?.length
+                        ? relatedInvoicesByContactId[selectedContact.id].join(", ")
+                        : "No linked invoices yet",
+                    },
+                    {
+                      label: "Next workflow move",
+                      value: relatedProjectsByContactId[selectedContact.id]?.length
+                        ? "Use the linked project to continue delivery from this contact."
+                        : "Create or link a project from the Projects workspace if this contact is moving into delivery.",
+                    },
                   ],
                 },
               ]

@@ -18,6 +18,30 @@ export const CIVIS_KB: KnowledgeEntry[] = [
       "Civis CRM supports custom fields on contacts, companies, and deals. Use text, number, currency, date, select, multi-select, or checkbox fields. You can mark a field as required, reorder columns, and hide fields per view.",
   },
   {
+    title: "CRM plus ERP operating centre",
+    keywords: ["crm", "erp", "projects", "invoice", "handoff", "operating centre", "workflow"],
+    content:
+      "Civis is not just a contact manager. CRM records should connect to projects, invoices, approvals, proof links, and delivery workflows so one customer record can explain what should happen next across the business.",
+  },
+  {
+    title: "Project proof and external links",
+    keywords: ["project", "proof", "github", "repository", "deployment", "docs", "figma", "monitoring", "link"],
+    content:
+      "Projects can now store proof links and external system links such as GitHub repositories, deployment URLs, documentation, monitoring dashboards, tickets, design files, and client-site URLs. URLs must use http or https only.",
+  },
+  {
+    title: "Invoice document fields and linking",
+    keywords: ["invoice", "line item", "terms", "notes", "linked project", "linked deal", "related link"],
+    content:
+      "Invoices support notes, payment terms, line items, related links, and linked company/deal/project context. Use those fields so finance records keep the same business context as CRM and project delivery work.",
+  },
+  {
+    title: "Industry and role adaptability",
+    keywords: ["industry", "role", "adapt", "sales", "operations", "engineering", "finance", "setup"],
+    content:
+      "Civis should adapt to the operating pattern of the workspace. Sales-led teams may stay pipeline-first, while delivery or operations-heavy teams should link CRM records directly into projects, proof, and invoice flows.",
+  },
+  {
     title: "Ops command center",
     keywords: ["ops", "command", "operations", "alerts", "anomaly", "decision"],
     content:
@@ -46,6 +70,12 @@ export const CIVIS_KB: KnowledgeEntry[] = [
     keywords: ["privacy", "pin", "locked", "limited", "action required", "missing", "preview only", "launch readiness"],
     content:
       "HR and Accounting use separate privacy PIN locks. If HR or Accounting details are hidden, the module may still be privacy locked or your role may not be allowed to unlock it. In launch readiness, Limited means the feature exists but live evidence is still pending. Action Required means manual validation or evidence is still needed before launch approval. Missing means required configuration is absent. Preview Only means the feature is intentionally non-production in this release.",
+  },
+  {
+    title: "Validation and disabled states",
+    keywords: ["validation", "error", "disabled", "forbidden", "invalid url", "field disabled"],
+    content:
+      "Civis should surface validation and permission errors directly in the UI. Invalid URLs must be rejected, privacy-locked finance or HR actions should explain the lock clearly, and founder-only controls should stay blocked for workspace users.",
   },
   {
     title: "Playbooks and workflows",

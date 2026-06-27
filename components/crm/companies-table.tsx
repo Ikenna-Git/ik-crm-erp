@@ -33,6 +33,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { RecordDetailsDialog } from "@/components/shared/record-details-dialog"
 import { getSessionHeaders } from "@/lib/user-settings"
 import type { CrmViewSettings } from "@/lib/user-settings"
 import { DEFAULT_CRM_VIEWS } from "@/lib/user-settings"
@@ -72,6 +73,8 @@ type CompaniesTableProps = {
   onAddCompany?: (data: Omit<Company, "id">) => void
   onDeleteCompany?: (id: string) => void
   onUpdateCompany?: (id: string, data: Partial<Company>) => void
+  relatedProjectsByCompanyId?: Record<string, string[]>
+  relatedInvoicesByCompanyId?: Record<string, string[]>
   crmView?: CrmViewSettings
   onViewChange?: (view: CrmViewSettings) => void
 }
@@ -81,6 +84,8 @@ export function CompaniesTable({
   onAddCompany,
   onDeleteCompany,
   onUpdateCompany,
+  relatedProjectsByCompanyId = {},
+  relatedInvoicesByCompanyId = {},
   crmView,
   onViewChange,
 }: CompaniesTableProps) {
@@ -93,6 +98,7 @@ export function CompaniesTable({
   const [fieldsLoading, setFieldsLoading] = useState(false)
   const [fieldsError, setFieldsError] = useState("")
   const [fieldDialogOpen, setFieldDialogOpen] = useState(false)
+  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null)
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null)
   const [fieldForm, setFieldForm] = useState({
     name: "",
@@ -476,6 +482,10 @@ export function CompaniesTable({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setSelectedCompany(company)}>
+                            <Edit className="w-4 h-4 mr-2" />
+                            View details
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleEdit(company)}>
                             <Edit className="w-4 h-4 mr-2" />
                             Edit
@@ -506,6 +516,47 @@ export function CompaniesTable({
           </div>
         </CardContent>
       </Card>
+
+      <RecordDetailsDialog
+        open={Boolean(selectedCompany)}
+        onOpenChange={(open) => {
+          if (!open) setSelectedCompany(null)
+        }}
+        title={selectedCompany?.name || "Company details"}
+        description="Review account context, linked delivery work, and billing visibility without leaving CRM."
+        sections={
+          selectedCompany
+            ? [
+                {
+                  title: "Company profile",
+                  fields: [
+                    { label: "Company", value: selectedCompany.name },
+                    { label: "Industry", value: selectedCompany.industry || "—" },
+                    { label: "Size", value: selectedCompany.size || "—" },
+                    { label: "Owner", value: selectedCompany.owner || "—" },
+                    { label: "Last updated", value: selectedCompany.updatedAt || "—" },
+                    {
+                      label: "Related projects",
+                      value: relatedProjectsByCompanyId[selectedCompany.id]?.length
+                        ? relatedProjectsByCompanyId[selectedCompany.id].join(", ")
+                        : "No linked projects yet",
+                    },
+                    {
+                      label: "Related invoices",
+                      value: relatedInvoicesByCompanyId[selectedCompany.id]?.length
+                        ? relatedInvoicesByCompanyId[selectedCompany.id].join(", ")
+                        : "No linked invoices yet",
+                    },
+                    {
+                      label: "Create or link project",
+                      value: "Use Projects to attach this company to delivery work. The project form now accepts a linked CRM company.",
+                    },
+                  ],
+                },
+              ]
+            : []
+        }
+      />
 
       <Dialog open={fieldDialogOpen} onOpenChange={setFieldDialogOpen}>
         <DialogContent className="max-w-4xl">

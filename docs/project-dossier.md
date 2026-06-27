@@ -112,19 +112,29 @@ This was chosen because local Turbopack builds were unstable for this repo.
 - Companies CRUD
 - Deals CRUD
 - Follow-up generation endpoint
+- record detail drawers with related project and invoice context
+- CRM to Projects correlation via linked company/contact/deal selectors
+- CRM to Invoices correlation via linked company/deal/project invoice metadata
 - Custom CRM fields with types:
   - text
+  - long text
   - number
   - currency
   - date
   - select
   - multiselect
   - checkbox
+  - url
+  - email
+  - phone
+  - user
 - CRM reports and dashboard views
 
 ### 4.3 Accounting
 
 - Invoice CRUD
+- invoice notes, terms, line items, and related links
+- invoice linkage to CRM company/deal and project context
 - Expense CRUD
 - Report exports
 - Digest/reporting endpoints
@@ -150,6 +160,8 @@ The projects module now has a real server/data layer in local work:
 - project board
 - kanban task flow
 - timeline view
+- linked CRM company/contact/deal context
+- project proof links, client URLs, repository/docs/deployment/monitoring links
 
 The page has been rewired to `/api/projects` and `/api/projects/tasks`.
 
@@ -191,6 +203,8 @@ The page has been rewired to `/api/inventory/*`.
 - AI page in dashboard
 - global AI assist popover / coach
 - AI guided navigation actions
+- launch readiness and setup guidance
+- deterministic guidance for CRM field settings, project proof, CRM/project linking, and invoice/project linking
 - email drafting
 - business summaries
 - live data prompts for CRM / accounting / HR / operations
@@ -353,4 +367,3 @@ The main thing that now matters is operational discipline:
 - keep database connectivity stable
 - finish applying migrations
 - separate committed production-ready work from local experiments
-

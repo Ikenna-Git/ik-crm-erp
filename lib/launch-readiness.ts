@@ -352,11 +352,47 @@ export function getModuleReadiness(context: LaunchContext): ReadinessItem[] {
       href: "/dashboard/crm",
     },
     {
+      id: "crm-redesign",
+      label: "CRM operating-centre redesign",
+      status: "limited",
+      reason: "CRM now carries delivery and billing handoff context, but live validation evidence is still pending.",
+      nextAction: "Open CRM and validate related projects, invoices, and role-adaptable layouts with real data.",
+      evidenceNote: "Action required.",
+      href: "/dashboard/crm",
+    },
+    {
+      id: "crm-field-builder",
+      label: "CRM field builder",
+      status: "limited",
+      reason: "Field types and layout control are richer now, but persistence and validation still need evidence.",
+      nextAction: "Create one custom field, refresh the view, and confirm it remains usable.",
+      evidenceNote: "Action required.",
+      href: "/dashboard/crm",
+    },
+    {
       id: "accounting",
       label: "Accounting",
       status: "limited",
       reason: "Accounting pages, privacy lock, and approval flows exist, but launch sign-off still depends on live approval and privacy evidence.",
       nextAction: "Validate invoice and expense approvals plus Accounting privacy unlock and re-lock.",
+      evidenceNote: "Action required.",
+      href: "/dashboard/accounting",
+    },
+    {
+      id: "invoice-document-fields",
+      label: "Invoice document fields",
+      status: "limited",
+      reason: "Notes, terms, line items, and related links are editable now, but launch evidence is still pending.",
+      nextAction: "Update one invoice document end-to-end and confirm the data survives refresh.",
+      evidenceNote: "Action required.",
+      href: "/dashboard/accounting",
+    },
+    {
+      id: "crm-invoice-links",
+      label: "CRM to Invoices links",
+      status: "limited",
+      reason: "Invoices can now be linked back to CRM and project context, but live browser validation still needs capture.",
+      nextAction: "Link one invoice to a CRM record and project, refresh, and confirm the links remain visible.",
       evidenceNote: "Action required.",
       href: "/dashboard/accounting",
     },
@@ -397,6 +433,30 @@ export function getModuleReadiness(context: LaunchContext): ReadinessItem[] {
       href: "/dashboard/projects",
     },
     {
+      id: "crm-project-links",
+      label: "CRM to Projects links",
+      status: "limited",
+      reason: "Projects now accept linked company, contact, and deal context from CRM, but live validation is still pending.",
+      nextAction: "Create or edit one project with a linked CRM record and confirm the relationship after refresh.",
+      evidenceNote: "Action required.",
+      href: "/dashboard/projects",
+    },
+    {
+      id: "project-proof-links",
+      label: "Project proof and external links",
+      status: "limited",
+      reason:
+        cloudinary === "configured"
+          ? "Proof, repository, deployment, and documentation links are usable and uploads are provider-configured, but live evidence is still pending."
+          : "Proof and external links are usable now, but storage-backed upload claims stay blocked until Cloudinary is validated.",
+      nextAction:
+        cloudinary === "configured"
+          ? "Validate one project with proof links and one upload-backed artifact."
+          : "Validate external proof links now and keep file-upload claims blocked until storage is proven.",
+      evidenceNote: "Action required.",
+      href: "/dashboard/projects",
+    },
+    {
       id: "gallery",
       label: "Gallery",
       status: cloudinary === "configured" ? "limited" : "blocked",
@@ -431,6 +491,24 @@ export function getModuleReadiness(context: LaunchContext): ReadinessItem[] {
           : "Validate deterministic navigation and setup guidance only.",
       evidenceNote: ai === "configured" ? "Action required." : "Ready for deterministic validation.",
       href: "/dashboard/ai",
+    },
+    {
+      id: "civis-guide-knowledge",
+      label: "Civis Guide operating-centre knowledge",
+      status: "limited",
+      reason: "Deterministic guidance now covers setup, launch readiness, CRM links, invoice links, and project proof flows, but validation is still pending.",
+      nextAction: "Ask the new guided questions in Civis Guide and record the results.",
+      evidenceNote: "Action required.",
+      href: "/dashboard/ai",
+    },
+    {
+      id: "liquid-glass-surfaces",
+      label: "Liquid glass surfaces",
+      status: "limited",
+      reason: "The lighter glass treatment is now applied to core runtime surfaces, but final browser validation is still required.",
+      nextAction: "Validate readability and interaction quality on CRM, Projects, Accounting, Setup, and Launch Readiness.",
+      evidenceNote: "Action required.",
+      href: "/dashboard",
     },
     {
       id: "settings",
@@ -551,6 +629,25 @@ export function getWorkspaceSetupItems(context: LaunchContext): ReadinessItem[] 
           : "Civis Pulse and sales workflows stay thin until at least one contact, company, and deal exist.",
       nextAction: "Open CRM and create the first sales records.",
       href: "/dashboard/crm",
+    },
+    {
+      id: "crm-correlation",
+      label: "Link CRM to delivery and billing",
+      status: (counts.deals || 0) > 0 ? "limited" : "action-required",
+      reason:
+        (counts.deals || 0) > 0
+          ? "The workspace now has enough CRM data to begin linking projects and invoices to live customer records."
+          : "Without at least one deal or account, project and invoice linkage stays empty.",
+      nextAction: "Link one project and one invoice back to a CRM company or deal.",
+      href: "/dashboard/projects",
+    },
+    {
+      id: "industry-role-adaptability",
+      label: "Choose an industry and role operating pattern",
+      status: "limited",
+      reason: "The redesigned CRM should adapt to sales, service, operations, and engineering-heavy teams rather than one fixed workflow.",
+      nextAction: "Use Setup to choose which team owns CRM, Projects, and Accounting handoffs first.",
+      href: "/dashboard/setup",
     },
     {
       id: "invite-team-member",
@@ -720,6 +817,33 @@ export function getWorkspaceSetupItems(context: LaunchContext): ReadinessItem[] 
           : "No approval activity exists yet for this workspace.",
       nextAction: "Create one approval request and verify it persists through decision.",
       href: "/dashboard/operations",
+    },
+    {
+      id: "invoice-document-readiness",
+      label: "Finish one invoice document with line items and terms",
+      status: "action-required",
+      reason: "The invoice editor is only meaningful once one real invoice has linked work, notes, terms, and line items saved through refresh.",
+      nextAction: "Open Accounting and complete one invoice document end-to-end.",
+      href: "/dashboard/accounting",
+    },
+    {
+      id: "project-proof-readiness",
+      label: "Attach proof and system links to one project",
+      status: "action-required",
+      reason: "Projects now support proof notes, client URLs, repository links, docs, deployment links, and monitoring links.",
+      nextAction: "Open Projects and add at least one proof link plus one external system link.",
+      href: "/dashboard/projects",
+    },
+    {
+      id: "launch-readiness-review",
+      label: "Review launch readiness inside the app",
+      status: isFounder ? "limited" : "ready",
+      reason:
+        isFounder
+          ? "Founder launch readiness is visible in-app now, but it still depends on fresh evidence."
+          : "Workspace setup now points clearly to founder-owned launch blockers without hiding them in docs only.",
+      nextAction: isFounder ? "Review the founder readiness board after each major validation run." : "Use Setup to track what the founder still owns.",
+      href: isFounder ? "/admin/launch-readiness" : "/dashboard/setup",
     },
     {
       id: "marketing-preview",

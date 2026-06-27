@@ -33,6 +33,7 @@ const mapProject = (project: any): Project => ({
   ownerName: project.ownerName || "",
   siteName: project.siteName || "",
   location: project.location || "",
+  linkedRecords: project.linkedRecords && typeof project.linkedRecords === "object" ? project.linkedRecords : {},
   proofLinks: Array.isArray(project.proofLinks) ? project.proofLinks : [],
   externalLinks: Array.isArray(project.externalLinks) ? project.externalLinks : [],
   status: ["planning", "in-progress", "on-hold", "completed"].includes(project.status) ? project.status : "planning",
@@ -60,6 +61,9 @@ export default function ProjectsPage() {
   const searchQuery = ""
   const [projects, setProjects] = useState<Project[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
+  const [crmCompanies, setCrmCompanies] = useState<Array<{ id: string; label: string }>>([])
+  const [crmContacts, setCrmContacts] = useState<Array<{ id: string; label: string }>>([])
+  const [crmDeals, setCrmDeals] = useState<Array<{ id: string; label: string }>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [openProjectDialog, setOpenProjectDialog] = useState(false)
@@ -79,9 +83,30 @@ export default function ProjectsPage() {
     setLoading(true)
     setError("")
     try {
-      const [projectsRes, tasksRes] = await Promise.all([requestJson<any>("/api/projects"), requestJson<any>("/api/projects/tasks")])
+      const [projectsRes, tasksRes, companiesRes, contactsRes, dealsRes] = await Promise.all([
+        requestJson<any>("/api/projects"),
+        requestJson<any>("/api/projects/tasks"),
+        requestJson<any>("/api/crm/companies"),
+        requestJson<any>("/api/crm/contacts"),
+        requestJson<any>("/api/crm/deals"),
+      ])
       setProjects((projectsRes.projects || []).map(mapProject))
       setTasks((tasksRes.tasks || []).map(mapTask))
+      setCrmCompanies(
+        Array.isArray(companiesRes.companies)
+          ? companiesRes.companies.map((company: any) => ({ id: company.id, label: company.name || company.id }))
+          : [],
+      )
+      setCrmContacts(
+        Array.isArray(contactsRes.contacts)
+          ? contactsRes.contacts.map((contact: any) => ({ id: contact.id, label: contact.name || contact.email || contact.id }))
+          : [],
+      )
+      setCrmDeals(
+        Array.isArray(dealsRes.deals)
+          ? dealsRes.deals.map((deal: any) => ({ id: deal.id, label: deal.title || deal.id }))
+          : [],
+      )
     } catch (err) {
       setError(getApiErrorMessage(err, "Failed to load projects"))
     } finally {
@@ -376,13 +401,17 @@ export default function ProjectsPage() {
         </TabsContent>
 
         <TabsContent value="board" className="space-y-4">
-          <ProjectsBoard
-            searchQuery={searchQuery}
-            statusFilter={statusFilter}
-            projects={projects}
-            onAddProject={addProject}
-            onUpdateProject={handleUpdateProject}
-            onDeleteProject={handleDeleteProject}
+            <ProjectsBoard
+              searchQuery={searchQuery}
+              statusFilter={statusFilter}
+              projects={projects}
+              crmCompanies={crmCompanies}
+              crmContacts={crmContacts}
+              crmDeals={crmDeals}
+              uploadsEnabled={Boolean(process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME)}
+              onAddProject={addProject}
+              onUpdateProject={handleUpdateProject}
+              onDeleteProject={handleDeleteProject}
           />
         </TabsContent>
 

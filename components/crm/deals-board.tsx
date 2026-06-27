@@ -61,9 +61,17 @@ type DealsBoardProps = {
   deals?: Deal[]
   onAddDeal?: (data: Omit<Deal, "id">) => void
   onUpdateDeal?: (id: string, data: Partial<Deal>) => void
+  relatedProjectsByDealId?: Record<string, string[]>
+  relatedInvoicesByDealId?: Record<string, string[]>
 }
 
-export function DealsBoard({ deals, onAddDeal, onUpdateDeal }: DealsBoardProps) {
+export function DealsBoard({
+  deals,
+  onAddDeal,
+  onUpdateDeal,
+  relatedProjectsByDealId = {},
+  relatedInvoicesByDealId = {},
+}: DealsBoardProps) {
   const [dealList, setDealList] = useState<Deal[]>(deals || [])
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -343,6 +351,22 @@ export function DealsBoard({ deals, onAddDeal, onUpdateDeal }: DealsBoardProps) 
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Calendar className="w-3 h-3" />
                         {deal.expectedClose || "—"}
+                      </div>
+                      <div className="rounded-md border border-border/70 bg-muted/20 p-2 text-xs text-muted-foreground">
+                        <p>
+                          Projects:{" "}
+                          {relatedProjectsByDealId[deal.id]?.length ? relatedProjectsByDealId[deal.id].join(", ") : "none linked"}
+                        </p>
+                        <p className="mt-1">
+                          Invoices:{" "}
+                          {relatedInvoicesByDealId[deal.id]?.length ? relatedInvoicesByDealId[deal.id].join(", ") : "none linked"}
+                        </p>
+                        <p className="mt-1">
+                          Next move:{" "}
+                          {relatedProjectsByDealId[deal.id]?.length
+                            ? "Open the linked project in Projects."
+                            : "Create or link a project from Projects once delivery starts."}
+                        </p>
                       </div>
                     </div>
                   </div>

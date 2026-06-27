@@ -263,6 +263,14 @@ const moduleActions: Record<string, AiAction> = {
     title: "Settings",
     message: "Settings is where you manage profile, workspace, notifications, and admin invitations.",
   },
+  setup: {
+    type: "navigate",
+    route: "/dashboard/setup",
+    href: "/dashboard/setup",
+    label: "Open Setup",
+    title: "Setup",
+    message: "Setup is where Civis shows what the workspace can really verify instead of what people assume is done.",
+  },
   marketing: {
     type: "navigate",
     route: "/dashboard/marketing",
@@ -295,9 +303,19 @@ const moduleActions: Record<string, AiAction> = {
     title: "Admin",
     message: "Opening Admin. Founder-only platform controls stay locked unless your role permits them.",
   },
+  launchReadiness: {
+    type: "navigate",
+    route: "/admin/launch-readiness",
+    href: "/admin/launch-readiness",
+    label: "Open Launch Readiness",
+    title: "Launch Readiness",
+    message: "Opening founder launch readiness. It stays honest about what is ready, limited, or still blocked.",
+  },
 }
 
 const commandRoutes: CommandRoute[] = [
+  { match: /\b(setup|onboarding checklist|workspace setup)\b/, action: moduleActions.setup, requiresModule: "settings" },
+  { match: /\b(launch readiness|go live|release board)\b/, action: moduleActions.launchReadiness, requiresAdmin: true, requiresModule: "admin" },
   { match: /\b(pricing|plan|plans|billing)\b/, action: moduleActions.pricing },
   { match: /\b(gallery|media|assets)\b/, action: moduleActions.gallery, requiresModule: "gallery" },
   { match: /\b(crm|contacts?|companies?|deals?)\b/, action: moduleActions.crm, requiresModule: "crm" },
@@ -384,6 +402,62 @@ const resolveGuidedHowTo = (prompt: string): DataResolution | null => {
     return {
       message:
         "Easy.\n\n1. Go to Accounting → Invoices from the sidebar.\n2. Click New Invoice.\n3. Select a client and add line items.\n4. Save the invoice, then request approval if your workflow requires it.\n\nYou can also create invoice workflows from CRM deals if that is enabled. Would you like me to walk you through a full invoice example?",
+      action: moduleActions.accounting,
+    }
+  }
+
+  if (/open crm field settings|crm field settings|custom field settings/.test(value)) {
+    return {
+      message:
+        "Open CRM, then go to Contacts, Companies, or Pipeline and click the Fields button. That is where you add custom fields, choose field types, and control visible columns.",
+      action: moduleActions.crm,
+    }
+  }
+
+  if (/open setup|where is setup|show setup/.test(value)) {
+    return {
+      message:
+        "Setup is the honest workspace checklist. It shows which controls are already verifiable and which still need founder or workspace action.",
+      action: moduleActions.setup,
+    }
+  }
+
+  if (/open launch readiness|show launch readiness|founder release board/.test(value)) {
+    return {
+      message:
+        "Launch Readiness is the founder release board. It keeps missing evidence visible and does not treat configuration alone as proof.",
+      action: moduleActions.launchReadiness,
+    }
+  }
+
+  if (/show me project proof|where is project proof|project proof/.test(value)) {
+    return {
+      message:
+        "Open Projects, choose a project, then open Edit Project. The proof section is where you add proof notes, screenshots, deployment URLs, client-site links, and documentation links. URLs must use http or https.",
+      action: moduleActions.projects,
+    }
+  }
+
+  if (/how do i link a project to a deal|link project to deal|connect project to deal/.test(value)) {
+    return {
+      message:
+        "Go to Projects, create or edit a project, then use the Linked deal field in the CRM relationship section. Save the project and refresh once to confirm the deal link persisted.",
+      action: moduleActions.projects,
+    }
+  }
+
+  if (/how do i add a github link to a project|add github link to project|repository link/.test(value)) {
+    return {
+      message:
+        "Open Projects, edit the project, and use External links. Choose GitHub as the category, paste the repository URL, add an optional note, then save. Civis only accepts safe http or https links.",
+      action: moduleActions.projects,
+    }
+  }
+
+  if (/how do i link an invoice to a project|link invoice to project|connect invoice to project/.test(value)) {
+    return {
+      message:
+        "Go to Accounting, edit the invoice, and use the Linked project field. You can also link the same invoice back to a CRM company or deal so billing keeps the same operating context as delivery.",
       action: moduleActions.accounting,
     }
   }

@@ -7,6 +7,8 @@ import { AlertTriangle, CheckCircle2, ExternalLink, ShieldCheck, Wrench } from "
 
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { LiquidGlassPanel } from "@/components/ui/liquid-glass-panel"
+import { getApiErrorMessage, requestJson } from "@/lib/api-client"
 
 type LaunchItem = {
   id: string
@@ -108,12 +110,10 @@ export default function AdminLaunchReadinessPage() {
       try {
         setLoading(true)
         setError("")
-        const response = await fetch("/api/admin/launch-readiness")
-        const payload = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(payload?.error || "Failed to load launch readiness")
+        const payload = await requestJson<LaunchReadinessResponse>("/api/admin/launch-readiness")
         setData(payload)
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load launch readiness")
+        setError(getApiErrorMessage(err, "Failed to load launch readiness"))
       } finally {
         setLoading(false)
       }
@@ -142,7 +142,7 @@ export default function AdminLaunchReadinessPage() {
 
   return (
     <div className="space-y-6">
-      <Card className="overflow-hidden border-white/10 bg-white/5 text-slate-100">
+      <LiquidGlassPanel className="overflow-hidden text-slate-100">
         <CardContent className="grid gap-6 p-6 lg:grid-cols-[1.15fr_0.85fr] lg:p-8">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
@@ -203,6 +203,21 @@ export default function AdminLaunchReadinessPage() {
               </p>
             </div>
           </div>
+        </CardContent>
+      </LiquidGlassPanel>
+
+      <Card className="border-white/10 bg-white/5 text-slate-100">
+        <CardContent className="grid gap-3 p-6 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            "API errors must surface in the UI, not only in logs.",
+            "CRM must show project and invoice correlation honestly.",
+            "Project proof and invoice document fields must stay persisted after refresh.",
+            "Setup and launch readiness must remain visible in-app, not hidden in docs only.",
+          ].map((item) => (
+            <div key={item} className="rounded-2xl border border-white/10 bg-slate-950/55 p-4 text-sm text-slate-300">
+              {item}
+            </div>
+          ))}
         </CardContent>
       </Card>
 

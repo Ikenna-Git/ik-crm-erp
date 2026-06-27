@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,6 +25,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { toast } from "@/hooks/use-toast"
 import { LiquidGlassPanel } from "@/components/ui/liquid-glass-panel"
+import { getApiErrorMessage, requestJson } from "@/lib/api-client"
 
 const crmNames = ["Adaeze Okafor", "Emeka Umeh", "Sarah Johnson", "David Chen", "Ibrahim Musa", "Lena Martins", "Grace Williams", "Noah Brown"]
 const crmCompanies = ["Northwind", "Acme Corp", "Venture Labs", "Globex", "NovaWorks", "Blue Ridge", "Nimbus", "Zenith"]
@@ -93,6 +94,8 @@ export default function CRMPage() {
   const [contacts, setContacts] = useState<any[]>([])
   const [companies, setCompanies] = useState<any[]>([])
   const [deals, setDeals] = useState<any[]>([])
+  const [projects, setProjects] = useState<any[]>([])
+  const [invoices, setInvoices] = useState<any[]>([])
   const [crmViews, setCrmViews] = useState(DEFAULT_CRM_VIEWS)
   const [exportEmail, setExportEmail] = useState("ikchils@gmail.com")
   const [openExportDialog, setOpenExportDialog] = useState(false)
@@ -294,37 +297,33 @@ export default function CRMPage() {
     try {
       setLoading(true)
       setCrmError("")
-      const [contactsRes, dealsRes, companiesRes] = await Promise.all([
-        fetch("/api/crm/contacts", { headers: { ...getSessionHeaders() } }),
-        fetch("/api/crm/deals", { headers: { ...getSessionHeaders() } }),
-        fetch("/api/crm/companies", { headers: { ...getSessionHeaders() } }),
+      const [contactsJson, dealsJson, companiesJson, projectsJson, invoicesJson] = await Promise.all([
+        requestJson<any>("/api/crm/contacts", { headers: { ...getSessionHeaders() } }),
+        requestJson<any>("/api/crm/deals", { headers: { ...getSessionHeaders() } }),
+        requestJson<any>("/api/crm/companies", { headers: { ...getSessionHeaders() } }),
+        requestJson<any>("/api/projects", { headers: { ...getSessionHeaders() } }),
+        requestJson<any>("/api/accounting/invoices", { headers: { ...getSessionHeaders() } }),
       ])
-      const contactsJson = contactsRes.ok ? await parseJsonSafe(contactsRes) : null
-      const dealsJson = dealsRes.ok ? await parseJsonSafe(dealsRes) : null
-      const companiesJson = companiesRes.ok ? await parseJsonSafe(companiesRes) : null
-
-      if (!contactsRes.ok || !dealsRes.ok || !companiesRes.ok) {
-        throw new Error(
-          contactsJson?.error ||
-            dealsJson?.error ||
-            companiesJson?.error ||
-            "Failed to load CRM data",
-        )
-      }
 
       const loadedContacts = Array.isArray(contactsJson?.contacts) ? contactsJson.contacts.map(mapContact) : []
       const loadedDeals = Array.isArray(dealsJson?.deals) ? dealsJson.deals.map(mapDeal) : []
       const loadedCompanies = Array.isArray(companiesJson?.companies) ? companiesJson.companies.map(mapCompany) : []
+      const loadedProjects = Array.isArray(projectsJson?.projects) ? projectsJson.projects : []
+      const loadedInvoices = Array.isArray(invoicesJson?.invoices) ? invoicesJson.invoices : []
 
       setContacts(loadedContacts)
       setDeals(loadedDeals)
       setCompanies(loadedCompanies)
+      setProjects(loadedProjects)
+      setInvoices(loadedInvoices)
     } catch (err: any) {
       console.error("Failed to load CRM data", err)
-      setCrmError(err?.message || "Failed to load CRM data")
+      setCrmError(getApiErrorMessage(err, "Failed to load CRM data"))
       setContacts([])
       setDeals([])
       setCompanies([])
+      setProjects([])
+      setInvoices([])
     } finally {
       setLoading(false)
     }
@@ -562,6 +561,91 @@ export default function CRMPage() {
     }
   }
 
+  const relatedProjectsByCompanyId = useMemo(
+    () =>
+      Object.fromEntries(
+        companies.map((company) => [
+          company.id,
+          projects
+            .filter(
+              (project) =>
+                project?.linkedRecords?.company?.id === company.id ||
+                String(project?.client || "").toLowerCase() === String(company.name || "").toLowerCase(),
+            )
+            .map((project) => project.name || project.id),
+        ]),
+      ),
+    [companies, projects],
+  )
+
+  const relatedInvoicesByCompanyId = useMemo(
+    () =>
+      Object.fromEntries(
+        companies.map((company) => [
+          company.id,
+          invoices
+            .filter(
+              (invoice) =>
+                invoice?.relatedRecords?.company?.id === company.id ||
+                String(invoice?.clientName || "").toLowerCase() === String(company.name || "").toLowerCase(),
+            )
+            .map((invoice) => invoice.invoiceNumber || invoice.id),
+        ]),
+      ),
+    [companies, invoices],
+  )
+
+  const relatedProjectsByContactId = useMemo(
+    () =>
+      Object.fromEntries(
+        contacts.map((contact) => [
+          contact.id,
+          projects.filter((project) => project?.linkedRecords?.contact?.id === contact.id).map((project) => project.name || project.id),
+        ]),
+      ),
+    [contacts, projects],
+  )
+
+  const relatedInvoicesByContactId = useMemo(
+    () =>
+      Object.fromEntries(
+        contacts.map((contact) => [
+          contact.id,
+          invoices
+            .filter(
+              (invoice) =>
+                invoice?.relatedRecords?.company?.label === contact.company ||
+                invoice?.relatedRecords?.company?.id ===
+                  companies.find((company) => company.name === contact.company)?.id,
+            )
+            .map((invoice) => invoice.invoiceNumber || invoice.id),
+        ]),
+      ),
+    [contacts, invoices, companies],
+  )
+
+  const relatedProjectsByDealId = useMemo(
+    () =>
+      Object.fromEntries(
+        deals.map((deal) => [
+          deal.id,
+          projects.filter((project) => project?.linkedRecords?.deal?.id === deal.id).map((project) => project.name || project.id),
+        ]),
+      ),
+    [deals, projects],
+  )
+
+  const relatedInvoicesByDealId = useMemo(
+    () =>
+      Object.fromEntries(
+        deals.map((deal) => [
+          deal.id,
+          invoices.filter((invoice) => invoice?.relatedRecords?.deal?.id === deal.id).map((invoice) => invoice.invoiceNumber || invoice.id),
+        ]),
+      ),
+    [deals, invoices],
+  )
+
   const handleExportReports = async (target: "desktop" | "email") => {
     try {
       if (target === "desktop") {
@@ -743,7 +827,13 @@ export default function CRMPage() {
         </TabsContent>
 
         <TabsContent value="pipeline" className="space-y-4">
-          <DealsBoard deals={deals} onAddDeal={handleAddDealAPI} onUpdateDeal={handleUpdateDeal} />
+          <DealsBoard
+            deals={deals}
+            onAddDeal={handleAddDealAPI}
+            onUpdateDeal={handleUpdateDeal}
+            relatedProjectsByDealId={relatedProjectsByDealId}
+            relatedInvoicesByDealId={relatedInvoicesByDealId}
+          />
         </TabsContent>
 
         <TabsContent value="contacts" className="space-y-4">
@@ -753,6 +843,8 @@ export default function CRMPage() {
             onAddContact={handleAddContactAPI}
             onDeleteContact={handleDeleteContact}
             onUpdateContact={handleUpdateContact}
+            relatedProjectsByContactId={relatedProjectsByContactId}
+            relatedInvoicesByContactId={relatedInvoicesByContactId}
             crmView={crmViews.contacts}
             onViewChange={(view) => handleViewChange("contacts", view)}
           />
@@ -764,6 +856,8 @@ export default function CRMPage() {
             onAddCompany={handleAddCompanyAPI}
             onDeleteCompany={handleDeleteCompany}
             onUpdateCompany={handleUpdateCompany}
+            relatedProjectsByCompanyId={relatedProjectsByCompanyId}
+            relatedInvoicesByCompanyId={relatedInvoicesByCompanyId}
             crmView={crmViews.companies}
             onViewChange={(view) => handleViewChange("companies", view)}
           />
