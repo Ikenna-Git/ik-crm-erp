@@ -40,6 +40,15 @@ Branch: `p0-permanent-admin-centre-privacy-pins-and-motion-performance`
 | Accounting approvals | Finance / ops | Request + approve/reject persists after refresh |  |  |  |  |  |
 | HR privacy PIN | Authorized HR role | Wrong PIN blocked, correct PIN unlocks, re-lock hides details |  |  |  |  |  |
 | Accounting privacy PIN | Authorized finance role | Wrong PIN blocked, correct PIN unlocks, re-lock hides details |  |  |  |  |  |
+
+## 2026-06-27 Redesign Validation Snapshot
+
+| Test item | Expected result | Actual result | Pass/Fail | Notes/evidence | Tester | Date |
+| --- | --- | --- | --- | --- | --- | --- |
+| Shared API error surfacing foundation | Client mutations can map safe server validation into UI messages | Implemented in `lib/api-client.ts`; browser confirmation still required for every flow | Limited | Code landed; manual PIN + CRM form checks still pending | Codex | 2026-06-27 |
+| CRM shell redesign | No duplicated top-level header pulse stack; clearer CRM + ERP framing | New CRM hero shell, overview tab, pipeline tab, and operating-centre messaging added | Pass in build | Manual browser review still required | Codex | 2026-06-27 |
+| Projects shell redesign | Projects page should explain CRM/delivery proof linkage | New project hero shell, overview tab, owner/site/location capture, and proof/link foundation added | Pass in build | Manual browser review still required | Codex | 2026-06-27 |
+| Live smoke | Safe smoke should detect network/app issues without false FAIL | 0 FAIL, 27 BLOCKED because local environment hit DNS `ENOTFOUND` for Render | Blocked | `BASE_URL=https://ik-crm-erp.onrender.com P0_SMOKE_DEBUG=1 npm run p0:smoke` | Codex | 2026-06-27 |
 | Privacy PIN rotation | Org admin + prior unlocked user | Old unlock session is invalid after rotation or force-lock |  |  |  |  |  |
 | Landing performance | Public | System cursor default, custom cursor opt-in, no lag/hydration issues |  |  |  |  |  |
 | Civis Guide deterministic commands | Authenticated user | Navigation and guidance commands behave honestly |  |  |  |  |  |

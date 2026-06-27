@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   try {
     const { org, user } = await requireModuleAccess(request, "projects", "manage")
     const body = await request.json()
-    const { title, projectId, project, assignee, startDate, endDate, priority, stage } = body || {}
+    const { title, projectId, project, assignee, startDate, endDate, priority, stage, proofLinks } = body || {}
     if (!title) {
       return NextResponse.json({ error: "title is required" }, { status: 400 })
     }
@@ -55,6 +55,7 @@ export async function POST(request: Request) {
         endDate: endDate ? new Date(endDate) : null,
         priority: priority ? String(priority).trim().toLowerCase() : "medium",
         stage: stage ? String(stage).trim().toLowerCase() : "todo",
+        proofLinks: Array.isArray(proofLinks) ? proofLinks : undefined,
       },
       include: { project: true },
     })
@@ -79,7 +80,7 @@ export async function PATCH(request: Request) {
   try {
     const { org, user } = await requireModuleAccess(request, "projects", "manage")
     const body = await request.json()
-    const { id, title, projectId, project, assignee, startDate, endDate, priority, stage } = body || {}
+    const { id, title, projectId, project, assignee, startDate, endDate, priority, stage, proofLinks } = body || {}
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 })
     }
@@ -121,6 +122,7 @@ export async function PATCH(request: Request) {
         endDate: endDate !== undefined ? (endDate ? new Date(endDate) : null) : undefined,
         priority: priority !== undefined ? String(priority).trim().toLowerCase() : undefined,
         stage: stage !== undefined ? String(stage).trim().toLowerCase() : undefined,
+        proofLinks: proofLinks !== undefined && Array.isArray(proofLinks) ? proofLinks : undefined,
       },
       include: { project: true },
     })

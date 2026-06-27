@@ -65,6 +65,11 @@ Branch: `p0-fix-privacy-pin-and-launch-readiness-sweep`
 - “Limited does not mean broken here. It means the feature exists, but launch-window evidence is still pending.”
 
 ### 12. Accounting privacy PIN
+
+## 2026-06-27 Founder Demo Notes
+- call out that validation errors are being moved into visible in-product UI, not left in the browser console
+- use the redesigned CRM shell to explain how a deal becomes a project, then an invoice, then an approval
+- if project proof links or invoice document metadata have not been browser-validated yet, do not overclaim them in the demo
 - “Accounting stays privacy locked separately from HR.”
 - “Unlocking one sensitive module does not unlock the other.”
 

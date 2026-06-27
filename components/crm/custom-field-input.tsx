@@ -2,15 +2,21 @@
 
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Textarea } from "@/components/ui/textarea"
 
 export type CrmFieldType =
   | "TEXT"
+  | "LONG_TEXT"
   | "NUMBER"
   | "CURRENCY"
   | "DATE"
   | "SELECT"
   | "MULTISELECT"
   | "CHECKBOX"
+  | "URL"
+  | "EMAIL"
+  | "PHONE"
+  | "USER"
 
 export type CrmField = {
   id: string
@@ -19,6 +25,9 @@ export type CrmField = {
   type: CrmFieldType
   options?: string[] | null
   required?: boolean
+  visible?: boolean
+  section?: string | null
+  helpText?: string | null
 }
 
 export const normalizeOptions = (options?: string[] | string | null) => {
@@ -115,16 +124,40 @@ export function CustomFieldInput({ field, value, onChange }: CustomFieldInputPro
     )
   }
 
+  if (field.type === "LONG_TEXT") {
+    return (
+      <Textarea
+        value={value ?? ""}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={field.helpText || field.name}
+        className="min-h-[110px]"
+      />
+    )
+  }
+
+  const inputType =
+    field.type === "DATE"
+      ? "date"
+      : field.type === "NUMBER" || field.type === "CURRENCY"
+        ? "number"
+        : field.type === "EMAIL"
+          ? "email"
+          : field.type === "PHONE"
+            ? "tel"
+            : field.type === "URL"
+              ? "url"
+              : "text"
+
   return (
     <Input
-      type={field.type === "DATE" ? "date" : field.type === "NUMBER" || field.type === "CURRENCY" ? "number" : "text"}
+      type={inputType}
       value={value ?? ""}
       onChange={(event) => {
         const nextValue =
           field.type === "NUMBER" || field.type === "CURRENCY" ? Number(event.target.value || 0) : event.target.value
         onChange(nextValue)
       }}
-      placeholder={field.type === "DATE" ? "YYYY-MM-DD" : field.name}
+      placeholder={field.type === "DATE" ? "YYYY-MM-DD" : field.helpText || field.name}
     />
   )
 }

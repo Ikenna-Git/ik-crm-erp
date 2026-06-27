@@ -31,3 +31,10 @@ Date: 2026-06-07
 - Keep the calm premium aesthetic.
 - Win on clarity, governance, and AI-guided next actions.
 - Avoid competing on fake breadth. Compete on connected workflows and honest control.
+# 2026-06-27 Benchmark Addendum
+
+Current product direction after this PR:
+- closer to Dynamics/Odoo-style connected CRM + ERP framing
+- stronger configurable-object posture via richer CRM field types
+- lightweight premium UI accent added without copying motion-heavy Awwwards patterns or shipping WebGL
+- still behind mature CRMs on fully linked record relationships and document builders until live validation and further hardening are complete

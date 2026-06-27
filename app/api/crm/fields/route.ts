@@ -17,7 +17,7 @@ const toEntity = (value?: string | null) => {
 const toFieldType = (value?: string | null) => {
   if (!value) return null
   const upper = value.toUpperCase()
-  const allowed = ["TEXT", "NUMBER", "CURRENCY", "DATE", "SELECT", "MULTISELECT", "CHECKBOX"]
+  const allowed = ["TEXT", "LONG_TEXT", "NUMBER", "CURRENCY", "DATE", "SELECT", "MULTISELECT", "CHECKBOX", "URL", "EMAIL", "PHONE", "USER"]
   return allowed.includes(upper) ? upper : null
 }
 
@@ -104,6 +104,9 @@ export async function POST(request: Request) {
     const name = typeof body?.name === "string" ? body.name.trim() : ""
     const options = toOptions(body?.options)
     const required = Boolean(body?.required)
+    const visible = body?.visible !== false
+    const section = typeof body?.section === "string" ? body.section.trim().slice(0, 80) : null
+    const helpText = typeof body?.helpText === "string" ? body.helpText.trim().slice(0, 160) : null
 
     if (!entity || !type || !name) {
       return NextResponse.json({ error: "entity, name, and type are required" }, { status: 400 })
@@ -130,6 +133,9 @@ export async function POST(request: Request) {
         type: type as any,
         options,
         required,
+        visible,
+        section: section || null,
+        helpText: helpText || null,
         order,
       },
     })
@@ -158,7 +164,7 @@ export async function PATCH(request: Request) {
   try {
     const { org, user } = await requireModuleAccess(request, "crm", "manage")
     const body = await request.json()
-    const { id, name, options, required, archived, order } = body || {}
+    const { id, name, options, required, archived, order, visible, section, helpText } = body || {}
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 })
     }
@@ -166,6 +172,9 @@ export async function PATCH(request: Request) {
     if (typeof name === "string" && name.trim()) updates.name = name.trim()
     if (Array.isArray(options)) updates.options = options
     if (typeof required === "boolean") updates.required = required
+    if (typeof visible === "boolean") updates.visible = visible
+    if (typeof section === "string") updates.section = section.trim().slice(0, 80) || null
+    if (typeof helpText === "string") updates.helpText = helpText.trim().slice(0, 160) || null
     if (typeof archived === "boolean") updates.archived = archived
     if (typeof order === "number") updates.order = order
 

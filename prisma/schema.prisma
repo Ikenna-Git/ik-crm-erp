@@ -81,12 +81,17 @@ enum CrmEntity {
 
 enum CrmFieldType {
   TEXT
+  LONG_TEXT
   NUMBER
   CURRENCY
   DATE
   SELECT
   MULTISELECT
   CHECKBOX
+  URL
+  EMAIL
+  PHONE
+  USER
 }
 
 enum PlaybookStatus {
@@ -353,6 +358,9 @@ model CrmField {
   type      CrmFieldType
   options   Json?
   required  Boolean       @default(false)
+  visible   Boolean       @default(true)
+  section   String?
+  helpText  String?
   archived  Boolean       @default(false)
   order     Int           @default(0)
   createdAt DateTime      @default(now())
@@ -391,6 +399,12 @@ model Invoice {
   status        InvoiceStatus  @default(DRAFT)
   issueDate     DateTime?
   dueDate       DateTime?
+  notes         String?
+  terms         String?
+  lineItems     Json?
+  customFields  Json?
+  relatedLinks  Json?
+  relatedRecords Json?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
@@ -503,6 +517,9 @@ model Project {
   name        String
   description String
   client      String?
+  ownerName   String?
+  siteName    String?
+  location    String?
   status      String      @default("planning")
   progress    Int         @default(0)
   team        Int         @default(0)
@@ -511,6 +528,10 @@ model Project {
   startDate   DateTime?
   endDate     DateTime?
   priority    String      @default("medium")
+  linkedRecords Json?
+  proofLinks  Json?
+  externalLinks Json?
+  customFields Json?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
@@ -531,6 +552,7 @@ model ProjectTask {
   endDate   DateTime?
   priority  String    @default("medium")
   stage     String    @default("todo")
+  proofLinks Json?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 

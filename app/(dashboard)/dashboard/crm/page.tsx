@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Sparkles, Download } from "lucide-react"
+import { ActivitySquare, BriefcaseBusiness, Download, ReceiptText, ShieldCheck, Sparkles, Wrench } from "lucide-react"
 import { ContactsTable } from "@/components/crm/contacts-table"
 import { DealsBoard } from "@/components/crm/deals-board"
 import { ActivitiesTimeline } from "@/components/crm/activities-timeline"
@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { toast } from "@/hooks/use-toast"
+import { LiquidGlassPanel } from "@/components/ui/liquid-glass-panel"
 
 const crmNames = ["Adaeze Okafor", "Emeka Umeh", "Sarah Johnson", "David Chen", "Ibrahim Musa", "Lena Martins", "Grace Williams", "Noah Brown"]
 const crmCompanies = ["Northwind", "Acme Corp", "Venture Labs", "Globex", "NovaWorks", "Blue Ridge", "Nimbus", "Zenith"]
@@ -98,6 +99,7 @@ export default function CRMPage() {
   const [followupSummary, setFollowupSummary] = useState<FollowupSummary | null>(null)
   const [followupLoading, setFollowupLoading] = useState(false)
   const [followupNotice, setFollowupNotice] = useState("")
+  const [activeTab, setActiveTab] = useState("overview")
 
   const parseJsonSafe = async (res: Response) => {
     const text = await res.text()
@@ -607,81 +609,102 @@ export default function CRMPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold" data-ai-anchor="crm-header">
-            CRM Dashboard
-          </h1>
-          <p className="text-muted-foreground mt-1">Manage contacts, deals, and sales activities</p>
-          {loading && <p className="text-xs text-muted-foreground">Loading...</p>}
-          {crmError ? <p className="text-xs text-destructive mt-1">{crmError}</p> : null}
-        </div>
-        <div className="flex gap-2 flex-wrap justify-end">
-          <Dialog open={openExportDialog} onOpenChange={setOpenExportDialog}>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2 bg-transparent">
-                <Download className="w-4 h-4" />
-                Export CRM
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Export CRM report</DialogTitle>
-                <DialogDescription>Download or email your CRM CSV report.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="crm-export-email">Email</Label>
-                  <Input
-                    id="crm-export-email"
-                    type="email"
-                    value={exportEmail}
-                    onChange={(e) => setExportEmail(e.target.value)}
-                    placeholder="name@example.com"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => handleExportReports("desktop")}>
-                    Export to Desktop
-                  </Button>
-                  <Button onClick={() => handleExportReports("email")}>Send to Email</Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-
-      {/* CRM Pulse */}
-      <div className="rounded-xl border border-border bg-card/70 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-primary" />
+    <div className="space-y-6 p-6">
+      <LiquidGlassPanel className="p-6">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-muted-foreground">
+              <Sparkles className="h-3.5 w-3.5 text-primary" />
+              CRM + ERP operating centre
+            </div>
+            <div>
+              <h1 className="text-3xl font-semibold" data-ai-anchor="crm-header">
+                Keep pipeline, delivery, and billing context in one CRM workspace.
+              </h1>
+              <p className="mt-2 max-w-3xl text-sm leading-7 text-muted-foreground md:text-base">
+                Civis should not stop at contacts and deals. Use this workspace to manage relationships, track follow-ups,
+                prep delivery handoffs, and keep invoice-ready context close to the customer record.
+              </p>
+              {loading ? <p className="mt-2 text-xs text-muted-foreground">Loading live CRM records...</p> : null}
+              {crmError ? <p className="mt-2 text-sm text-destructive">{crmError}</p> : null}
+            </div>
           </div>
-          <div>
-            <p className="font-semibold">CRM Focus</p>
-            <p className="text-sm text-muted-foreground">Track pipeline momentum and follow-ups.</p>
+          <div className="flex gap-2 flex-wrap justify-end">
+            <Dialog open={openExportDialog} onOpenChange={setOpenExportDialog}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="flex items-center gap-2 bg-transparent">
+                  <Download className="w-4 h-4" />
+                  Export CRM
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Export CRM report</DialogTitle>
+                  <DialogDescription>Download or email your CRM CSV report.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="crm-export-email">Email</Label>
+                    <Input
+                      id="crm-export-email"
+                      type="email"
+                      value={exportEmail}
+                      onChange={(e) => setExportEmail(e.target.value)}
+                      placeholder="name@example.com"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => handleExportReports("desktop")}>
+                      Export to Desktop
+                    </Button>
+                    <Button onClick={() => handleExportReports("email")}>Send to Email</Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 text-xs">
-          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
-            Contacts: {contacts.length}
-          </span>
-          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
-            Companies: {companies.length}
-          </span>
-          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
-            Deals: {deals.length}
-          </span>
-          <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground">
-            Active follow-ups: {deals.filter((deal) => ["proposal", "negotiation"].includes(deal.stage)).length}
-          </span>
+
+        <div className="mt-6 grid gap-3 md:grid-cols-4">
+          {[
+            { label: "Contacts", value: contacts.length, hint: "Workspace customer records", icon: ActivitySquare },
+            { label: "Companies", value: companies.length, hint: "Accounts ready for delivery and billing", icon: ShieldCheck },
+            { label: "Deals", value: deals.length, hint: "Pipeline and opportunity records", icon: BriefcaseBusiness },
+            {
+              label: "Ops handoffs",
+              value: deals.filter((deal) => ["proposal", "negotiation"].includes(deal.stage)).length,
+              hint: "Deals likely to need projects or invoices next",
+              icon: ReceiptText,
+            },
+          ].map((item) => (
+            <div key={item.label} className="rounded-2xl border border-white/10 bg-black/10 p-4">
+              <item.icon className="h-4 w-4 text-primary" />
+              <p className="mt-4 text-xs uppercase tracking-[0.2em] text-muted-foreground">{item.label}</p>
+              <p className="mt-2 text-xl font-semibold">{item.value}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{item.hint}</p>
+            </div>
+          ))}
         </div>
+      </LiquidGlassPanel>
+
+      <div className="grid gap-4 lg:grid-cols-[1.35fr_0.65fr]">
+        <CrmQualityScorecard contacts={contacts} deals={deals} />
+        <LiquidGlassPanel className="p-5">
+          <div className="flex items-start gap-3">
+            <div className="rounded-2xl border border-white/10 bg-white/10 p-2">
+              <Wrench className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold">Connected operating workflow</h2>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                A mature CRM record should explain what must happen next: follow-up, proposal, project kickoff, invoice
+                drafting, or operations approval. This page now frames that flow directly.
+              </p>
+            </div>
+          </div>
+        </LiquidGlassPanel>
       </div>
 
-      <CrmQualityScorecard contacts={contacts} deals={deals} />
       <FollowupSchedulerCard
         summary={followupSummary}
         loading={followupLoading}
@@ -689,17 +712,40 @@ export default function CRMPage() {
         onGenerate={handleGenerateFollowups}
       />
 
-      {/* Tabs */}
-      <Tabs defaultValue="contacts" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-7">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
           <TabsTrigger value="contacts">Contacts</TabsTrigger>
           <TabsTrigger value="companies">Companies</TabsTrigger>
-          <TabsTrigger value="deals">Sales Pipeline</TabsTrigger>
           <TabsTrigger value="activities">Activities</TabsTrigger>
+          <TabsTrigger value="layouts">Layouts</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
 
-        {/* Contacts Tab */}
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid gap-4 xl:grid-cols-3">
+            <LiquidGlassPanel className="p-5 xl:col-span-2">
+              <h3 className="text-lg font-semibold">What Civis CRM should answer</h3>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Who is the customer? What revenue is active? Which deal is stalled? What project should spin up next? What
+                invoice or operational approval is likely to follow? The rest of this workspace supports those answers.
+              </p>
+            </LiquidGlassPanel>
+            <LiquidGlassPanel className="p-5">
+              <h3 className="text-lg font-semibold">Role adaptability</h3>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Sales teams can stay pipeline-first, while engineering, operations, field service, and project teams can
+                use the same CRM record as the handoff point into delivery.
+              </p>
+            </LiquidGlassPanel>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="pipeline" className="space-y-4">
+          <DealsBoard deals={deals} onAddDeal={handleAddDealAPI} onUpdateDeal={handleUpdateDeal} />
+        </TabsContent>
+
         <TabsContent value="contacts" className="space-y-4">
           <ContactsTable
             searchQuery={searchQuery}
@@ -723,14 +769,18 @@ export default function CRMPage() {
           />
         </TabsContent>
 
-        {/* Deals Tab */}
-        <TabsContent value="deals" className="space-y-4">
-          <DealsBoard deals={deals} onAddDeal={handleAddDealAPI} onUpdateDeal={handleUpdateDeal} />
-        </TabsContent>
-
-        {/* Activities Tab */}
         <TabsContent value="activities" className="space-y-4">
           <ActivitiesTimeline activities={[]} />
+        </TabsContent>
+
+        <TabsContent value="layouts" className="space-y-4">
+          <LiquidGlassPanel className="p-5">
+            <h3 className="text-lg font-semibold">Custom fields and layouts</h3>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Contact, company, and deal tables now expose richer field types so the same CRM structure can fit sales,
+              service, engineering, and operations-heavy organisations without pretending every team works the same way.
+            </p>
+          </LiquidGlassPanel>
         </TabsContent>
 
         <TabsContent value="reports" className="space-y-4">

@@ -22,6 +22,10 @@ export interface Invoice {
   number: string
   client: string
   amount: number
+  notes?: string
+  terms?: string
+  lineItems?: Array<{ description?: string; quantity?: number; unitPrice?: number; amount?: number }>
+  relatedLinks?: Array<{ label?: string; url: string }>
   status: "draft" | "sent" | "paid" | "overdue"
   approvalStatus?: "pending" | "approved" | "rejected" | null
   date?: string
@@ -382,6 +386,24 @@ export function InvoicesTable({
                     { label: "Approval", value: selectedInvoice.approvalStatus || "Not requested" },
                     { label: "Invoice date", value: selectedInvoice.date || "—" },
                     { label: "Due date", value: selectedInvoice.dueDate || "—" },
+                    {
+                      label: "Line items",
+                      value:
+                        selectedInvoice.lineItems?.length
+                          ? selectedInvoice.lineItems
+                              .map((item, index) => item.description || `Line ${index + 1}`)
+                              .join(", ")
+                          : "No line items recorded yet",
+                    },
+                    { label: "Notes", value: selectedInvoice.notes || "—" },
+                    { label: "Terms", value: selectedInvoice.terms || "—" },
+                    {
+                      label: "Related links",
+                      value:
+                        selectedInvoice.relatedLinks?.length
+                          ? selectedInvoice.relatedLinks.map((item) => item.label || item.url).join(", ")
+                          : "No related links recorded",
+                    },
                   ],
                 },
               ]

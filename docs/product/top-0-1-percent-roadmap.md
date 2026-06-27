@@ -46,3 +46,10 @@ Date: 2026-06-07
 - No client-only business persistence
 - No locked-data leakage
 - No permission bypass through AI or UI polish
+# 2026-06-27 Roadmap Addendum
+
+Near-term hardening after the redesign foundation:
+- unify all remaining client mutations on the shared API error helper
+- finish reusable proof-and-links patterns beyond projects
+- deepen invoice document editing and related-record linking
+- surface CRM/ERP correlation hints inside AI guide flows

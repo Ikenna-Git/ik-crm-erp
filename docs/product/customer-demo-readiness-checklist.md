@@ -21,3 +21,10 @@ Date: 2026-06-19
 | Admin | Founder / org owner | Founder and workspace admin experiences remain separated | High |  |  |  |
 | Launch readiness | Founder | Provider diagnostics and evidence gaps visible, no secret leak | High |  |  |  |
 | Marketing | Any allowed user | Preview-only state is explicit, no fake success | Medium |  |  |  |
+# 2026-06-27 Demo Readiness Addendum
+
+Before using the latest build in a customer or investor demo:
+- show CRM as a connected CRM + ERP command layer, not just a sales list
+- avoid promising project proof/file upload flows unless the provider-backed path has been validated live
+- show invoice detail/document improvements only after confirming Accounting privacy unlock behavior on the deployed app
+- keep any missing or blocked flow framed as "foundation shipped, live validation pending"

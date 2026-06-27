@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { getSessionHeaders } from "@/lib/user-settings"
 import { canViewFounderControls } from "@/lib/authz"
+import { requestJson, getApiErrorMessage } from "@/lib/api-client"
 
 type PrivacyLockSetting = {
   module: "hr" | "accounting"
@@ -99,27 +100,13 @@ export function WorkspaceAdminCentre() {
       setLoading(true)
       setError("")
       const headers = { ...getSessionHeaders(session?.user) }
-      const [workspaceRes, privacyRes, usersRes, securityRes, setupRes] = await Promise.all([
-        fetch("/api/admin/workspace", { headers }),
-        fetch("/api/admin/privacy-lock-settings", { headers }),
-        fetch("/api/admin/users", { headers }),
-        fetch("/api/admin/security", { headers }),
-        fetch("/api/setup/readiness", { headers }),
-      ])
-
       const [workspaceData, privacyData, usersData, securityData, setupData] = await Promise.all([
-        workspaceRes.json().catch(() => ({})),
-        privacyRes.json().catch(() => ({})),
-        usersRes.json().catch(() => ({})),
-        securityRes.json().catch(() => ({})),
-        setupRes.json().catch(() => ({})),
+        requestJson<any>("/api/admin/workspace", { headers }),
+        requestJson<any>("/api/admin/privacy-lock-settings", { headers }),
+        requestJson<any>("/api/admin/users", { headers }),
+        requestJson<any>("/api/admin/security", { headers }),
+        requestJson<any>("/api/setup/readiness", { headers }),
       ])
-
-      if (!workspaceRes.ok) throw new Error(workspaceData?.error || "Failed to load workspace admin centre")
-      if (!privacyRes.ok) throw new Error(privacyData?.error || "Failed to load privacy locks")
-      if (!usersRes.ok) throw new Error(usersData?.error || "Failed to load users")
-      if (!securityRes.ok) throw new Error(securityData?.error || "Failed to load admin security")
-      if (!setupRes.ok) throw new Error(setupData?.error || "Failed to load setup readiness")
 
       setWorkspace({
         name: workspaceData?.org?.name || "Workspace",
@@ -141,7 +128,7 @@ export function WorkspaceAdminCentre() {
       setSetupItems(Array.isArray(setupData?.setupItems) ? setupData.setupItems : [])
       setNotes(privacyData?.notes || {})
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load workspace admin centre")
+      setError(getApiErrorMessage(err, "Failed to load workspace admin centre"))
     } finally {
       setLoading(false)
     }
@@ -166,7 +153,7 @@ export function WorkspaceAdminCentre() {
     try {
       setSaving(true)
       setError("")
-      const response = await fetch("/api/admin/privacy-lock-settings", {
+      await requestJson("/api/admin/privacy-lock-settings", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -179,13 +166,11 @@ export function WorkspaceAdminCentre() {
           confirmPin: pinForm.confirmPin,
         }),
       })
-      const payload = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(payload?.error || "Failed to update privacy PIN")
       setDialogModule(null)
       setPinForm({ pin: "", confirmPin: "" })
       await loadAll()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update privacy PIN")
+      setError(getApiErrorMessage(err, "Failed to update privacy PIN"))
     } finally {
       setSaving(false)
     }
@@ -195,7 +180,7 @@ export function WorkspaceAdminCentre() {
     try {
       setSaving(true)
       setError("")
-      const response = await fetch("/api/admin/privacy-lock-settings", {
+      await requestJson("/api/admin/privacy-lock-settings", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -206,11 +191,9 @@ export function WorkspaceAdminCentre() {
           action: "force-lock",
         }),
       })
-      const payload = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(payload?.error || "Failed to force-lock active sessions")
       await loadAll()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to force-lock active sessions")
+      setError(getApiErrorMessage(err, "Failed to force-lock active sessions"))
     } finally {
       setSaving(false)
     }

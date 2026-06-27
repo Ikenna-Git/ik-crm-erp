@@ -26,7 +26,26 @@ export async function POST(request: Request) {
   try {
     const { org, user } = await requireModuleAccess(request, "projects", "manage")
     const body = await request.json()
-    const { name, description, client, status, progress, team, budget, spent, startDate, endDate, priority } = body || {}
+    const {
+      name,
+      description,
+      client,
+      ownerName,
+      siteName,
+      location,
+      linkedRecords,
+      proofLinks,
+      externalLinks,
+      customFields,
+      status,
+      progress,
+      team,
+      budget,
+      spent,
+      startDate,
+      endDate,
+      priority,
+    } = body || {}
     if (!name) {
       return NextResponse.json({ error: "name is required" }, { status: 400 })
     }
@@ -37,6 +56,13 @@ export async function POST(request: Request) {
         name: String(name).trim(),
         description: description ? String(description).trim() : "",
         client: client ? String(client).trim() : null,
+        ownerName: ownerName ? String(ownerName).trim() : null,
+        siteName: siteName ? String(siteName).trim() : null,
+        location: location ? String(location).trim() : null,
+        linkedRecords: linkedRecords && typeof linkedRecords === "object" ? linkedRecords : undefined,
+        proofLinks: Array.isArray(proofLinks) ? proofLinks : undefined,
+        externalLinks: Array.isArray(externalLinks) ? externalLinks : undefined,
+        customFields: customFields && typeof customFields === "object" ? customFields : undefined,
         status: status ? String(status).trim().toLowerCase() : "planning",
         progress: Number(progress || 0),
         team: Number(team || 0),
@@ -69,7 +95,27 @@ export async function PATCH(request: Request) {
   try {
     const { org, user } = await requireModuleAccess(request, "projects", "manage")
     const body = await request.json()
-    const { id, name, description, client, status, progress, team, budget, spent, startDate, endDate, priority } = body || {}
+    const {
+      id,
+      name,
+      description,
+      client,
+      ownerName,
+      siteName,
+      location,
+      linkedRecords,
+      proofLinks,
+      externalLinks,
+      customFields,
+      status,
+      progress,
+      team,
+      budget,
+      spent,
+      startDate,
+      endDate,
+      priority,
+    } = body || {}
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 })
     }
@@ -87,6 +133,13 @@ export async function PATCH(request: Request) {
         name: name !== undefined ? String(name).trim() : undefined,
         description: description !== undefined ? String(description).trim() : undefined,
         client: client !== undefined ? (client ? String(client).trim() : null) : undefined,
+        ownerName: ownerName !== undefined ? (ownerName ? String(ownerName).trim() : null) : undefined,
+        siteName: siteName !== undefined ? (siteName ? String(siteName).trim() : null) : undefined,
+        location: location !== undefined ? (location ? String(location).trim() : null) : undefined,
+        linkedRecords: linkedRecords !== undefined && typeof linkedRecords === "object" ? linkedRecords : undefined,
+        proofLinks: proofLinks !== undefined && Array.isArray(proofLinks) ? proofLinks : undefined,
+        externalLinks: externalLinks !== undefined && Array.isArray(externalLinks) ? externalLinks : undefined,
+        customFields: customFields !== undefined && typeof customFields === "object" ? customFields : undefined,
         status: status !== undefined ? String(status).trim().toLowerCase() : undefined,
         progress: progress !== undefined ? Number(progress || 0) : undefined,
         team: team !== undefined ? Number(team || 0) : undefined,

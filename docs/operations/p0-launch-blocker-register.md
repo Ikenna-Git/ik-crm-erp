@@ -27,3 +27,19 @@ Branch: `p0-permanent-admin-centre-privacy-pins-and-motion-performance`
 | Backup evidence gap | Ops / trust | Open | Product language stays honest; no fake sign-off | Real backup evidence required |
 | Restore drill evidence gap | Ops / trust | Open | Product language stays honest; no fake sign-off | Real restore drill evidence required |
 | Fake-data review gap | Demo / customer readiness | Open | Demo/sample guidance added; no fake customer claims should be made | Human review and evidence required |
+
+## 2026-06-27 CRM + ERP Redesign Foundations
+- Status: Limited
+- Product issue confirmed: multiple APIs already returned safe `{ error }` messages, but key client flows still left validation feedback hidden in DevTools instead of surfacing it in the product UI.
+- Implemented in code:
+  - shared client API error helper for safe message extraction
+  - workspace privacy PIN admin actions now surface validation errors in-product
+  - CRM and Projects shells were redesigned toward a connected CRM + ERP operating-centre model
+  - CRM custom-field foundations now support long text, URL, email, phone, and user/owner field types
+  - Projects and invoices now have safe persistence foundations for proof/links and document metadata
+  - lightweight liquid-glass panel component added without WebGL or canvas
+- Remaining evidence required:
+  - weak PIN and short PIN validation confirmed in browser UI
+  - CRM field editor usability and persistence confirmed live
+  - project proof/link flows confirmed live
+  - invoice document metadata and privacy-aware export confirmed live

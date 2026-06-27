@@ -21,6 +21,11 @@ export interface Project {
   name: string
   description: string
   client?: string
+  ownerName?: string
+  siteName?: string
+  location?: string
+  proofLinks?: Array<{ label?: string; url: string }>
+  externalLinks?: Array<{ label?: string; url: string; category?: string }>
   status: "planning" | "in-progress" | "on-hold" | "completed"
   progress: number
   team: number
@@ -375,6 +380,9 @@ export function ProjectsBoard({
                   fields: [
                     { label: "Name", value: selectedProject.name },
                     { label: "Client", value: selectedProject.client || "—" },
+                    { label: "Owner", value: selectedProject.ownerName || "—" },
+                    { label: "Site", value: selectedProject.siteName || "—" },
+                    { label: "Location", value: selectedProject.location || "—" },
                     { label: "Status", value: selectedProject.status },
                     { label: "Priority", value: selectedProject.priority },
                     { label: "Progress", value: `${selectedProject.progress}%` },
@@ -384,6 +392,20 @@ export function ProjectsBoard({
                     { label: "Start date", value: selectedProject.startDate },
                     { label: "End date", value: selectedProject.endDate },
                     { label: "Description", value: selectedProject.description },
+                    {
+                      label: "Delivery proof",
+                      value:
+                        selectedProject.proofLinks?.length
+                          ? selectedProject.proofLinks.map((item) => item.label || item.url).join(", ")
+                          : "No proof links added yet",
+                    },
+                    {
+                      label: "External links",
+                      value:
+                        selectedProject.externalLinks?.length
+                          ? selectedProject.externalLinks.map((item) => item.label || item.url).join(", ")
+                          : "No external links added yet",
+                    },
                   ],
                 },
               ]

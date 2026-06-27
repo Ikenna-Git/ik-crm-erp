@@ -60,3 +60,9 @@ Date: 2026-06-19
 - “Ready for validation.”
 - “Role-aware.”
 - “Governed workspace.”
+# 2026-06-27 Story Update
+
+Narrative shift:
+- Civis CRM should be presented as the relationship layer that hands work into Projects, Accounting, and Operations
+- Projects should be shown as delivery execution with owner, site, link, and proof context
+- Privacy-sensitive modules should be introduced with visible validation and unlock guardrails, not hidden DevTools output

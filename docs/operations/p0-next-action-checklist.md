@@ -79,3 +79,12 @@ Branch: `p0-permanent-admin-centre-privacy-pins-and-motion-performance`
 - [ ] Launch blocker register updated
 - [ ] Go-live decision updated from current evidence, not optimism
 - [ ] Landing performance checked with system cursor default and custom cursor opt-in
+
+## 2026-06-27 Redesign Follow-up
+- [ ] Trigger weak privacy PIN and confirm the server message appears in the visible UI
+- [ ] Trigger short privacy PIN and confirm the server message appears in the visible UI
+- [ ] Open `/dashboard/crm` and confirm the new overview/pipeline shell is live on Render
+- [ ] Open CRM field editors and validate new field types: long text, URL, email, phone, user/owner
+- [ ] Open `/dashboard/projects` and confirm owner/site/location capture and proof/link foundation are live
+- [ ] Open Accounting invoice details and confirm notes/terms/line-item metadata render correctly when unlocked
+- [ ] Re-run live smoke from a machine that can resolve `ik-crm-erp.onrender.com`

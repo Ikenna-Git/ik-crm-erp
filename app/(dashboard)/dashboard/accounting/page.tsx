@@ -27,6 +27,7 @@ import { formatNaira } from "@/lib/currency"
 import { toast } from "@/hooks/use-toast"
 import { hasModuleAccess } from "@/lib/access-control"
 import { isAdmin } from "@/lib/authz"
+import { requestJson, getApiErrorMessage } from "@/lib/api-client"
 
 const sectionLoader = (label: string) => () => <div className="text-sm text-muted-foreground">Loading {label}...</div>
 
@@ -148,15 +149,6 @@ export default function AccountingPage() {
   const canManageSensitiveAccounting = canManageAccounting || privacyCanUnlock
   const canUseSensitiveAccounting = canManageSensitiveAccounting && privacyUnlocked
 
-  const parseJsonSafe = async (res: Response) => {
-    const text = await res.text()
-    try {
-      return JSON.parse(text)
-    } catch {
-      throw new Error(`Invalid JSON response: ${text.slice(0, 120)}`)
-    }
-  }
-
   const splitCsvLine = (line: string) => {
     const result: string[] = []
     let current = ""
@@ -205,6 +197,10 @@ export default function AccountingPage() {
     number: safeString(inv?.invoiceNumber, "Untitled invoice"),
     client: safeString(inv?.clientName, "Unknown client"),
     amount: safeNumber(inv?.amount),
+    notes: safeString(inv?.notes),
+    terms: safeString(inv?.terms),
+    lineItems: Array.isArray(inv?.lineItems) ? inv.lineItems : [],
+    relatedLinks: Array.isArray(inv?.relatedLinks) ? inv.relatedLinks : [],
     status: String(inv?.status || "DRAFT").toLowerCase() as Invoice["status"],
     approvalStatus:
       inv?.approvalStatus === "pending" || inv?.approvalStatus === "approved" || inv?.approvalStatus === "rejected"
@@ -285,16 +281,11 @@ export default function AccountingPage() {
     try {
       setLoading(true)
       setImportNotice("")
-      const [invRes, expRes] = await Promise.all([
-        fetch("/api/accounting/invoices", { headers: { ...getSessionHeaders() } }),
-        fetch("/api/accounting/expenses", { headers: { ...getSessionHeaders() } }),
+      const headers = { ...getSessionHeaders() }
+      const [invJson, expJson] = await Promise.all([
+        requestJson<any>("/api/accounting/invoices", { headers }),
+        requestJson<any>("/api/accounting/expenses", { headers }),
       ])
-      const invJson = invRes.ok ? await parseJsonSafe(invRes) : null
-      const expJson = expRes.ok ? await parseJsonSafe(expRes) : null
-
-      if (!invRes.ok || !expRes.ok) {
-        throw new Error(invJson?.error || expJson?.error || "Failed to load accounting data")
-      }
 
       const mappedInvoices = Array.isArray(invJson?.invoices) ? invJson.invoices.map(mapInvoice) : []
 
@@ -304,7 +295,7 @@ export default function AccountingPage() {
       setExpenses(mappedExpenses)
     } catch (err: any) {
       console.error("Failed to load accounting data", err)
-      setError(err?.message || "Failed to load accounting data")
+      setError(getApiErrorMessage(err, "Failed to load accounting data"))
       setInvoices([])
       setExpenses([])
     } finally {
@@ -320,7 +311,7 @@ export default function AccountingPage() {
     setPrivacyLoading(true)
     setPrivacyError("")
     try {
-      const response = await parseJsonSafe(await fetch("/api/privacy-lock?module=accounting", { headers: { ...getSessionHeaders() } }))
+      const response = await requestJson<any>("/api/privacy-lock?module=accounting", { headers: { ...getSessionHeaders() } })
       setPrivacyUnlocked(Boolean(response.unlocked))
       setPrivacyConfigured(response.configured !== false)
       setPrivacyCanUnlock(Boolean(response.canUnlock))
@@ -331,7 +322,7 @@ export default function AccountingPage() {
       setPrivacyConfigured(true)
       setPrivacyCanUnlock(false)
       setPrivacyMessage("Checking privacy state failed.")
-      setPrivacyError(err?.message || "Failed to load Accounting privacy state")
+      setPrivacyError(getApiErrorMessage(err, "Failed to load Accounting privacy state"))
       return null
     } finally {
       setPrivacyLoading(false)
@@ -346,17 +337,15 @@ export default function AccountingPage() {
     setPrivacyError("")
     setPrivacyLoading(true)
     try {
-      const response = await fetch("/api/privacy-lock", {
+      await requestJson("/api/privacy-lock", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
         body: JSON.stringify({ module: "accounting", pin }),
       })
-      const data = await parseJsonSafe(response)
-      if (!response.ok) throw new Error(data.error || "Failed to unlock Accounting privacy")
       await loadPrivacyState()
       await loadData()
     } catch (err: any) {
-      setPrivacyError(err?.message || "Failed to unlock Accounting privacy")
+      setPrivacyError(getApiErrorMessage(err, "Failed to unlock Accounting privacy"))
     } finally {
       setPrivacyLoading(false)
     }
@@ -366,17 +355,15 @@ export default function AccountingPage() {
     setPrivacyError("")
     setPrivacyLoading(true)
     try {
-      const response = await fetch("/api/privacy-lock", {
+      await requestJson("/api/privacy-lock", {
         method: "DELETE",
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
         body: JSON.stringify({ module: "accounting" }),
       })
-      const data = await parseJsonSafe(response)
-      if (!response.ok) throw new Error(data.error || "Failed to relock Accounting privacy")
       await loadPrivacyState()
       await loadData()
     } catch (err: any) {
-      setPrivacyError(err?.message || "Failed to relock Accounting privacy")
+      setPrivacyError(getApiErrorMessage(err, "Failed to relock Accounting privacy"))
     } finally {
       setPrivacyLoading(false)
     }
@@ -385,7 +372,7 @@ export default function AccountingPage() {
   const createInvoice = async (payload: Omit<Invoice, "id">) => {
     try {
       setError("")
-      const res = await fetch("/api/accounting/invoices", {
+      const data = await requestJson<any>("/api/accounting/invoices", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
         body: JSON.stringify({
@@ -397,13 +384,11 @@ export default function AccountingPage() {
           status: payload.status,
         }),
       })
-      const data = await parseJsonSafe(res)
-      if (!res.ok) throw new Error(data.error || "Failed to add invoice")
       const mapped = mapInvoice(data.invoice)
       setInvoices((prev) => [mapped, ...prev])
       return mapped
     } catch (err: any) {
-      setError(err?.message || "Failed to add invoice")
+      setError(getApiErrorMessage(err, "Failed to add invoice"))
       return null
     }
   }
@@ -411,7 +396,7 @@ export default function AccountingPage() {
   const createExpense = async (payload: Omit<Expense, "id">) => {
     try {
       setError("")
-      const res = await fetch("/api/accounting/expenses", {
+      const data = await requestJson<any>("/api/accounting/expenses", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
         body: JSON.stringify({
@@ -423,13 +408,11 @@ export default function AccountingPage() {
           submittedBy: payload.submittedBy,
         }),
       })
-      const data = await parseJsonSafe(res)
-      if (!res.ok) throw new Error(data.error || "Failed to add expense")
       const mapped = mapExpense(data.expense)
       setExpenses((prev) => [mapped, ...prev])
       return mapped
     } catch (err: any) {
-      setError(err?.message || "Failed to add expense")
+      setError(getApiErrorMessage(err, "Failed to add expense"))
       return null
     }
   }
@@ -465,7 +448,7 @@ export default function AccountingPage() {
   const handleUpdateInvoice = async (id: string, data: Partial<Invoice>) => {
     try {
       setError("")
-      const res = await fetch("/api/accounting/invoices", {
+      const json = await requestJson<any>("/api/accounting/invoices", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
         body: JSON.stringify({
@@ -478,37 +461,31 @@ export default function AccountingPage() {
           issueDate: data.date,
         }),
       })
-      const json = await parseJsonSafe(res)
-      if (!res.ok) throw new Error(json.error || "Failed to update invoice")
       const updated = mapInvoice(json.invoice)
       setInvoices((prev) => prev.map((inv) => (inv.id === id ? updated : inv)))
     } catch (err: any) {
-      setError(err?.message || "Failed to update invoice")
+      setError(getApiErrorMessage(err, "Failed to update invoice"))
     }
   }
 
   const handleDeleteInvoice = async (id: string) => {
     try {
       setError("")
-      const res = await fetch(`/api/accounting/invoices?id=${id}`, {
+      await requestJson(`/api/accounting/invoices?id=${id}`, {
         method: "DELETE",
         headers: { ...getSessionHeaders() },
       })
-      if (!res.ok) {
-        const json = await parseJsonSafe(res)
-        throw new Error(json.error || "Failed to delete invoice")
-      }
       setInvoices((prev) => prev.filter((inv) => inv.id !== id))
     } catch (err: any) {
       console.warn("Failed to delete invoice", err)
-      setError(err?.message || "Failed to delete invoice")
+      setError(getApiErrorMessage(err, "Failed to delete invoice"))
     }
   }
 
   const handleUpdateExpense = async (id: string, data: Partial<Expense>) => {
     try {
       setError("")
-      const res = await fetch("/api/accounting/expenses", {
+      const json = await requestJson<any>("/api/accounting/expenses", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...getSessionHeaders() },
         body: JSON.stringify({
@@ -521,43 +498,33 @@ export default function AccountingPage() {
           submittedBy: data.submittedBy,
         }),
       })
-      const json = await parseJsonSafe(res)
-      if (!res.ok) throw new Error(json.error || "Failed to update expense")
       const updated = mapExpense(json.expense)
       setExpenses((prev) => prev.map((exp) => (exp.id === id ? updated : exp)))
     } catch (err: any) {
-      setError(err?.message || "Failed to update expense")
+      setError(getApiErrorMessage(err, "Failed to update expense"))
     }
   }
 
   const handleDeleteExpense = async (id: string) => {
     try {
       setError("")
-      const res = await fetch(`/api/accounting/expenses?id=${id}`, {
+      await requestJson(`/api/accounting/expenses?id=${id}`, {
         method: "DELETE",
         headers: { ...getSessionHeaders() },
       })
-      if (!res.ok) {
-        const json = await parseJsonSafe(res)
-        throw new Error(json.error || "Failed to delete expense")
-      }
       setExpenses((prev) => prev.filter((exp) => exp.id !== id))
     } catch (err: any) {
       console.warn("Failed to delete expense", err)
-      setError(err?.message || "Failed to delete expense")
+      setError(getApiErrorMessage(err, "Failed to delete expense"))
     }
   }
 
   const requestApproval = async (sourceType: "invoice" | "expense", sourceId: string) => {
-    const res = await fetch("/api/ops/approvals", {
+    const data = await requestJson<any>("/api/ops/approvals", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getSessionHeaders() },
       body: JSON.stringify({ sourceType, sourceId }),
     })
-    const data = await parseJsonSafe(res)
-    if (!res.ok) {
-      throw new Error(data?.error || "Failed to request approval")
-    }
     return data?.approval || null
   }
 

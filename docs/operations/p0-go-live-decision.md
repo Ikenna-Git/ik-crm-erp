@@ -46,3 +46,11 @@ Move to go-live only when:
 5. Backup / restore / fake-data review evidence is logged.
 
 Until then, Civis is valid for guided demos and internal validation, not full go-live approval.
+# 2026-06-27 Decision Addendum
+
+Decision: Not yet ready for final launch sign-off.
+
+Reasons:
+- the redesign foundations for API error surfacing, CRM operating-centre UX, project proof/link support, invoice document metadata, and liquid-glass UI are now in code
+- the changes built successfully, but live browser evidence is still missing for privacy PIN validation surfacing, CRM field editor UX, project proof/link usage, and invoice document behavior
+- the latest smoke run had `0 fail` but stayed `BLOCKED` by local DNS reachability to Render, so it does not replace live verification

@@ -46,7 +46,7 @@ export async function POST(request: Request) {
   try {
     const { org, user } = await requireModuleAccess(request, "accounting", "manage")
     const body = await request.json()
-    const { invoiceNumber, clientName, amount, status, dueDate, issueDate } = body || {}
+    const { invoiceNumber, clientName, amount, status, dueDate, issueDate, notes, terms, lineItems, customFields, relatedLinks, relatedRecords } = body || {}
     if (!invoiceNumber || !clientName || typeof amount !== "number") {
       return NextResponse.json({ error: "invoiceNumber, clientName, amount required" }, { status: 400 })
     }
@@ -60,6 +60,12 @@ export async function POST(request: Request) {
         status: safeStatus,
         issueDate: issueDate ? new Date(issueDate) : null,
         dueDate: dueDate ? new Date(dueDate) : null,
+        notes: typeof notes === "string" ? notes.trim() : null,
+        terms: typeof terms === "string" ? terms.trim() : null,
+        lineItems: Array.isArray(lineItems) ? lineItems : undefined,
+        customFields: customFields && typeof customFields === "object" ? customFields : undefined,
+        relatedLinks: Array.isArray(relatedLinks) ? relatedLinks : undefined,
+        relatedRecords: relatedRecords && typeof relatedRecords === "object" ? relatedRecords : undefined,
         orgId: org.id,
       },
     })
@@ -89,7 +95,7 @@ export async function PATCH(request: Request) {
   try {
     const { org, user } = await requireModuleAccess(request, "accounting", "manage")
     const body = await request.json()
-    const { id, invoiceNumber, clientName, amount, status, dueDate, issueDate } = body || {}
+    const { id, invoiceNumber, clientName, amount, status, dueDate, issueDate, notes, terms, lineItems, customFields, relatedLinks, relatedRecords } = body || {}
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 })
     }
@@ -109,6 +115,12 @@ export async function PATCH(request: Request) {
         status: safeStatus,
         issueDate: issueDate ? new Date(issueDate) : undefined,
         dueDate: dueDate ? new Date(dueDate) : undefined,
+        notes: typeof notes === "string" ? notes.trim() : undefined,
+        terms: typeof terms === "string" ? terms.trim() : undefined,
+        lineItems: lineItems !== undefined && Array.isArray(lineItems) ? lineItems : undefined,
+        customFields: customFields !== undefined && typeof customFields === "object" ? customFields : undefined,
+        relatedLinks: relatedLinks !== undefined && Array.isArray(relatedLinks) ? relatedLinks : undefined,
+        relatedRecords: relatedRecords !== undefined && typeof relatedRecords === "object" ? relatedRecords : undefined,
       },
     })
     if (previous) {

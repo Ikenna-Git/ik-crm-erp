@@ -17,3 +17,11 @@ Date: 2026-06-07
 | Record dialogs | 390px | Scroll / close / locked state | Shared dialog already hardened; lock copy updated | Needs mobile QA | Pending | Open HR + Accounting details dialogs |
 | HR privacy lock | 390px | Tiny tap targets / overflow | New lock panel uses compact controls | Needs live mobile test | Pending | Test unlock + relock on mobile |
 | Accounting privacy lock | 390px | Tiny tap targets / overflow | New lock panel uses compact controls | Needs live mobile test | Pending | Test unlock + relock on mobile |
+# 2026-06-27 Premium UI QA Addendum
+
+Validate the new liquid-glass system against these rules:
+- glass panels stay readable in both light and dark modes
+- hover/focus remains subtle and does not feel bouncy
+- no cursor override is forced
+- no canvas, WebGL, or heavy animation loop is used
+- CRM and Projects heroes feel premium without slowing table-heavy work areas

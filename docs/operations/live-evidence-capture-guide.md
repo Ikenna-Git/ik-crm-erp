@@ -113,3 +113,13 @@ Use this guide after redeploy. Do not mark any item complete without the actual 
 | Backup evidence | Founder | Latest backup proof attached |  |  |  |  |  |
 | Restore drill | Founder | Latest restore proof attached |  |  |  |  |  |
 | Fake-data review | Founder | Demo/sample records reviewed and labeled honestly |  |  |  |  |  |
+# 2026-06-27 Evidence Addendum
+
+Capture screenshots or short clips for these redesign-sensitive checks:
+- weak privacy PIN error appears directly in Workspace Admin Center or privacy lock UI
+- short privacy PIN error appears directly in Workspace Admin Center or privacy lock UI
+- CRM create/edit validation appears in-page without opening DevTools
+- CRM overview opens without duplicated top-level headers
+- CRM field editor stays scrollable and closeable while using richer field types
+- Projects page shows owner/site/location context and any saved proof or external links
+- Invoice details show notes/terms/line-item metadata only when Accounting privacy is unlocked

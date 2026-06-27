@@ -326,12 +326,17 @@ export function ContactsTable({
 
   const fieldTypeHelp: Record<CrmFieldType, { hint: string; example: string }> = {
     TEXT: { hint: "Use text for free-form notes or labels.", example: "e.g. Lagos" },
+    LONG_TEXT: { hint: "Longer notes for onboarding context or field observations.", example: "e.g. Multi-team handoff notes" },
     NUMBER: { hint: "Numbers only, no currency symbols.", example: "e.g. 12" },
     CURRENCY: { hint: "Numeric amounts in NGN.", example: "e.g. 250000" },
     DATE: { hint: "Date format is YYYY-MM-DD.", example: "e.g. 2025-03-15" },
     SELECT: { hint: "Single choice. Provide comma-separated options.", example: "Online, Referral, Partner" },
     MULTISELECT: { hint: "Multiple choices. Provide comma-separated options.", example: "Payroll, CRM, HR" },
     CHECKBOX: { hint: "Yes/No toggle.", example: "Example: VIP customer" },
+    URL: { hint: "Capture websites or profile links.", example: "e.g. https://client.example.com" },
+    EMAIL: { hint: "Use for alternate or shared inbox addresses.", example: "e.g. ops@example.com" },
+    PHONE: { hint: "Use for direct or escalation numbers.", example: "e.g. +2348012345678" },
+    USER: { hint: "Reference a responsible teammate or owner.", example: "e.g. Success manager" },
   }
 
   const customFieldMap = useMemo(
@@ -789,12 +794,17 @@ export function ContactsTable({
                     disabled={isEditingField}
                   >
                     <option value="TEXT">Text</option>
+                    <option value="LONG_TEXT">Long text</option>
                     <option value="NUMBER">Number</option>
                     <option value="CURRENCY">Currency</option>
                     <option value="DATE">Date</option>
                     <option value="SELECT">Single select</option>
                     <option value="MULTISELECT">Multi select</option>
                     <option value="CHECKBOX">Checkbox</option>
+                    <option value="URL">URL / link</option>
+                    <option value="EMAIL">Email</option>
+                    <option value="PHONE">Phone</option>
+                    <option value="USER">User / owner</option>
                   </select>
                 </div>
                 {["SELECT", "MULTISELECT"].includes(fieldForm.type) && (
