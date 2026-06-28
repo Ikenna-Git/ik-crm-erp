@@ -136,6 +136,7 @@ export const completeCredentialsSignup = async ({
         name: normalizedName,
         role,
         accessProfile: getDefaultAccessProfileForRole(role),
+        twoFactorBackupCodes: [],
         moduleAccess: buildModuleAccessForUser({
           role,
           accessProfile: getDefaultAccessProfileForRole(role),

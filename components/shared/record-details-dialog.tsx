@@ -23,6 +23,8 @@ type RecordDetailsDialogProps = {
   locked?: boolean
   lockedTitle?: string
   lockedDescription?: string
+  headerContent?: ReactNode
+  footer?: ReactNode
 }
 
 export function RecordDetailsDialog({
@@ -34,6 +36,8 @@ export function RecordDetailsDialog({
   locked = false,
   lockedTitle = "Details unavailable",
   lockedDescription = "Your current role can access this module, but not the underlying record details.",
+  headerContent,
+  footer,
 }: RecordDetailsDialogProps) {
   const safeValue = (value: ReactNode) => {
     if (value === null || value === undefined || value === "") return "—"
@@ -51,6 +55,7 @@ export function RecordDetailsDialog({
             ) : description ? (
               <DialogDescription>{description}</DialogDescription>
             ) : null}
+            {!locked && headerContent ? <div className="mt-4">{headerContent}</div> : null}
           </div>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto px-6 py-5">
@@ -83,9 +88,12 @@ export function RecordDetailsDialog({
           )}
         </div>
         <div className="border-t border-border px-6 py-4">
-          <Button type="button" variant="outline" className="w-full bg-transparent sm:w-auto" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            {footer ? <div className="flex flex-wrap gap-2">{footer}</div> : <div />}
+            <Button type="button" variant="outline" className="w-full bg-transparent sm:w-auto" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

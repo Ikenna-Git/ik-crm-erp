@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { listApprovalItemsForOrg } from "@/lib/approval-requests"
 import { getUserFromRequest, isRequestUserError } from "@/lib/request-user"
 import { getWorkspaceSetupItems } from "@/lib/launch-readiness"
+import { getWorkspaceRoleLabel } from "@/lib/workspace-context"
 
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable setup readiness." }, { status: 503 })
@@ -27,6 +28,16 @@ export async function GET(request: Request) {
     const setupItems = getWorkspaceSetupItems({
       role: user.role,
       email: user.email,
+      orgName: org.name,
+      logoUrl: org.logoUrl,
+      industry: org.industry,
+      operatingTemplate: org.operatingTemplate,
+      legalBusinessName: org.legalBusinessName,
+      businessAddress: org.businessAddress,
+      businessEmail: org.businessEmail,
+      defaultInvoiceTerms: org.defaultInvoiceTerms,
+      defaultInvoiceNotes: org.defaultInvoiceNotes,
+      orgStatus: org.status,
       counts: {
         contacts,
         companies,
@@ -44,6 +55,17 @@ export async function GET(request: Request) {
         id: org.id,
         name: org.name,
         role: user.role,
+        roleLabel: getWorkspaceRoleLabel({
+          role: user.role,
+          accessProfile: user.accessProfile,
+          title: user.title,
+          email: user.email,
+        }),
+        logoUrl: org.logoUrl,
+        industry: org.industry,
+        operatingTemplate: org.operatingTemplate,
+        status: org.status,
+        legalBusinessName: org.legalBusinessName,
       },
       setupItems,
     })

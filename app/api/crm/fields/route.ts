@@ -168,9 +168,28 @@ export async function PATCH(request: Request) {
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 })
     }
+    const existingField = await prisma.crmField.findUnique({ where: { id } })
+    if (!existingField) {
+      return NextResponse.json({ error: "CRM field not found" }, { status: 404 })
+    }
+    if (existingField.orgId !== org.id) {
+      return NextResponse.json({ error: "CRM field does not belong to this workspace" }, { status: 403 })
+    }
+
     const updates: Record<string, any> = {}
-    if (typeof name === "string" && name.trim()) updates.name = name.trim()
-    if (Array.isArray(options)) updates.options = options
+    if (typeof name === "string" && name.trim()) {
+      updates.name = name.trim()
+      const nextKeyBase = slugify(name.trim())
+      if (nextKeyBase && nextKeyBase !== existingField.key) {
+        updates.key = await ensureUniqueKey(org.id, existingField.entity, nextKeyBase)
+      }
+    }
+    if (Array.isArray(options)) {
+      if (isSelectType(existingField.type) && !options.map((item) => String(item).trim()).filter(Boolean).length) {
+        return NextResponse.json({ error: "Options are required for select fields." }, { status: 400 })
+      }
+      updates.options = options
+    }
     if (typeof required === "boolean") updates.required = required
     if (typeof visible === "boolean") updates.visible = visible
     if (typeof section === "string") updates.section = section.trim().slice(0, 80) || null
@@ -206,6 +225,13 @@ export async function DELETE(request: Request) {
     const id = searchParams.get("id")
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 })
+    }
+    const existingField = await prisma.crmField.findUnique({ where: { id } })
+    if (!existingField) {
+      return NextResponse.json({ error: "CRM field not found" }, { status: 404 })
+    }
+    if (existingField.orgId !== org.id) {
+      return NextResponse.json({ error: "CRM field does not belong to this workspace" }, { status: 403 })
     }
     const field = await prisma.crmField.update({
       where: { id },

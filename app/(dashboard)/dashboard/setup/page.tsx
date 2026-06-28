@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { LiquidGlassPanel } from "@/components/ui/liquid-glass-panel"
+import { WorkspaceIdentityManager } from "@/components/workspace/workspace-identity-manager"
 import { getApiErrorMessage, requestJson } from "@/lib/api-client"
 
 type SetupItem = {
@@ -24,6 +25,11 @@ type SetupReadinessResponse = {
     id: string
     name: string
     role: string
+    roleLabel?: string
+    logoUrl?: string | null
+    industry?: string | null
+    operatingTemplate?: string | null
+    status?: string | null
   }
   setupItems: SetupItem[]
 }
@@ -86,12 +92,17 @@ export default function SetupPage() {
 
   return (
     <div className="p-6 space-y-6">
+      <WorkspaceIdentityManager
+        title="Company identity and operating context"
+        description="Set the company name, industry, operating template, and logo here, then use the checklist below to clear real launch blockers."
+      />
+
       <LiquidGlassPanel className="overflow-hidden p-0">
         <CardContent className="grid gap-6 p-6 lg:grid-cols-[1.1fr_0.9fr] lg:p-8">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               <Badge>Workspace setup center</Badge>
-              <Badge variant="outline">{data.workspace.role}</Badge>
+              <Badge variant="outline">{data.workspace.roleLabel || data.workspace.role}</Badge>
             </div>
             <h1 className="text-3xl font-semibold">Set up {data.workspace.name} without guessing what is actually done.</h1>
             <p className="max-w-3xl text-sm leading-7 text-muted-foreground md:text-base">

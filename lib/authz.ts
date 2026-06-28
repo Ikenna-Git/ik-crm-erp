@@ -21,6 +21,9 @@ export const canViewFounderControls = (role?: string | null, email?: string | nu
 export const canManageWorkspaceSettings = (role?: string | null, email?: string | null) =>
   role === "ORG_OWNER" || isSuperAdmin(role, email)
 
+export const canManageWorkspaceIdentity = (role?: string | null, email?: string | null) =>
+  role === "ORG_OWNER" || role === "ADMIN" || isSuperAdmin(role, email)
+
 export const isPlatformSuperAdminUser = (user?: { role?: string | null; email?: string | null } | null) =>
   isSuperAdmin(user?.role, user?.email)
 

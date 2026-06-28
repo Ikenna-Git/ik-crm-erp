@@ -28,6 +28,7 @@ import { toast } from "@/hooks/use-toast"
 import { hasModuleAccess } from "@/lib/access-control"
 import { isAdmin } from "@/lib/authz"
 import { requestJson, getApiErrorMessage } from "@/lib/api-client"
+import type { WorkspaceContextResponse, WorkspaceDocumentIdentity } from "@/lib/workspace-context"
 
 const sectionLoader = (label: string) => () => <div className="text-sm text-muted-foreground">Loading {label}...</div>
 
@@ -123,6 +124,7 @@ export default function AccountingPage() {
   const [crmCompanies, setCrmCompanies] = useState<Array<{ id: string; label: string }>>([])
   const [crmDeals, setCrmDeals] = useState<Array<{ id: string; label: string }>>([])
   const [projectOptions, setProjectOptions] = useState<Array<{ id: string; label: string }>>([])
+  const [documentIdentity, setDocumentIdentity] = useState<WorkspaceDocumentIdentity | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [privacyUnlocked, setPrivacyUnlocked] = useState(false)
@@ -205,6 +207,10 @@ export default function AccountingPage() {
     lineItems: Array.isArray(inv?.lineItems) ? inv.lineItems : [],
     relatedLinks: Array.isArray(inv?.relatedLinks) ? inv.relatedLinks : [],
     relatedRecords: inv?.relatedRecords && typeof inv.relatedRecords === "object" ? inv.relatedRecords : {},
+    documentIdentity:
+      inv?.documentIdentity && typeof inv.documentIdentity === "object" && !Array.isArray(inv.documentIdentity)
+        ? (inv.documentIdentity as WorkspaceDocumentIdentity)
+        : null,
     status: String(inv?.status || "DRAFT").toLowerCase() as Invoice["status"],
     approvalStatus:
       inv?.approvalStatus === "pending" || inv?.approvalStatus === "approved" || inv?.approvalStatus === "rejected"
@@ -286,12 +292,13 @@ export default function AccountingPage() {
       setLoading(true)
       setImportNotice("")
       const headers = { ...getSessionHeaders() }
-      const [invJson, expJson, companiesJson, dealsJson, projectsJson] = await Promise.all([
+      const [invJson, expJson, companiesJson, dealsJson, projectsJson, workspaceContext] = await Promise.all([
         requestJson<any>("/api/accounting/invoices", { headers }),
         requestJson<any>("/api/accounting/expenses", { headers }),
         requestJson<any>("/api/crm/companies", { headers }),
         requestJson<any>("/api/crm/deals", { headers }),
         requestJson<any>("/api/projects", { headers }),
+        requestJson<WorkspaceContextResponse>("/api/workspace/context", { headers }),
       ])
 
       const mappedInvoices = Array.isArray(invJson?.invoices) ? invJson.invoices.map(mapInvoice) : []
@@ -315,11 +322,26 @@ export default function AccountingPage() {
           ? projectsJson.projects.map((project: any) => ({ id: project.id, label: project.name || project.id }))
           : [],
       )
+      setDocumentIdentity({
+        workspaceDisplayName: workspaceContext.org.name || null,
+        logoUrl: workspaceContext.org.logoUrl || null,
+        legalBusinessName: workspaceContext.org.legalBusinessName || null,
+        tradingName: workspaceContext.org.tradingName || null,
+        businessEmail: workspaceContext.org.businessEmail || null,
+        businessPhone: workspaceContext.org.businessPhone || null,
+        businessAddress: workspaceContext.org.businessAddress || null,
+        taxNumber: workspaceContext.org.taxNumber || null,
+        companyRegistrationNumber: workspaceContext.org.companyRegistrationNumber || null,
+        defaultInvoiceTerms: workspaceContext.org.defaultInvoiceTerms || null,
+        defaultInvoiceNotes: workspaceContext.org.defaultInvoiceNotes || null,
+        paymentInstructions: workspaceContext.org.paymentInstructions || null,
+      })
     } catch (err: any) {
       console.error("Failed to load accounting data", err)
       setError(getApiErrorMessage(err, "Failed to load accounting data"))
       setInvoices([])
       setExpenses([])
+      setDocumentIdentity(null)
     } finally {
       setLoading(false)
     }
@@ -995,6 +1017,7 @@ export default function AccountingPage() {
               crmCompanies={crmCompanies}
               crmDeals={crmDeals}
               projects={projectOptions}
+              documentIdentity={documentIdentity}
               showAmounts={canUseSensitiveAccounting}
               onAddInvoice={createInvoice}
               onUpdateInvoice={handleUpdateInvoice}

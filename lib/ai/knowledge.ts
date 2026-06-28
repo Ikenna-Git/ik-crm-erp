@@ -42,6 +42,30 @@ export const CIVIS_KB: KnowledgeEntry[] = [
       "Civis should adapt to the operating pattern of the workspace. Sales-led teams may stay pipeline-first, while delivery or operations-heavy teams should link CRM records directly into projects, proof, and invoice flows.",
   },
   {
+    title: "Company identity and workspace context",
+    keywords: ["company identity", "workspace identity", "logo", "workspace context", "operating context", "industry", "template", "setup mode", "launch review", "live mode"],
+    content:
+      "Set company identity from Setup, Settings, or Workspace profile. The company name, logo, industry, and operating template are org-scoped and should persist after refresh. The workspace card shows current role, operating mode, and launch readiness summary. Setup mode means core workspace identity or first operating records are still incomplete. Launch review means the workspace is close but still has blockers or review items. Live means the operating centre passed the current readiness checks.",
+  },
+  {
+    title: "Company logo handling",
+    keywords: ["upload logo", "replace logo", "remove logo", "cloudinary", "branding", "workspace logo"],
+    content:
+      "Workspace logos are stored against the organization and must not fake success when upload storage is missing. Civis accepts safe image formats only, should show visible upload errors, and should fall back to initials immediately when the logo is removed.",
+  },
+  {
+    title: "Document identity and invoice branding",
+    keywords: ["legal business name", "document identity", "invoice branding", "invoice logo", "trading name", "payment instructions", "invoice terms"],
+    content:
+      "Workspace display identity is not the same thing as document identity. Invoices should use the legal business name and formal document identity. If no logo exists, formal invoices should fall back to clean text-only business identity, not an initials avatar. Default terms, notes, and payment instructions should come from the workspace document identity only when those fields are actually configured.",
+  },
+  {
+    title: "Rebrand and historical invoice safety",
+    keywords: ["rebrand", "acquisition", "change logo", "change business name", "old invoice branding", "historical invoice", "issued invoice snapshot"],
+    content:
+      "Changing the current workspace logo or business identity should affect future invoices and draft documents, not silently rewrite already issued invoices. Historical issued invoices should keep the branding snapshot that was used when they were issued unless the product explicitly supports a reissue flow.",
+  },
+  {
     title: "Ops command center",
     keywords: ["ops", "command", "operations", "alerts", "anomaly", "decision"],
     content:
@@ -121,6 +145,12 @@ export const CIVIS_BEST_PRACTICES: BestPracticeEntry[] = [
     keywords: ["security", "admin", "access", "role", "audit"],
     guidance:
       "Apply least-privilege roles, rotate secrets quarterly, enforce MFA for admins, and review audit logs for unusual behavior every week.",
+  },
+  {
+    title: "Workspace launch readiness discipline",
+    keywords: ["launch readiness", "setup mode", "launch review", "blockers", "workspace blockers", "go live"],
+    guidance:
+      "Do not treat configuration as proof. Clear company identity, verify first CRM and finance records, keep provider gaps visible, and record actual browser evidence before calling a workspace live.",
   },
 ]
 

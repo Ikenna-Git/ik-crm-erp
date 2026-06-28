@@ -187,6 +187,7 @@ export async function POST(request: Request) {
             title: title || null,
             role: normalized,
             accessProfile,
+            twoFactorBackupCodes: [],
             moduleAccess: buildModuleAccessForUser({ role: normalized, accessProfile }),
           },
           select: {

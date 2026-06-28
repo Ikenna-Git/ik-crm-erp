@@ -229,8 +229,29 @@ export async function GET(request: Request) {
       email: user.email,
       dbConnected: true,
       inviteCount,
+      orgName: org.name,
+      logoUrl: org.logoUrl,
+      industry: org.industry,
+      operatingTemplate: org.operatingTemplate,
+      legalBusinessName: org.legalBusinessName,
+      businessAddress: org.businessAddress,
+      businessEmail: org.businessEmail,
+      defaultInvoiceTerms: org.defaultInvoiceTerms,
+      defaultInvoiceNotes: org.defaultInvoiceNotes,
+      orgStatus: org.status,
     })
-    const launchEvidence = getLaunchEvidence()
+    const launchEvidence = getLaunchEvidence({
+      orgName: org.name,
+      logoUrl: org.logoUrl,
+      industry: org.industry,
+      operatingTemplate: org.operatingTemplate,
+      legalBusinessName: org.legalBusinessName,
+      businessAddress: org.businessAddress,
+      businessEmail: org.businessEmail,
+      defaultInvoiceTerms: org.defaultInvoiceTerms,
+      defaultInvoiceNotes: org.defaultInvoiceNotes,
+      orgStatus: org.status,
+    })
 
     return NextResponse.json({
       readiness,

@@ -11,6 +11,7 @@ import {
   getPrivacyUnlockCookieTtlSeconds,
   getPrivacyUnlockCookieName,
   isPrivacyUnlockedForOrg,
+  validatePrivacyPin,
   verifyPrivacyPinForOrg,
 } from "@/lib/privacy-lock"
 
@@ -87,10 +88,24 @@ export async function POST(request: Request) {
       )
     }
 
+    const normalizedPin = String(body.pin || "").trim()
+    if (!normalizedPin) {
+      return NextResponse.json({ error: `Enter the ${config.label.toLowerCase()} PIN.` }, { status: 400 })
+    }
+
+    const pinValidationError = validatePrivacyPin(normalizedPin)
+    if (
+      pinValidationError &&
+      (pinValidationError === "PIN must be at least 6 characters." ||
+        pinValidationError === "PIN must be 32 characters or fewer.")
+    ) {
+      return NextResponse.json({ error: pinValidationError }, { status: 400 })
+    }
+
     const pinCheck = await verifyPrivacyPinForOrg({
       orgId: org.id,
       module: config.module,
-      candidate: String(body.pin || ""),
+      candidate: normalizedPin,
     })
     if (pinCheck.reason === "missing") {
       return NextResponse.json(
@@ -102,6 +117,9 @@ export async function POST(request: Request) {
       )
     }
     if (!pinCheck.ok) {
+      if (pinValidationError === "Choose a less obvious privacy PIN.") {
+        return NextResponse.json({ error: pinValidationError }, { status: 400 })
+      }
       return NextResponse.json(
         { error: config.module === "hr" ? "Incorrect HR PIN. Try again." : "Incorrect Accounting PIN. Try again." },
         { status: 400 },

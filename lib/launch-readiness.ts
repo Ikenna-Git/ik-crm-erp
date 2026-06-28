@@ -32,6 +32,16 @@ type LaunchContext = {
   email?: string | null
   dbConnected?: boolean
   inviteCount?: number
+  orgName?: string | null
+  logoUrl?: string | null
+  industry?: string | null
+  operatingTemplate?: string | null
+  legalBusinessName?: string | null
+  businessAddress?: string | null
+  businessEmail?: string | null
+  defaultInvoiceTerms?: string | null
+  defaultInvoiceNotes?: string | null
+  orgStatus?: string | null
   counts?: Partial<Record<string, number>>
 }
 
@@ -107,12 +117,14 @@ export function getProviderDiagnostics(): ProviderDiagnostic[] {
       id: "database",
       label: "Database",
       feature: "Core product persistence",
-      status: process.env.DATABASE_URL ? "configured" : "missing",
+      status: process.env.DATABASE_URL ? "partial" : "missing",
       reason: process.env.DATABASE_URL
-        ? "DATABASE_URL is present, so the app can reach its primary persistence layer."
+        ? "DATABASE_URL is present, but live connectivity still has to be verified before persistence can be considered ready."
         : "Without DATABASE_URL, authenticated modules cannot persist real product state.",
-      nextAction: process.env.DATABASE_URL ? "Capture fresh build, runtime, and launch-window database evidence before sign-off." : "Add DATABASE_URL and verify Prisma connectivity.",
-      evidenceNote: process.env.DATABASE_URL ? "Configured, evidence pending." : "Action required.",
+      nextAction: process.env.DATABASE_URL
+        ? "Verify Prisma connectivity and a successful database health check before sign-off."
+        : "Add DATABASE_URL and verify Prisma connectivity.",
+      evidenceNote: process.env.DATABASE_URL ? "Configured, connectivity evidence pending." : "Action required.",
       href: "/admin/launch-readiness",
     },
     {
@@ -343,6 +355,35 @@ export function getModuleReadiness(context: LaunchContext): ReadinessItem[] {
   const ai = getProviderDiagnostics().find((item) => item.id === "ai")?.status || "missing"
   return [
     {
+      id: "workspace-identity",
+      label: "Workspace identity and operating context",
+      status:
+        context.orgName?.trim() &&
+        context.industry?.trim() &&
+        context.operatingTemplate?.trim() &&
+        context.legalBusinessName?.trim()
+          ? context.logoUrl
+            ? "limited"
+            : "limited"
+          : "action-required",
+      reason:
+        context.orgName?.trim() &&
+        context.industry?.trim() &&
+        context.operatingTemplate?.trim() &&
+        context.legalBusinessName?.trim()
+          ? "Company identity, formal document identity, and operating context are configured. Browser validation still needs to confirm replace/remove logo flows and in-app visibility."
+          : "Workspace/company identity or formal document identity is not complete enough to present Civis as a finished operating centre yet.",
+      nextAction:
+        context.orgName?.trim() &&
+        context.industry?.trim() &&
+        context.operatingTemplate?.trim() &&
+        context.legalBusinessName?.trim()
+          ? "Validate sidebar, setup, launch readiness, and invoice-facing identity usage in the browser."
+          : "Set workspace identity plus legal/document identity from Setup or Workspace profile.",
+      evidenceNote: "Action required.",
+      href: "/dashboard/setup",
+    },
+    {
       id: "crm",
       label: "CRM",
       status: "limited",
@@ -531,7 +572,7 @@ export function getModuleReadiness(context: LaunchContext): ReadinessItem[] {
   ]
 }
 
-export function getLaunchEvidence(): ReadinessItem[] {
+export function getLaunchEvidence(context: LaunchContext = {}): ReadinessItem[] {
   return [
     {
       id: "smoke-test",
@@ -568,6 +609,18 @@ export function getLaunchEvidence(): ReadinessItem[] {
       nextAction: "Run one contact/company/deal cycle and capture the refresh result.",
       evidenceNote: "Action required.",
       href: "/dashboard/crm",
+    },
+    {
+      id: "workspace-identity-evidence",
+      label: "Workspace identity evidence",
+      status: "action-required",
+      reason:
+        context.orgName?.trim() || context.logoUrl || context.industry?.trim() || context.operatingTemplate?.trim()
+          ? "Company name, logo behavior, and operating template visibility still need browser evidence."
+          : "Workspace identity still needs setup plus browser evidence before it can be treated as launch-ready.",
+      nextAction: "Validate upload, replace, remove, refresh, and non-admin view behavior for company identity.",
+      evidenceNote: "Action required.",
+      href: "/dashboard/setup",
     },
     {
       id: "fake-data-review",
@@ -618,6 +671,52 @@ export function getWorkspaceSetupItems(context: LaunchContext): ReadinessItem[] 
   const isFounder = canViewFounderControls(context.role, context.email)
 
   return [
+    {
+      id: "company-name",
+      label: "Set company or workspace name",
+      status: context.orgName?.trim() ? "ready" : "action-required",
+      reason: context.orgName?.trim()
+        ? "Workspace identity has a real company or workspace name."
+        : "A real company or workspace name should be set before launch or external-facing invoice use.",
+      nextAction: context.orgName?.trim() ? "Review identity placement in sidebar, setup, and workspace profile." : "Set the workspace/company name from Setup or Workspace profile.",
+      href: "/dashboard/setup",
+    },
+    {
+      id: "company-logo",
+      label: "Add company logo",
+      status: context.logoUrl ? "limited" : "optional",
+      reason: context.logoUrl
+        ? "A workspace logo is configured, but browser validation should still confirm it survives refresh and replacement."
+        : "A logo is recommended for a polished operating centre and invoice identity, but it is not a hard launch blocker.",
+      nextAction: context.logoUrl ? "Validate replace/remove behavior and refresh persistence." : "Upload a workspace logo or keep initials fallback intentionally.",
+      href: "/dashboard/setup",
+    },
+    {
+      id: "document-legal-name",
+      label: "Set legal business name for invoices",
+      status: context.legalBusinessName?.trim() ? "ready" : "action-required",
+      reason: context.legalBusinessName?.trim()
+        ? "Formal invoice and document identity has a legal business name."
+        : "Invoices should not go live without a formal business name for document branding.",
+      nextAction: context.legalBusinessName?.trim()
+        ? "Validate invoice branding against the legal business name."
+        : "Add the legal business name in Company Identity → Document identity.",
+      href: "/dashboard/setup",
+    },
+    {
+      id: "industry-template",
+      label: "Set industry and operating template",
+      status: context.industry?.trim() && context.operatingTemplate?.trim() ? "ready" : "action-required",
+      reason:
+        context.industry?.trim() && context.operatingTemplate?.trim()
+          ? "Industry and primary operating template are configured."
+          : "Industry and operating template help Civis explain the right CRM, projects, and finance workflow for this workspace.",
+      nextAction:
+        context.industry?.trim() && context.operatingTemplate?.trim()
+          ? "Review whether the selected template still matches the operating model."
+          : "Choose the industry and primary operating template in Setup or Workspace profile.",
+      href: "/dashboard/setup",
+    },
     {
       id: "first-crm-records",
       label: "Create first CRM contact, company, and deal",
@@ -821,9 +920,13 @@ export function getWorkspaceSetupItems(context: LaunchContext): ReadinessItem[] 
     {
       id: "invoice-document-readiness",
       label: "Finish one invoice document with line items and terms",
-      status: "action-required",
-      reason: "The invoice editor is only meaningful once one real invoice has linked work, notes, terms, and line items saved through refresh.",
-      nextAction: "Open Accounting and complete one invoice document end-to-end.",
+      status: context.legalBusinessName?.trim() ? "action-required" : "blocked",
+      reason: context.legalBusinessName?.trim()
+        ? "The invoice editor is only meaningful once one real invoice has linked work, notes, terms, line items, and document branding saved through refresh."
+        : "Formal invoice identity is still incomplete, so invoice branding is not ready for launch sign-off.",
+      nextAction: context.legalBusinessName?.trim()
+        ? "Open Accounting and complete one invoice document end-to-end."
+        : "Add legal business name and document identity before invoice launch sign-off.",
       href: "/dashboard/accounting",
     },
     {

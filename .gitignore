@@ -11,4 +11,4 @@ coverage
 tsconfig.tsbuildinfo
 npm-debug.log*
 pnpm-debug.log*
-yarn-error.log*ø
+yarn-error.log*

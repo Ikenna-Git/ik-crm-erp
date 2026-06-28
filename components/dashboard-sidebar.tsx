@@ -26,6 +26,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { hasModuleAccess, type AccessModule } from "@/lib/access-control"
 import { isAdmin } from "@/lib/authz"
+import { WorkspaceContextCard } from "@/components/workspace/workspace-context-card"
 
 const baseNavigation = [
   { section: "Command", name: "Overview", href: "/dashboard", icon: BarChart3, module: "overview" as AccessModule },
@@ -49,14 +50,6 @@ const baseNavigation = [
 export function DashboardSidebar() {
   const pathname = usePathname()
   const { data: session } = useSession()
-  const workspaceLabel =
-    session?.user?.role === "SUPER_ADMIN"
-      ? "Founder workspace"
-      : session?.user?.role === "ORG_OWNER"
-        ? "Workspace owner"
-        : session?.user?.role === "ADMIN"
-          ? "Workspace admin"
-          : "Workspace member"
   const navigation = [
     ...baseNavigation.filter((item) => hasModuleAccess(session?.user || {}, item.module, "view")),
     ...(isAdmin(session?.user?.role) ? [{ name: "Admin", href: "/dashboard/admin", icon: ShieldCheck }] : []),
@@ -72,7 +65,7 @@ export function DashboardSidebar() {
   }
 
   return (
-    <aside className="w-64 border-r border-border/70 bg-card/95 h-full flex flex-col">
+    <aside className="flex h-full w-64 flex-col border-r border-white/10 bg-[linear-gradient(180deg,rgba(10,16,28,0.92),rgba(8,12,20,0.9))] backdrop-blur-xl">
       {/* Logo */}
       <div className="p-6 border-b border-border/70 space-y-3">
         <Link href="/dashboard" className="flex items-center gap-2">
@@ -81,10 +74,7 @@ export function DashboardSidebar() {
           </div>
           <span className="font-bold text-lg">Civis</span>
         </Link>
-        <div className="rounded-2xl border border-border bg-background/70 px-3 py-2">
-          <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Workspace context</p>
-          <p className="mt-1 text-sm font-medium">{workspaceLabel}</p>
-        </div>
+        <WorkspaceContextCard />
       </div>
 
       {/* Navigation */}
@@ -103,10 +93,10 @@ export function DashboardSidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-colors ${
+              className={`flex items-center gap-3 rounded-2xl px-4 py-2.5 transition-colors ${
                 isActive
-                  ? "bg-primary/10 text-primary font-medium shadow-sm"
-                  : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                  ? "border border-primary/20 bg-primary/10 text-primary font-medium shadow-sm"
+                  : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
               }`}
             >
               <Icon className="w-5 h-5" />
@@ -124,7 +114,7 @@ export function DashboardSidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="p-4 border-t border-border space-y-2">
+      <div className="space-y-2 border-t border-white/10 p-4">
         <Button variant="outline" className="w-full justify-start gap-2 bg-transparent" asChild>
           <Link href="/dashboard/settings">
             <Settings className="w-4 h-4" />

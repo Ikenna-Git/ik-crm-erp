@@ -82,6 +82,8 @@ export function DealsBoard({
   const [fieldsLoading, setFieldsLoading] = useState(false)
   const [fieldsError, setFieldsError] = useState("")
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null)
+  const [fieldSaving, setFieldSaving] = useState(false)
+  const [fieldStatus, setFieldStatus] = useState("")
   const [fieldForm, setFieldForm] = useState({
     name: "",
     type: "TEXT" as CrmFieldType,
@@ -161,13 +163,20 @@ export function DealsBoard({
   }, [currentPage, totalPages])
 
   const handleCreateField = async () => {
-    if (!fieldForm.name.trim()) return
+    if (!fieldForm.name.trim()) {
+      setFieldStatus("")
+      setFieldsError("Field name is required.")
+      return
+    }
     if (["SELECT", "MULTISELECT"].includes(fieldForm.type) && !normalizeOptions(fieldForm.options).length) {
+      setFieldStatus("")
       setFieldsError("Add at least one option for select fields.")
       return
     }
     try {
+      setFieldSaving(true)
       setFieldsError("")
+      setFieldStatus("")
       const isEditing = Boolean(editingFieldId)
       const payload = {
         id: editingFieldId || undefined,
@@ -194,30 +203,44 @@ export function DealsBoard({
       setFields((prev) => (isEditing ? prev.map((item) => (item.id === nextField.id ? nextField : item)) : [...prev, nextField]))
       setFieldForm({ name: "", type: "TEXT", options: "", required: false })
       setEditingFieldId(null)
+      setFieldStatus(isEditing ? "Field updated." : "Field added.")
     } catch (err: any) {
+      setFieldStatus("")
       setFieldsError(err?.message || "Failed to save field")
+    } finally {
+      setFieldSaving(false)
     }
   }
 
   const handleArchiveField = async (field: CrmField) => {
     try {
+      setFieldSaving(true)
+      setFieldsError("")
+      setFieldStatus("")
       const res = await fetch(`/api/crm/fields?id=${field.id}`, {
         method: "DELETE",
         headers: { ...getSessionHeaders() },
       })
-      if (!res.ok) throw new Error("Failed to archive field")
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to archive field")
     } catch (err: any) {
+      setFieldStatus("")
       setFieldsError(err?.message || "Failed to archive field")
       return
+    } finally {
+      setFieldSaving(false)
     }
     setFields((prev) => prev.filter((item) => item.id !== field.id))
     if (editingFieldId === field.id) {
       setEditingFieldId(null)
       setFieldForm({ name: "", type: "TEXT", options: "", required: false })
     }
+    setFieldStatus("Field archived.")
   }
 
   const handleEditField = (field: CrmField) => {
+    setFieldStatus("")
+    setFieldsError("")
     setEditingFieldId(field.id)
     setFieldForm({
       name: field.name,
@@ -228,6 +251,8 @@ export function DealsBoard({
   }
 
   const cancelEditField = () => {
+    setFieldStatus("")
+    setFieldsError("")
     setEditingFieldId(null)
     setFieldForm({ name: "", type: "TEXT", options: "", required: false })
   }
@@ -480,17 +505,18 @@ export function DealsBoard({
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button onClick={handleCreateField} className="flex-1 min-w-[160px]">
+                <Button onClick={handleCreateField} className="flex-1 min-w-[160px]" disabled={fieldSaving}>
                   {isEditingField ? "Save field" : "Add field"}
                 </Button>
                 {isEditingField ? (
-                  <Button variant="outline" className="bg-transparent" onClick={cancelEditField}>
+                  <Button variant="outline" className="bg-transparent" onClick={cancelEditField} disabled={fieldSaving}>
                     Cancel
                   </Button>
                 ) : null}
               </div>
               {fieldsLoading && <p className="text-xs text-muted-foreground">Loading custom fields...</p>}
               {fieldsError && <p className="text-xs text-destructive">{fieldsError}</p>}
+              {fieldStatus && <p className="text-xs text-emerald-600 dark:text-emerald-300">{fieldStatus}</p>}
               {!fields.length && !fieldsLoading && (
                 <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
                   <p>No custom fields yet.</p>
@@ -510,7 +536,13 @@ export function DealsBoard({
                     <p className="text-xs text-muted-foreground">{field.type.toLowerCase()}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button size="sm" variant="outline" className="bg-transparent" onClick={() => handleEditField(field)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="bg-transparent"
+                      onClick={() => handleEditField(field)}
+                      disabled={fieldSaving}
+                    >
                       Edit
                     </Button>
                     <Button
@@ -518,6 +550,7 @@ export function DealsBoard({
                       variant="ghost"
                       className="text-destructive"
                       onClick={() => handleArchiveField(field)}
+                      disabled={fieldSaving}
                     >
                       <Archive className="mr-2 h-4 w-4" />
                       Archive

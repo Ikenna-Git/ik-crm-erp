@@ -9,9 +9,11 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { NotificationCenter } from "@/components/notification-center"
 import { UnifiedSearch } from "@/components/unified-search"
 import { userUpdatedEventName } from "@/lib/user-settings"
+import { useWorkspaceContext } from "@/components/workspace/use-workspace-context"
 
 export function DashboardHeader() {
   const { data: session } = useSession()
+  const { data: workspace } = useWorkspaceContext()
   const [userName, setUserName] = useState("")
   const [timestamp, setTimestamp] = useState("")
   const [online, setOnline] = useState(true)
@@ -64,7 +66,7 @@ export function DashboardHeader() {
   }, [])
 
   return (
-    <header className="border-b border-border/70 bg-card/95 px-6 py-4 backdrop-blur supports-[backdrop-filter]:bg-card/85 flex items-center justify-between">
+    <header className="flex items-center justify-between border-b border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03))] px-6 py-4 backdrop-blur-xl">
       <div className="flex-1">
         <div className="flex items-center gap-3 rounded-2xl border border-border/80 bg-gradient-to-r from-background via-background to-muted/40 px-4 py-3 max-w-2xl shadow-sm">
           <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -75,10 +77,12 @@ export function DashboardHeader() {
             <p className="text-xs text-muted-foreground">{timestamp || "Loading time..."}</p>
           </div>
           <div className="ml-auto hidden md:flex items-center gap-2 text-xs">
-            <span className="px-2.5 py-1 rounded-full border border-border bg-card text-muted-foreground">
+            <span className="rounded-full border border-white/10 bg-card/80 px-2.5 py-1 text-muted-foreground">
               Sync: {online ? "Online" : "Offline"}
             </span>
-            <span className="px-2.5 py-1 rounded-full border border-border bg-card text-muted-foreground">Mode: Live</span>
+            <span className="rounded-full border border-white/10 bg-card/80 px-2.5 py-1 text-muted-foreground">
+              Mode: {workspace?.launch.modeLabel || "Loading..."}
+            </span>
           </div>
         </div>
       </div>

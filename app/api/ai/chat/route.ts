@@ -414,6 +414,38 @@ const resolveGuidedHowTo = (prompt: string): DataResolution | null => {
     }
   }
 
+  if (/company identity|workspace identity|change logo|upload logo|replace logo|remove logo|workspace context/.test(value)) {
+    return {
+      message:
+        "Open Setup or Settings → Organization. That is where you set company name, industry, operating template, and upload or remove the workspace logo. Changes should update the sidebar workspace card after save.",
+      action: moduleActions.setup,
+    }
+  }
+
+  if (/document identity|legal business name|invoice branding|trading name|payment instructions/.test(value)) {
+    return {
+      message:
+        "Open Setup or Settings → Organization, then use the Document identity section. That is where you set the legal business name, trading name, business contact details, default invoice terms, and payment instructions used for future invoice branding.",
+      action: moduleActions.setup,
+    }
+  }
+
+  if (/rebrand|acquisition|change company name|change legal name|change invoice logo|old invoice branding/.test(value)) {
+    return {
+      message:
+        "Update Company Identity for future workspace and draft document branding. Already issued invoices should keep the branding snapshot used when they were issued, so a rebrand should not silently rewrite historical invoices.",
+      action: moduleActions.setup,
+    }
+  }
+
+  if (/setup mode|launch review|live mode|workspace mode/.test(value)) {
+    return {
+      message:
+        "Setup mode means core workspace identity or first operating records are still incomplete. Launch review means the workspace is close but still has blockers or review items. Live means the current readiness checks no longer show launch blockers.",
+      action: moduleActions.setup,
+    }
+  }
+
   if (/open setup|where is setup|show setup/.test(value)) {
     return {
       message:
@@ -458,6 +490,14 @@ const resolveGuidedHowTo = (prompt: string): DataResolution | null => {
     return {
       message:
         "Go to Accounting, edit the invoice, and use the Linked project field. You can also link the same invoice back to a CRM company or deal so billing keeps the same operating context as delivery.",
+      action: moduleActions.accounting,
+    }
+  }
+
+  if (/link crm to invoice|link deal to invoice|link company to invoice|link contact to invoice/.test(value)) {
+    return {
+      message:
+        "Open Accounting, edit the invoice, and use the linked company, deal, or project fields. Save the invoice and refresh once to confirm the relationship stayed persisted.",
       action: moduleActions.accounting,
     }
   }

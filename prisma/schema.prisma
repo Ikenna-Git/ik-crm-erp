@@ -109,6 +109,20 @@ enum PortalStatus {
 model Org {
   id           String         @id @default(uuid())
   name         String
+  logoUrl      String?
+  logoPublicId String?
+  industry     String?
+  operatingTemplate String?
+  legalBusinessName String?
+  tradingName String?
+  businessEmail String?
+  businessPhone String?
+  businessAddress String?
+  taxNumber String?
+  companyRegistrationNumber String?
+  defaultInvoiceTerms String?
+  defaultInvoiceNotes String?
+  paymentInstructions String?
   status       String         @default("active")
   statusReason String?
   statusChangedAt DateTime?
@@ -405,6 +419,7 @@ model Invoice {
   customFields  Json?
   relatedLinks  Json?
   relatedRecords Json?
+  documentIdentitySnapshot Json?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 

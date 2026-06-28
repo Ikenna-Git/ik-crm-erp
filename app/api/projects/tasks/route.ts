@@ -6,6 +6,78 @@ import { handleAccessRouteError, requireModuleAccess } from "@/lib/access-route"
 const dbUnavailable = () =>
   NextResponse.json({ error: "Database not configured. Set DATABASE_URL to enable project tasks." }, { status: 503 })
 
+type TaskProofLinkInput = {
+  label?: unknown
+  url?: unknown
+  category?: unknown
+  note?: unknown
+}
+
+type NormalizedTaskProofLink = {
+  label?: string
+  url: string
+  category?: string
+  note?: string
+}
+
+type TaskProofLinkError = { error: string }
+
+const isTaskProofLinkError = (value: NormalizedTaskProofLink | TaskProofLinkError | null): value is TaskProofLinkError =>
+  Boolean(value && "error" in value)
+
+const isSafeHttpUrl = (value: string) => {
+  try {
+    const url = new URL(value)
+    return url.protocol === "http:" || url.protocol === "https:"
+  } catch {
+    return false
+  }
+}
+
+const parseDateInput = (value: unknown, label: string) => {
+  if (value === undefined) return { ok: true as const, date: undefined }
+  if (value === null || value === "") return { ok: true as const, date: null }
+  const parsed = new Date(String(value))
+  if (Number.isNaN(parsed.getTime())) {
+    return { ok: false as const, error: `${label} must be a valid date.` }
+  }
+  return { ok: true as const, date: parsed }
+}
+
+const normalizeProofLinks = (value: unknown) => {
+  if (value === undefined) return { ok: true as const, links: undefined }
+  if (!Array.isArray(value)) {
+    return { ok: false as const, error: "Task proof links must be an array." }
+  }
+
+  const normalized = value
+    .map((item) => {
+      if (!item || typeof item !== "object") return null
+      const typed = item as TaskProofLinkInput
+      const label = typeof typed.label === "string" ? typed.label.trim() : ""
+      const url = typeof typed.url === "string" ? typed.url.trim() : ""
+      const category = typeof typed.category === "string" ? typed.category.trim() : ""
+      const note = typeof typed.note === "string" ? typed.note.trim() : ""
+      if (!label && !url && !category && !note) return null
+      if (!url) return { error: "Task proof links must include a URL." }
+      if (!isSafeHttpUrl(url)) return { error: "Task proof links must use a valid http or https URL." }
+      return {
+        label: label || undefined,
+        url,
+        category: category || undefined,
+        note: note || undefined,
+      }
+    })
+    .filter(Boolean)
+
+  const invalid = normalized.find(isTaskProofLinkError)
+  if (invalid) {
+    return { ok: false as const, error: invalid.error }
+  }
+
+  return { ok: true as const, links: normalized.filter((item): item is NormalizedTaskProofLink => Boolean(item && !("error" in item))) }
+}
+
 export async function GET(request: Request) {
   if (!process.env.DATABASE_URL) return dbUnavailable()
   try {
@@ -27,8 +99,21 @@ export async function POST(request: Request) {
     const { org, user } = await requireModuleAccess(request, "projects", "manage")
     const body = await request.json()
     const { title, projectId, project, assignee, startDate, endDate, priority, stage, proofLinks } = body || {}
-    if (!title) {
-      return NextResponse.json({ error: "title is required" }, { status: 400 })
+    const normalizedTitle = typeof title === "string" ? title.trim() : ""
+    if (!normalizedTitle) {
+      return NextResponse.json({ error: "Task title is required." }, { status: 400 })
+    }
+    const normalizedProofLinks = normalizeProofLinks(proofLinks)
+    if (!normalizedProofLinks.ok) {
+      return NextResponse.json({ error: normalizedProofLinks.error }, { status: 400 })
+    }
+    const parsedStartDate = parseDateInput(startDate, "Task start date")
+    if (!parsedStartDate.ok) {
+      return NextResponse.json({ error: parsedStartDate.error }, { status: 400 })
+    }
+    const parsedEndDate = parseDateInput(endDate, "Task end date")
+    if (!parsedEndDate.ok) {
+      return NextResponse.json({ error: parsedEndDate.error }, { status: 400 })
     }
 
     let resolvedProjectId: string | null = projectId || null
@@ -49,13 +134,13 @@ export async function POST(request: Request) {
       data: {
         orgId: org.id,
         projectId: resolvedProjectId,
-        title: String(title).trim(),
+        title: normalizedTitle,
         assignee: assignee ? String(assignee).trim() : null,
-        startDate: startDate ? new Date(startDate) : null,
-        endDate: endDate ? new Date(endDate) : null,
+        startDate: parsedStartDate.date ?? null,
+        endDate: parsedEndDate.date ?? null,
         priority: priority ? String(priority).trim().toLowerCase() : "medium",
         stage: stage ? String(stage).trim().toLowerCase() : "todo",
-        proofLinks: Array.isArray(proofLinks) ? proofLinks : undefined,
+        proofLinks: normalizedProofLinks.links,
       },
       include: { project: true },
     })
@@ -82,7 +167,7 @@ export async function PATCH(request: Request) {
     const body = await request.json()
     const { id, title, projectId, project, assignee, startDate, endDate, priority, stage, proofLinks } = body || {}
     if (!id) {
-      return NextResponse.json({ error: "id is required" }, { status: 400 })
+      return NextResponse.json({ error: "Project task id is required." }, { status: 400 })
     }
 
     const existingTask = await prisma.projectTask.findFirst({
@@ -90,6 +175,18 @@ export async function PATCH(request: Request) {
     })
     if (!existingTask) {
       return NextResponse.json({ error: "Project task not found" }, { status: 404 })
+    }
+    const normalizedProofLinks = normalizeProofLinks(proofLinks)
+    if (!normalizedProofLinks.ok) {
+      return NextResponse.json({ error: normalizedProofLinks.error }, { status: 400 })
+    }
+    const parsedStartDate = parseDateInput(startDate, "Task start date")
+    if (!parsedStartDate.ok) {
+      return NextResponse.json({ error: parsedStartDate.error }, { status: 400 })
+    }
+    const parsedEndDate = parseDateInput(endDate, "Task end date")
+    if (!parsedEndDate.ok) {
+      return NextResponse.json({ error: parsedEndDate.error }, { status: 400 })
     }
 
     let resolvedProjectId: string | null | undefined
@@ -118,11 +215,11 @@ export async function PATCH(request: Request) {
         title: title !== undefined ? String(title).trim() : undefined,
         ...(resolvedProjectId !== undefined ? { projectId: resolvedProjectId } : {}),
         assignee: assignee !== undefined ? (assignee ? String(assignee).trim() : null) : undefined,
-        startDate: startDate !== undefined ? (startDate ? new Date(startDate) : null) : undefined,
-        endDate: endDate !== undefined ? (endDate ? new Date(endDate) : null) : undefined,
+        startDate: parsedStartDate.date,
+        endDate: parsedEndDate.date,
         priority: priority !== undefined ? String(priority).trim().toLowerCase() : undefined,
         stage: stage !== undefined ? String(stage).trim().toLowerCase() : undefined,
-        proofLinks: proofLinks !== undefined && Array.isArray(proofLinks) ? proofLinks : undefined,
+        proofLinks: normalizedProofLinks.links,
       },
       include: { project: true },
     })

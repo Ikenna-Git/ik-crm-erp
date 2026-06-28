@@ -139,6 +139,7 @@ export const getUserFromRequest = async (request: Request) => {
         name: identity.name,
         role: identity.role,
         accessProfile: getDefaultAccessProfileForRole(identity.role),
+        twoFactorBackupCodes: [],
         moduleAccess: buildModuleAccessForUser({
           role: identity.role,
           accessProfile: getDefaultAccessProfileForRole(identity.role),

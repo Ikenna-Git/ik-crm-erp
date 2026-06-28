@@ -195,6 +195,7 @@ const buildAdapter = (): Adapter | undefined => {
           emailVerified: data.emailVerified ?? null,
           role,
           accessProfile,
+          twoFactorBackupCodes: [],
           moduleAccess: buildModuleAccessForUser({
             role,
             accessProfile,

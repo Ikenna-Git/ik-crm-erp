@@ -70,6 +70,7 @@ export async function POST(request: Request) {
         email: String(email).toLowerCase(),
         role: normalizedRole,
         accessProfile,
+        twoFactorBackupCodes: [],
         moduleAccess: buildModuleAccessForUser({ role: normalizedRole, accessProfile }),
         orgId: org.id,
       },

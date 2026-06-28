@@ -100,6 +100,8 @@ export function CompaniesTable({
   const [fieldDialogOpen, setFieldDialogOpen] = useState(false)
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null)
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null)
+  const [fieldSaving, setFieldSaving] = useState(false)
+  const [fieldStatus, setFieldStatus] = useState("")
   const [fieldForm, setFieldForm] = useState({
     name: "",
     type: "TEXT" as CrmFieldType,
@@ -246,13 +248,20 @@ export function CompaniesTable({
   }
 
   const handleCreateField = async () => {
-    if (!fieldForm.name.trim()) return
+    if (!fieldForm.name.trim()) {
+      setFieldStatus("")
+      setFieldsError("Field name is required.")
+      return
+    }
     if (["SELECT", "MULTISELECT"].includes(fieldForm.type) && !normalizeOptions(fieldForm.options).length) {
+      setFieldStatus("")
       setFieldsError("Add at least one option for select fields.")
       return
     }
     try {
+      setFieldSaving(true)
       setFieldsError("")
+      setFieldStatus("")
       const isEditing = Boolean(editingFieldId)
       const payload = {
         id: editingFieldId || undefined,
@@ -282,21 +291,32 @@ export function CompaniesTable({
       }
       setFieldForm({ name: "", type: "TEXT", options: "", required: false })
       setEditingFieldId(null)
+      setFieldStatus(isEditing ? "Field updated." : "Field added.")
     } catch (err: any) {
+      setFieldStatus("")
       setFieldsError(err?.message || "Failed to save field")
+    } finally {
+      setFieldSaving(false)
     }
   }
 
   const handleArchiveField = async (field: CrmField) => {
     try {
+      setFieldSaving(true)
+      setFieldsError("")
+      setFieldStatus("")
       const res = await fetch(`/api/crm/fields?id=${field.id}`, {
         method: "DELETE",
         headers: { ...getSessionHeaders() },
       })
-      if (!res.ok) throw new Error("Failed to archive field")
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to archive field")
     } catch (err: any) {
+      setFieldStatus("")
       setFieldsError(err?.message || "Failed to archive field")
       return
+    } finally {
+      setFieldSaving(false)
     }
     setFields((prev) => prev.filter((item) => item.id !== field.id))
     const nextOrder = view.order.filter((key) => key !== field.key)
@@ -306,9 +326,12 @@ export function CompaniesTable({
       setEditingFieldId(null)
       setFieldForm({ name: "", type: "TEXT", options: "", required: false })
     }
+    setFieldStatus("Field archived.")
   }
 
   const handleEditField = (field: CrmField) => {
+    setFieldStatus("")
+    setFieldsError("")
     setEditingFieldId(field.id)
     setFieldForm({
       name: field.name,
@@ -319,6 +342,8 @@ export function CompaniesTable({
   }
 
   const cancelEditField = () => {
+    setFieldStatus("")
+    setFieldsError("")
     setEditingFieldId(null)
     setFieldForm({ name: "", type: "TEXT", options: "", required: false })
   }
@@ -559,12 +584,14 @@ export function CompaniesTable({
       />
 
       <Dialog open={fieldDialogOpen} onOpenChange={setFieldDialogOpen}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="flex max-h-[85vh] max-w-4xl flex-col overflow-hidden p-0">
           <DialogHeader>
-            <DialogTitle>Fields & View Settings</DialogTitle>
-            <DialogDescription>Customize the companies table for your team.</DialogDescription>
+            <div className="border-b border-border px-6 pb-4 pt-6">
+              <DialogTitle>Fields & View Settings</DialogTitle>
+              <DialogDescription>Customize the companies table for your team.</DialogDescription>
+            </div>
           </DialogHeader>
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid flex-1 gap-6 overflow-y-auto px-6 py-5 md:grid-cols-2">
             <div className="space-y-4">
               <div className="space-y-1">
                 <h4 className="font-semibold">Add a custom field</h4>
@@ -635,11 +662,11 @@ export function CompaniesTable({
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button onClick={handleCreateField} className="flex-1 min-w-[160px]">
+                  <Button onClick={handleCreateField} className="flex-1 min-w-[160px]" disabled={fieldSaving}>
                     {isEditingField ? "Save field" : "Add field"}
                   </Button>
                   {isEditingField ? (
-                    <Button variant="outline" className="bg-transparent" onClick={cancelEditField}>
+                    <Button variant="outline" className="bg-transparent" onClick={cancelEditField} disabled={fieldSaving}>
                       Cancel
                     </Button>
                   ) : null}
@@ -648,6 +675,7 @@ export function CompaniesTable({
 
               {fieldsLoading && <p className="text-xs text-muted-foreground">Loading custom fields...</p>}
               {fieldsError && <p className="text-xs text-destructive">{fieldsError}</p>}
+              {fieldStatus && <p className="text-xs text-emerald-600 dark:text-emerald-300">{fieldStatus}</p>}
               {!fields.length && !fieldsLoading && (
                 <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
                   <p>No custom fields yet.</p>
@@ -667,7 +695,13 @@ export function CompaniesTable({
                           <p className="text-xs text-muted-foreground">{field.type.toLowerCase()}</p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Button size="sm" variant="outline" className="bg-transparent" onClick={() => handleEditField(field)}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="bg-transparent"
+                            onClick={() => handleEditField(field)}
+                            disabled={fieldSaving}
+                          >
                             Edit
                           </Button>
                           <Button
@@ -675,6 +709,7 @@ export function CompaniesTable({
                             variant="ghost"
                             className="text-destructive"
                             onClick={() => handleArchiveField(field)}
+                            disabled={fieldSaving}
                           >
                             <Archive className="mr-2 h-4 w-4" />
                             Archive

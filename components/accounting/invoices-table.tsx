@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { CheckSquare, Download, Edit, Eye, ExternalLink, Lock, MoreHorizontal, Plus, Trash2, X } from "lucide-react"
+import type { WorkspaceDocumentIdentity } from "@/lib/workspace-context"
 
 type InvoiceLineItem = { description?: string; quantity?: number; unitPrice?: number; amount?: number }
 type InvoiceLink = { label?: string; url: string }
@@ -43,6 +44,7 @@ export interface Invoice {
   approvalStatus?: "pending" | "approved" | "rejected" | null
   date?: string
   dueDate?: string
+  documentIdentity?: WorkspaceDocumentIdentity | null
 }
 
 type RelationOption = { id: string; label: string }
@@ -86,6 +88,7 @@ type Props = {
   showAmounts?: boolean
   canManage?: boolean
   privacyUnlocked?: boolean
+  documentIdentity?: WorkspaceDocumentIdentity | null
 }
 
 const formatNaira = (amount: number) =>
@@ -147,6 +150,7 @@ export function InvoicesTable({
   showAmounts = true,
   canManage = false,
   privacyUnlocked = false,
+  documentIdentity = null,
 }: Props) {
   const [invoices, setInvoices] = useState<Invoice[]>(providedInvoices ?? [])
   const [currentPage, setCurrentPage] = useState(1)
@@ -198,7 +202,11 @@ export function InvoicesTable({
     setEditorError("")
     if (!invoice) {
       setEditingId(null)
-      setFormData(emptyFormData)
+      setFormData({
+        ...emptyFormData,
+        notes: documentIdentity?.defaultInvoiceNotes || "",
+        terms: documentIdentity?.defaultInvoiceTerms || "",
+      })
       setShowModal(true)
       return
     }
@@ -495,6 +503,36 @@ export function InvoicesTable({
         }}
         title={selectedInvoice?.number || "Invoice details"}
         description="Review invoice metadata, linked records, and document links in a readable panel."
+        headerContent={
+          revealSensitive && selectedInvoice ? (
+            <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
+              <div className="flex items-start gap-4">
+                {selectedInvoice.documentIdentity?.logoUrl ? (
+                  <img
+                    src={selectedInvoice.documentIdentity.logoUrl}
+                    alt={`${selectedInvoice.documentIdentity.legalBusinessName || selectedInvoice.documentIdentity.workspaceDisplayName || "Business"} logo`}
+                    className="h-14 w-14 rounded-2xl border border-border/70 object-cover"
+                  />
+                ) : null}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-lg font-semibold">
+                    {selectedInvoice.documentIdentity?.legalBusinessName ||
+                      selectedInvoice.documentIdentity?.workspaceDisplayName ||
+                      "Business identity not configured"}
+                  </p>
+                  {selectedInvoice.documentIdentity?.tradingName ? (
+                    <p className="text-sm text-muted-foreground">Trading as {selectedInvoice.documentIdentity.tradingName}</p>
+                  ) : null}
+                  <div className="mt-2 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+                    {selectedInvoice.documentIdentity?.businessEmail ? <p>{selectedInvoice.documentIdentity.businessEmail}</p> : null}
+                    {selectedInvoice.documentIdentity?.businessPhone ? <p>{selectedInvoice.documentIdentity.businessPhone}</p> : null}
+                    {selectedInvoice.documentIdentity?.businessAddress ? <p className="sm:col-span-2">{selectedInvoice.documentIdentity.businessAddress}</p> : null}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null
+        }
         locked={!revealSensitive}
         lockedTitle="Accounting privacy locked"
         lockedDescription={
@@ -515,6 +553,13 @@ export function InvoicesTable({
                     { label: "Approval", value: selectedInvoice.approvalStatus || "Not requested" },
                     { label: "Invoice date", value: selectedInvoice.date || "—" },
                     { label: "Due date", value: selectedInvoice.dueDate || "—" },
+                    {
+                      label: "Business name",
+                      value:
+                        selectedInvoice.documentIdentity?.legalBusinessName ||
+                        selectedInvoice.documentIdentity?.workspaceDisplayName ||
+                        "Not configured",
+                    },
                     { label: "Notes", value: selectedInvoice.notes || "—" },
                     { label: "Terms", value: selectedInvoice.terms || "—" },
                   ],
@@ -556,6 +601,10 @@ export function InvoicesTable({
                         selectedInvoice.relatedLinks?.length
                           ? selectedInvoice.relatedLinks.map((item) => item.label || item.url).join(", ")
                           : "No related links recorded",
+                    },
+                    {
+                      label: "Payment instructions",
+                      value: selectedInvoice.documentIdentity?.paymentInstructions || "Not configured for this invoice",
                     },
                   ],
                 },
@@ -658,6 +707,20 @@ export function InvoicesTable({
                         </option>
                       ))}
                     </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <div className="rounded-2xl border border-border/70 bg-muted/20 p-4">
+                      <p className="text-sm font-medium">Invoice branding preview</p>
+                      <p className="mt-2 text-lg font-semibold">
+                        {documentIdentity?.legalBusinessName || documentIdentity?.workspaceDisplayName || "Set legal business name first"}
+                      </p>
+                      {documentIdentity?.tradingName ? (
+                        <p className="text-sm text-muted-foreground">Trading as {documentIdentity.tradingName}</p>
+                      ) : null}
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        New or draft invoices use the latest document identity. Already issued invoices keep the identity snapshot used when they were issued.
+                      </p>
+                    </div>
                   </div>
                   <div className="md:col-span-2">
                     <Label className="text-sm font-medium">Invoice notes</Label>

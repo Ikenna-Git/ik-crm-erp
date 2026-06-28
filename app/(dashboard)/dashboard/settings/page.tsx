@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
+import { WorkspaceIdentityManager } from "@/components/workspace/workspace-identity-manager"
 import { addNotification } from "@/lib/notifications"
 import { canViewFounderControls, FOUNDER_SUPER_ADMIN_EMAIL } from "@/lib/authz"
 import {
@@ -788,100 +789,43 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="organization" className="space-y-4">
+          <WorkspaceIdentityManager
+            title="Organization"
+            description="Edit the real company identity for this workspace here. Changes should immediately reflect in the sidebar workspace card and setup flow."
+          />
+
           <Card>
             <CardHeader>
-              <CardTitle>Organization</CardTitle>
-              <CardDescription>Workspace details and team access.</CardDescription>
+              <CardTitle>Invite team</CardTitle>
+              <CardDescription>Invite teammates into this organization with the intended workspace role only.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <Label htmlFor="org-name">Organization name</Label>
-                  <Input
-                    id="org-name"
-                    value={org.name}
-                    onChange={(e) => setOrg({ ...org, name: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="industry">Industry</Label>
-                  <Select
-                    value={org.industry}
-                    onValueChange={(value) => setOrg({ ...org, industry: value })}
-                  >
-                    <SelectTrigger id="industry">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {industries.map((i) => (
-                        <SelectItem key={i} value={i}>
-                          {i}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="org-currency">Base currency</Label>
-                  <Select
-                    value={org.currency}
-                    onValueChange={(value) => setOrg({ ...org, currency: value })}
-                  >
-                    <SelectTrigger id="org-currency">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {currencies.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          {c}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="fiscal">Fiscal year start</Label>
-                  <Input
-                    id="fiscal"
-                    value={org.fiscalYear}
-                    onChange={(e) => setOrg({ ...org, fiscalYear: e.target.value })}
-                  />
-                </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <Input
+                  placeholder="email@example.com"
+                  value={org.inviteEmail}
+                  onChange={(e) => setOrg({ ...org, inviteEmail: e.target.value })}
+                />
+                <Select
+                  value={org.inviteRole}
+                  onValueChange={(value) => setOrg({ ...org, inviteRole: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {inviteRoles.map((r) => (
+                      <SelectItem key={r} value={r}>
+                        {r}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button className="w-full" onClick={handleInvite}>
+                  Send invite
+                </Button>
               </div>
-              <Button className="w-fit" onClick={handleOrgSave}>
-                Save organization
-              </Button>
               {orgStatus ? <p className="text-xs text-muted-foreground">{orgStatus}</p> : null}
-
-              <Separator />
-              <div className="space-y-2">
-                <p className="font-medium">Invite team</p>
-                <div className="grid gap-3 md:grid-cols-3">
-                  <Input
-                    placeholder="email@example.com"
-                    value={org.inviteEmail}
-                    onChange={(e) => setOrg({ ...org, inviteEmail: e.target.value })}
-                  />
-                  <Select
-                    value={org.inviteRole}
-                    onValueChange={(value) => setOrg({ ...org, inviteRole: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {inviteRoles.map((r) => (
-                        <SelectItem key={r} value={r}>
-                          {r}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button className="w-full" onClick={handleInvite}>
-                    Send invite
-                  </Button>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </TabsContent>
